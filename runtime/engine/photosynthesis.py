@@ -313,14 +313,23 @@ def compute_chunk_gpp(
     a_c4 = max(0.0, assimilation_c4(Ca_ppm, par, T_C, wf_mean))
     a_cam = max(0.0, assimilation_cam(Ca_ppm, par, T_C, wf_mean))
 
-    # Build a (CHUNK_SIZE, CHUNK_SIZE) field by indexing the biome mix.
-    for b_int, mix in BIOME_PATHWAY_MIX.items():
-        m = biome == b_int
-        if not m.any():
-            continue
-        c3, c4, cam = mix
+    # If plant_evolution wrote a per-chunk override, prefer it — this is
+    # how AI-driven changes in actual vegetation composition feed back
+    # into measurable GPP without rewriting the biome static table.
+    override = getattr(chunk, "_plant_pathway_mix", None)
+    if override is not None:
+        c3, c4, cam = override
         leaf_rate = c3 * a_c3 + c4 * a_c4 + cam * a_cam
-        gpp[m] = leaf_rate
+        gpp[:] = leaf_rate
+    else:
+        # Build a (CHUNK_SIZE, CHUNK_SIZE) field by indexing the biome mix.
+        for b_int, mix in BIOME_PATHWAY_MIX.items():
+            m = biome == b_int
+            if not m.any():
+                continue
+            c3, c4, cam = mix
+            leaf_rate = c3 * a_c3 + c4 * a_c4 + cam * a_cam
+            gpp[m] = leaf_rate
 
     # Apply per-cell water multiplier.
     gpp *= water_factor

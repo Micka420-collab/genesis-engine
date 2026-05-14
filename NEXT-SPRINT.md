@@ -1,5 +1,53 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 17 — P5 marine + P3 inter-region mergés ; P10 long-run en cours).
+**Dernière mise à jour :** 14 mai 2026 (session 18 — Wave 6 plant evolution : 39 clades + divergence IA).
+
+---
+
+## ✅ Livré session 18 (2026-05-14) — Wave 6 plant evolution
+
+**39 clades végétaux réels** (cyanobactéries → angiospermes) câblés à
+émerger / mourir / se spécier selon les conditions environnementales.
+La trajectoire de l'évolution végétale **diverge selon les choix IA**.
+
+### Modules
+- `engine/plant_catalog.py` (~530 LOC) — catalogue immuable de 39 clades
+  avec phylogénie APG IV, ages d'apparition Earth-réels, enveloppe
+  climatique (T, eau, O2, CO2), affinité biome, traits (hauteur,
+  edibility, wood yield, growth rate).
+- `engine/plant_evolution.py` (~530 LOC) — state + tick + emergence +
+  extinction + speciation + O2 dynamics + persistence.
+
+### Modes
+- `modern` (défaut) : 39 clades seedées dans chunks biome-compatibles.
+- `ancient` : seulement cyanobactéries. O2 monte par photosynthèse,
+  bryophytes émergent quand O2 ≥ 5%, ferns à 15%, angiospermes à 18%.
+
+### Mécaniques scientifiques
+- **C4 grasses ont `max_co2_ppm=600`** (réel : ont évolué quand CO2
+  chuta de 1000→280 ppm il y a 30 Ma). Si IA pompe CO2 à >700 ppm,
+  graminées C4 meurent émergemment.
+- **Spéciation déterministe** via `prf_rng` après 30 sim-jours de
+  présence stable. Variants `oaks_mut_1` etc. avec ±10% perturbation.
+- **Extinction debouncing** 30 sim-jours sans présence globale.
+
+### Couplage photosynthesis
+`chunk._plant_pathway_mix` écrit par plant_evolution est lu en
+priorité par `compute_chunk_gpp`. **L'évolution végétale modifie la
+courbe Farquhar mesurable** → boucle de rétroaction complète.
+
+### Tests
+- `p27_plant_evolution_smoke` **13/13 PASS** (phylogénie acyclique,
+  fitness laws, modern + ancient modes, C4 stress, ADR-0005, déterminisme)
+- Non-régression p18 (9/9), p21, p23, p25 PASS.
+
+Voir `docs/sprints/2026-05-14_PHASE16-PLANT-EVOLUTION.md`.
+
+### Wave 7 (R&D future)
+Catalogue d'animaux (~50 espèces réelles), coévolution plante-animal,
+agriculture par les agents (`ActionKind.PLANT` / `HARVEST`), HUD widget
+plant evolution, overlay `plants` colorant par royaume dominant.
+
+---
 
 ---
 

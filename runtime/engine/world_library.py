@@ -36,10 +36,11 @@ from engine.world_builder import WorldBuilder, World, _BuilderState
 # absent at import time are skipped silently — keeps the persistence
 # system loosely coupled.
 _PERSISTENT_MODULES: Tuple[Tuple[str, str, str], ...] = (
-    ("engine.physiology",     "save_physio_state",   "load_physio_state"),
-    ("engine.photosynthesis", "save_photo_state",    "load_photo_state"),
-    ("engine.material_aging", "save_aging_state",    "load_aging_state"),
-    ("engine.marine",         "save_marine_state",   "load_marine_state"),
+    ("engine.physiology",       "save_physio_state",   "load_physio_state"),
+    ("engine.photosynthesis",   "save_photo_state",    "load_photo_state"),
+    ("engine.material_aging",   "save_aging_state",    "load_aging_state"),
+    ("engine.marine",           "save_marine_state",   "load_marine_state"),
+    ("engine.plant_evolution",  "save_plant_state",    "load_plant_state"),
 )
 
 

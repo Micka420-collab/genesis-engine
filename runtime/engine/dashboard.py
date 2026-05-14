@@ -15,6 +15,7 @@ GET  /api/photosynthesis_state → Wave 4 GPP: global + per-biome kcal/tick, Ca,
 GET  /api/material_aging_state → Wave 4 material aging: alive/destroyed counts, integrity
 GET  /api/marine_state       → Wave 5 marine: tides, currents, plankton/fish/predator totals
 GET  /api/global_world_state → Phase 15 inter-region: attached sims, shared atmosphere, clock, migration count
+GET  /api/plant_evolution_state → Wave 6 plant evolution: 40-clade phylogeny, biomass, speciation, O2
 GET  /api/demography         → lineage tree size, generations, cultures, top progenitors
 GET  /api/agent?row=N        → one-agent detail
 GET  /api/world?cx=&cy=      → one-chunk PNG (legacy)
@@ -70,6 +71,10 @@ try:
     from engine.global_world import GlobalWorld
 except Exception:  # pragma: no cover
     GlobalWorld = None  # type: ignore[assignment]
+try:
+    from engine.plant_evolution import plant_evolution_state
+except Exception:  # pragma: no cover
+    plant_evolution_state = None  # type: ignore[assignment]
 from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 
 
@@ -444,6 +449,10 @@ class _Handler(BaseHTTPRequestHandler):
                 "sims": [], "atmosphere": {}, "clock": {},
                 "migration_count": 0, "migration_fail_count": 0,
             }
+            self._json(200, payload); return
+        if path == "/api/plant_evolution_state":
+            payload = (plant_evolution_state(self.sim_ref)
+                       if plant_evolution_state is not None else {})
             self._json(200, payload); return
         if path == "/api/demography":
             self._json(200, self._demography()); return
