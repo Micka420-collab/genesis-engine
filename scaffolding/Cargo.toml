@@ -5,6 +5,7 @@ resolver = "2"
 members = [
     "crates/ge-core",
     "crates/ge-world",
+    "crates/ge-substrate",
     "crates/ge-agents",
     "crates/ge-cognition",
     "crates/ge-ann",

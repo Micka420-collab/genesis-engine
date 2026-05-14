@@ -1,0 +1,17 @@
+[package]
+name = "ge-substrate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Physical world substrate: voxel data model + reference physics (water, soil, rock)."
+
+[dependencies]
+ge-core = { path = "../ge-core" }
+
+serde.workspace = true
+rkyv.workspace = true
+glam.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
