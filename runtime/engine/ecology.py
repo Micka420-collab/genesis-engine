@@ -21,6 +21,7 @@ from typing import Dict, Tuple
 import numpy as np
 
 from engine.materials import MaterialKind, MATERIALS
+from engine.world import invalidate_resource_masks
 
 
 # Earth's pre-industrial baseline (Holocene mean).
@@ -160,3 +161,4 @@ def apply_climate_feedback(chunk, atm: Atmosphere) -> None:
     if atm.sea_level_rise_m > 1.0:
         flood_mask = chunk.height < (1.0 + atm.sea_level_rise_m)
         chunk.water[flood_mask] = np.maximum(chunk.water[flood_mask], 200.0)
+        invalidate_resource_masks(chunk)

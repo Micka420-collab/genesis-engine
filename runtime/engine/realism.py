@@ -49,7 +49,8 @@ import numpy as np
 
 from engine.core import prf_rng
 from engine.world import (Biome, CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M,
-                          world_to_cell, world_to_chunk)
+                          invalidate_resource_masks, world_to_cell,
+                          world_to_chunk)
 
 
 # Taxonomy — see ADR 0005.
@@ -137,6 +138,7 @@ def _ensure_hydrology(sim, coord: Tuple[int, int, int]
     if f.river_mask.any():
         chunk.water[f.river_mask] = np.maximum(
             chunk.water[f.river_mask], 200.0)
+        invalidate_resource_masks(chunk)
     return f
 
 

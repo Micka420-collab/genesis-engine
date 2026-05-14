@@ -12,7 +12,7 @@ from engine.spatial import SpatialGrid
 from engine.world import (Biome, CHUNK_SIDE_M, CHUNK_SIZE, ChunkStreamer,
                           VOXEL_SIZE_M, _stable_bytes_sig, biome_npp,
                           biome_habitability, world_to_chunk, world_to_cell,
-                          chunks_around)
+                          chunks_around, invalidate_resource_masks)
 
 
 PERCEPTION_RADIUS_M = 60.0
@@ -186,22 +186,65 @@ def evict_cell_grid_cache(keys):
         _CACHED_CELL_GRID.pop(k, None)
 
 
+def _chunk_resource_masks(chunk):
+    """Return cached resource masks + presence flags, recomputing only
+    when invalidated.
+
+    Tuple shape : ``(water_mask, food_mask, shelter_mask,
+    has_water, has_food, has_shelter)`` — the three masks are
+    ``(64, 64) bool`` arrays, the three flags are Python ``bool``
+    (computed once on cache fill so per-call ``.any()`` checks become
+    O(1) attribute reads).
+
+    The cache is invalidated by ``engine.world.invalidate_resource_masks``
+    which **must** be called from every site that mutates ``chunk.water``,
+    ``chunk.food_kcal``, ``chunk.wood``, ``chunk.stone`` or
+    ``chunk.height``. Stale masks would break bit-perfect determinism
+    when a mid-tick DRINK/FORAGE crosses the resource threshold.
+    """
+    cached = chunk._mask_cache
+    if cached is not None:
+        return cached
+    water_mask = chunk.water > np.float32(5.0)
+    food_mask = chunk.food_kcal > np.float32(5.0)
+    shelter_mask = (
+        (chunk.wood > np.float32(30.0))
+        | ((chunk.stone > np.float32(25.0))
+           & (chunk.height > np.float32(800.0)))
+    )
+    has_water = bool(water_mask.any())
+    has_food = bool(food_mask.any())
+    has_shelter = bool(shelter_mask.any())
+    entry = (water_mask, food_mask, shelter_mask,
+             has_water, has_food, has_shelter)
+    chunk._mask_cache = entry
+    return entry
+
+
 def _scan_chunk(chunk, px, py, radius_m, out, tick=None):
     """Find the nearest water / food / shelter cell in ``chunk``.
 
-    Dense vectorised path (optim #3b, sprint 2026-05-14 session 11) :
-    computes the single 64×64 ``d2`` array once and reuses it for all three
-    resources. The earlier ``np.nonzero`` + fancy-indexing path looked
-    cheaper on paper but was measured 2.4× slower per call on the Léman
-    workload (lac → ~12 % of cells pass the water threshold, so the sparse
-    arrays are still hundreds of elements and the fancy-indexing allocation
-    cost dominates). The ``tick`` argument is kept for API compatibility
-    but is no longer consulted (no per-tick scratch state).
+    Dense vectorised path (optim #3c+, sprint 2026-05-14 session 12).
+
+    Threshold masks + presence flags per chunk are cached between
+    writes via ``_chunk_resource_masks``; the ``(px, py)``-dependent
+    distance array ``d2`` is built once per call and shared across the
+    three resources. The ``tick`` argument is kept for API compatibility
+    but is no longer consulted — write-site invalidation drives cache
+    coherence.
 
     Determinism : ``np.argmin`` on a 4096-flat ``np.where(mask, d2, inf)``
-    picks the same row-major tie-break as the previous implementation, so
-    SHA-256 of the agents snapshot stays bit-identical across runs.
+    picks the same row-major tie-break as before, so SHA-256 of the
+    agent snapshot stays bit-identical across runs same seed.
     """
+    (water_mask, food_mask, shelter_mask,
+     has_water, has_food, has_shelter) = _chunk_resource_masks(chunk)
+    # Cheapest gate first : if no resource exists anywhere in the chunk,
+    # skip the d2 work entirely. The flags are cached Python bools so
+    # this is a 3-op short-circuit, no ``.any()`` reduction here.
+    if not (has_water or has_food or has_shelter):
+        return
+
     XX, YY = _chunk_cell_world_xy(chunk)
     dx = XX - np.float32(px)
     dy = YY - np.float32(py)
@@ -211,44 +254,44 @@ def _scan_chunk(chunk, px, py, radius_m, out, tick=None):
     if not in_r.any():
         return
 
-    water_mask = in_r & (chunk.water > np.float32(5.0))
-    if water_mask.any():
-        d2m = np.where(water_mask, d2, np.float32(np.inf))
-        flat_idx = int(np.argmin(d2m))
-        ay, ax = divmod(flat_idx, d2.shape[1])
-        dist = float(math.sqrt(float(d2[ay, ax])))
-        cur = out.get("water")
-        if cur is None or dist < cur.distance:
-            out["water"] = PerceivedTarget(
-                "water", float(XX[ay, ax]), float(YY[ay, ax]), dist,
-                float(chunk.water[ay, ax]))
+    if has_water:
+        m = in_r & water_mask
+        if m.any():
+            d2m = np.where(m, d2, np.float32(np.inf))
+            flat_idx = int(np.argmin(d2m))
+            ay, ax = divmod(flat_idx, d2.shape[1])
+            dist = float(math.sqrt(float(d2[ay, ax])))
+            cur = out.get("water")
+            if cur is None or dist < cur.distance:
+                out["water"] = PerceivedTarget(
+                    "water", float(XX[ay, ax]), float(YY[ay, ax]), dist,
+                    float(chunk.water[ay, ax]))
 
-    food_mask = in_r & (chunk.food_kcal > np.float32(5.0))
-    if food_mask.any():
-        d2m = np.where(food_mask, d2, np.float32(np.inf))
-        flat_idx = int(np.argmin(d2m))
-        ay, ax = divmod(flat_idx, d2.shape[1])
-        dist = float(math.sqrt(float(d2[ay, ax])))
-        cur = out.get("food")
-        if cur is None or dist < cur.distance:
-            out["food"] = PerceivedTarget(
-                "food", float(XX[ay, ax]), float(YY[ay, ax]), dist,
-                float(chunk.food_kcal[ay, ax]))
+    if has_food:
+        m = in_r & food_mask
+        if m.any():
+            d2m = np.where(m, d2, np.float32(np.inf))
+            flat_idx = int(np.argmin(d2m))
+            ay, ax = divmod(flat_idx, d2.shape[1])
+            dist = float(math.sqrt(float(d2[ay, ax])))
+            cur = out.get("food")
+            if cur is None or dist < cur.distance:
+                out["food"] = PerceivedTarget(
+                    "food", float(XX[ay, ax]), float(YY[ay, ax]), dist,
+                    float(chunk.food_kcal[ay, ax]))
 
-    shelter_mask = in_r & (
-        (chunk.wood > np.float32(30.0))
-        | ((chunk.stone > np.float32(25.0)) & (chunk.height > np.float32(800.0)))
-    )
-    if shelter_mask.any():
-        d2m = np.where(shelter_mask, d2, np.float32(np.inf))
-        flat_idx = int(np.argmin(d2m))
-        ay, ax = divmod(flat_idx, d2.shape[1])
-        dist = float(math.sqrt(float(d2[ay, ax])))
-        cur = out.get("shelter")
-        if cur is None or dist < cur.distance:
-            out["shelter"] = PerceivedTarget(
-                "shelter", float(XX[ay, ax]), float(YY[ay, ax]), dist,
-                float(chunk.wood[ay, ax] + chunk.stone[ay, ax]))
+    if has_shelter:
+        m = in_r & shelter_mask
+        if m.any():
+            d2m = np.where(m, d2, np.float32(np.inf))
+            flat_idx = int(np.argmin(d2m))
+            ay, ax = divmod(flat_idx, d2.shape[1])
+            dist = float(math.sqrt(float(d2[ay, ax])))
+            cur = out.get("shelter")
+            if cur is None or dist < cur.distance:
+                out["shelter"] = PerceivedTarget(
+                    "shelter", float(XX[ay, ax]), float(YY[ay, ax]), dist,
+                    float(chunk.wood[ay, ax] + chunk.stone[ay, ax]))
 
 
 @dataclass
@@ -488,6 +531,7 @@ def apply_decision(agents, row, decision, streamer, tick):
         avail = float(chunk.water[cy, cx])
         consumed = min(avail, 5.0)
         chunk.water[cy, cx] = avail - consumed
+        invalidate_resource_masks(chunk)
         if consumed > 0:
             agents.thirst[row] = max(0.0, float(agents.thirst[row]) - DRINK_RELIEF * (consumed / 5.0))
             agents.inv_water[row] = min(float(agents.inv_water[row]) + 0.5, 2.0)
@@ -514,6 +558,7 @@ def apply_decision(agents, row, decision, streamer, tick):
         skill = 0.5 + 0.25 * float(agents.intelligence[row]) + 0.25 * float(agents.conscientiousness[row])
         extracted = min(avail, FORAGE_RATE * skill)
         chunk.food_kcal[cy, cx] = avail - extracted
+        invalidate_resource_masks(chunk)
         cap_left = max(0.0, float(agents.inv_capacity_kg[row]) - _inventory_mass(agents, row))
         added = min(extracted / FORAGE_KCAL_PER_KG, cap_left)
         agents.inv_food[row] += added

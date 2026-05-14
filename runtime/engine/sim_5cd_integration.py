@@ -44,7 +44,8 @@ from engine.materials import MaterialKind
 from engine.tech_tree import (NUM_TECHS, TECHS, TechKind, can_discover,
                               discovery_probability, transmission_probability)
 from engine.values import evolve_value, free_will_override
-from engine.world import Biome, CHUNK_SIDE_M, world_to_cell, world_to_chunk
+from engine.world import (Biome, CHUNK_SIDE_M, invalidate_resource_masks,
+                          world_to_cell, world_to_chunk)
 
 
 # ---------------------------------------------------------------------------
@@ -538,6 +539,7 @@ def tick_material_forage(sim) -> None:
         if local_wood > 0.0 and hasattr(agents, "inv_wood"):
             agents.inv_wood[row] += wood_kg
             chunk.wood[cy, cx] = max(0.0, local_wood - wood_kg)
+            invalidate_resource_masks(chunk)
         # Fiber — universal, but slow to gather.
         if hasattr(agents, "inv_fiber"):
             agents.inv_fiber[row] += FORAGE_FIBER_KG * accel_factor
@@ -551,6 +553,7 @@ def tick_material_forage(sim) -> None:
         if local_stone > 0.0 and hasattr(agents, "inv_stone"):
             agents.inv_stone[row] += stone_kg
             chunk.stone[cy, cx] = max(0.0, local_stone - stone_kg)
+            invalidate_resource_masks(chunk)
         # Flint — probabilistic find when there's stone nearby.
         if (local_stone > 0.5 and hasattr(agents, "inv_flint")
                 and rng.random() < FORAGE_FLINT_PROB * accel_factor):

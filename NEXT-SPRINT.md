@@ -1,5 +1,36 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 11 — P-NEW.17 re-profile + optim #3b regression-fix).
+**Dernière mise à jour :** 14 mai 2026 (session 12 — P-NEW.21 path (b) mask cache + flag cache).
+
+---
+
+## ✅ Livré session 12 (2026-05-14) — P-NEW.21 path (b) mask cache + flag cache
+
+`_scan_chunk` descend de **54 µs → 40 µs per-call** (−26 %). Total 300
+ticks à pop=175 : **63.1 s** (vs 69.3 s post optim #3b, −9 %). Vs
+baseline pré-optim 72.0 s : **−12.4 %**. Cible <60 s manquée de 3.1 s
+mais on touche le plancher numpy pratique.
+
+**Mécanisme** : cache de 3 masques bool par chunk (`water > 5`,
+`food > 5`, `shelter`) + 3 flags `has_*` (bool Python cachés), avec
+invalidation explicite via `invalidate_resource_masks(chunk)` aux 10
+sites de mutation (DRINK/FORAGE, regen, sim_lift veg/erosion,
+sim_5cd wood/stone harvest, ecology flood, realism river inject).
+
+**Déterminisme** : SHA-256 bit-identique avec la version pré-cache
+(`5ea89da1466e4c318766e74e81a2ef2a`).
+
+Voir `docs/sprints/2026-05-14_PHASE8-MASK-CACHE.md`.
+
+### ~~P-NEW.21 path (b) ✅~~ Mask cache + flag cache — livré.
+
+### P-NEW.21 path (a) (toujours actif) — Batch perceive
+Partager `d2` entre les agents d'un même chunk pour gagner ~5s
+supplémentaires. Plancher restant à briser pour <60s.
+
+### P-NEW.21 path (c) (R&D) — Réécriture cython/numba de `_scan_chunk`
+Demande l'ajout d'une toolchain. Gain estimé −15s, mais coût build.
+
+---
 
 ---
 

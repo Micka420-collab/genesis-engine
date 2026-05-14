@@ -38,7 +38,8 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 
 from engine.core import prf_rng
-from engine.world import (Biome, CHUNK_SIDE_M, CHUNK_SIZE, world_to_cell,
+from engine.world import (Biome, CHUNK_SIDE_M, CHUNK_SIZE,
+                          invalidate_resource_masks, world_to_cell,
                           world_to_chunk)
 
 
@@ -250,6 +251,7 @@ def tick_vegetation(sim) -> None:
         multiplier = veg_mult[np.clip(veg.astype(np.int32), 0, 4)]
         target = wood_base_lookup[biome_clipped] * multiplier
         chunk.wood[:] = 0.85 * chunk.wood + 0.15 * target
+        invalidate_resource_masks(chunk)
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +302,7 @@ def tick_erosion(sim, *, agent_pass_intensity: float = 0.005) -> None:
             chunk.food_capacity[cy, cx] *= 0.99  # gentle decay per pass
         if field_obj.ravine_depth[cy, cx] > 0.6:
             chunk.wood[cy, cx] *= 0.98
+            invalidate_resource_masks(chunk)
 
 
 # ---------------------------------------------------------------------------

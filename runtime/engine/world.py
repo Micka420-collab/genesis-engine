@@ -246,6 +246,26 @@ class Chunk:
     food_capacity: np.ndarray     # max kcal/cell (cached)
     content_root: bytes
 
+    def __post_init__(self):
+        # Per-chunk read caches consumed by engine.cognition._scan_chunk
+        # (optim #3c, sprint 2026-05-14 session 12). Any code path that
+        # mutates ``water``, ``food_kcal``, ``wood``, ``stone`` or
+        # ``height`` MUST call ``invalidate_resource_masks(chunk)`` so
+        # the cached bool masks stay consistent and determinism holds.
+        self._mask_cache = None  # ``(water_mask, food_mask, shelter_mask)`` or None
+
+
+def invalidate_resource_masks(chunk: "Chunk") -> None:
+    """Drop the chunk's cached resource bool masks.
+
+    Call from any site that mutates the chunk's ``water``, ``food_kcal``,
+    ``wood``, ``stone``, or ``height`` arrays. The cached masks are
+    consumed by ``engine.cognition._scan_chunk`` and reused across all
+    agents perceiving the same chunk within a tick; mid-tick writes must
+    bust the cache to preserve bit-perfect determinism.
+    """
+    chunk._mask_cache = None
+
 
 def generate_chunk(seed: int, coord: Tuple[int, int, int], params: TerrainParams) -> Chunk:
     cx, cy, cz = coord
@@ -418,6 +438,7 @@ def regenerate_chunk_resources(chunk, weather, dt_s: float = 1.0) -> None:
         weather: a Weather record (provides `rain_mm_h`).
         dt_s: simulated seconds elapsed since last call.
     """
+    mutated = False
     try:
         if hasattr(chunk, "food_kcal") and hasattr(chunk, "food_capacity"):
             # Regrowth fraction per day toward carrying capacity.
@@ -425,10 +446,14 @@ def regenerate_chunk_resources(chunk, weather, dt_s: float = 1.0) -> None:
             delta = (chunk.food_capacity - chunk.food_kcal) * (growth_per_s * dt_s)
             chunk.food_kcal[:] = chunk.food_kcal + delta
             chunk.food_kcal[:] = chunk.food_kcal.clip(min=0.0)
+            mutated = True
         if hasattr(chunk, "water") and hasattr(weather, "rain_mm_h"):
             # 1 mm/h rain on 1 m^2 = 1 L/h -> ~0.000278 L/s, with simple cap.
             recharge = max(0.0, float(weather.rain_mm_h)) * dt_s / 3600.0
             chunk.water[:] = (chunk.water + recharge).clip(min=0.0)
+            mutated = True
     except Exception:
         # Never let this break the tick loop.
         pass
+    if mutated:
+        invalidate_resource_masks(chunk)
