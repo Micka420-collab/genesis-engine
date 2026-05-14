@@ -1,0 +1,1226 @@
+<!doctype html>
+<html lang="fr"><head>
+<meta charset="utf-8">
+<title>Genesis Engine — God View v2</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { background: #0a0d12; color: #d8dee9; font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; }
+.app { display: grid; grid-template-columns: 1fr 320px; height: 100vh; }
+.viewport { position: relative; background: #000; overflow: hidden; }
+#worldImg { position: absolute; image-rendering: pixelated; user-select: none; pointer-events: none; }
+#agentLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.sidebar { background: #0e1116; border-left: 1px solid #1f2530; padding: 14px 16px; overflow-y: auto; }
+.hud { position: absolute; pointer-events: none; }
+.hud.tl { top: 12px; left: 12px; }
+.hud.tr { top: 12px; right: 12px; }
+.hud.bl { bottom: 12px; left: 12px; }
+.hud.br { bottom: 12px; right: 12px; }
+.pill { background: rgba(14,17,22,0.85); border: 1px solid #1f2530; border-radius: 999px; padding: 4px 10px; font-size: 11px; color: #88c0d0; backdrop-filter: blur(6px); margin-right: 6px; pointer-events: auto; display: inline-block; }
+.pill button { background: transparent; border: none; color: inherit; font: inherit; cursor: pointer; padding: 0 4px; }
+.pill button:hover { color: #eceff4; }
+.toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.modepill { background: rgba(14,17,22,0.85); border: 1px solid #1f2530; border-radius: 6px; padding: 3px 4px; pointer-events: auto; display: inline-flex; gap: 2px; }
+.modepill button { background: transparent; color: #6e7888; border: 1px solid transparent; padding: 3px 8px; border-radius: 3px; font: inherit; font-size: 10px; cursor: pointer; }
+.modepill button:hover { color: #eceff4; }
+.modepill button.active { background: #2a3140; color: #ebcb8b; border-color: #3a4250; }
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+.kpi { background: #161b22; padding: 6px 10px; border-radius: 4px; border-left: 2px solid #88c0d0; }
+.kpi .label { color: #6e7888; font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; }
+.kpi .value { color: #eceff4; font-size: 16px; font-weight: 600; }
+.section-title { color: #88c0d0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin: 12px 0 6px 0; border-bottom: 1px solid #1f2530; padding-bottom: 4px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.tabs button { background: #1a1f28; color: #a0aaba; border: 1px solid #2a3140; padding: 4px 8px; border-radius: 3px; font-family: inherit; font-size: 10px; cursor: pointer; }
+.tabs button.active { background: #2a3140; color: #88c0d0; }
+.agent-list, .group-list, .events { font-size: 11px; max-height: 180px; overflow-y: auto; }
+.row { padding: 3px 4px; border-bottom: 1px solid #1a1f28; cursor: pointer; display: grid; grid-template-columns: 30px 1fr 60px; gap: 4px; align-items: center; }
+.row:hover { background: #161b22; }
+.row.selected { background: #2a3140; }
+.bar { background: #1a1f28; height: 4px; border-radius: 2px; overflow: hidden; margin: 2px 0 4px 0; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #5e81ac, #88c0d0); }
+.bar-fill.danger { background: linear-gradient(90deg, #d08770, #bf616a); }
+.help { position: absolute; right: 12px; bottom: 12px; background: rgba(14,17,22,0.92); border: 1px solid #1f2530; border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #a0aaba; line-height: 1.5; max-width: 280px; }
+.help b { color: #88c0d0; }
+.help kbd { background: #1a1f28; border: 1px solid #2a3140; padding: 1px 4px; border-radius: 3px; color: #d8dee9; font-size: 10px; }
+#minimap { background: #0a0d12; border: 1px solid #1f2530; }
+.event-line { padding: 2px 0; font-size: 10px; }
+.event-line.birth { color: #a3be8c; }
+.event-line.death { color: #bf616a; }
+.event-line.fight, .event-line.conflict { color: #d08770; }
+.event-line.share { color: #88c0d0; }
+.event-line.mating { color: #b48ead; }
+.event-line.vocalization { color: #ebcb8b; }
+.event-line.group_formed { color: #88c0d0; font-weight: bold; }
+.event-line.competition { color: #6e7888; }
+#agentDetail { background: #161b22; padding: 8px; margin-top: 8px; font-size: 11px; border-radius: 4px; min-height: 100px; }
+#replayBar {
+  position: absolute; left: 12px; right: 12px; bottom: 12px;
+  background: rgba(14,17,22,0.92); border: 1px solid #2a3140; border-radius: 8px;
+  padding: 8px 12px; pointer-events: auto; display: none;
+  color: #a0aaba; font-size: 11px;
+}
+#replayBar .rrow { display: flex; align-items: center; gap: 10px; }
+#replayBar button { background: #2a3140; color: #ebcb8b; border: 1px solid #3a4250; padding: 3px 8px; border-radius: 4px; cursor: pointer; font: inherit; font-size: 11px; }
+#replayBar button:hover { background: #3a4250; }
+#replayBar input[type=range] { flex: 1; accent-color: #ebcb8b; }
+</style></head>
+<body>
+
+<div class="app">
+  <div class="viewport" id="viewport">
+    <img id="worldImg" alt="">
+    <canvas id="agentLayer"></canvas>
+
+    <div class="hud tl">
+      <div class="toolbar">
+        <span class="pill" id="statusPill">connecting…</span>
+        <span class="pill" id="tickPill">tick —</span>
+        <span class="pill" id="aliveePill">pop —</span>
+        <span class="modepill" id="modeSelector">
+          <button data-mode="TOP_DOWN" class="active" title="top-down (god)">TD</button>
+          <button data-mode="FIRST_PERSON" title="first-person from god">1P</button>
+          <button data-mode="THIRD_PERSON" title="third-person behind god">3P</button>
+          <button data-mode="AGENT_SHOULDER" title="agent shoulder cam">AS</button>
+          <button data-mode="REPLAY" title="replay timeline">RP</button>
+        </span>
+      </div>
+    </div>
+
+    <div class="hud tr">
+      <div class="toolbar">
+        <span class="pill"><button id="btnPause">⏸ pause</button></span>
+        <span class="pill"><button id="btnStep">⏯ step</button></span>
+        <span class="pill"><button id="btnSpeed05">0.5×</button> <button id="btnSpeed1">1×</button> <button id="btnSpeed2">2×</button> <button id="btnSpeed5">5×</button> <button id="btnSpeedMax">max</button></span>
+        <span class="pill" id="speedPill">speed 1.0×</span>
+      </div>
+    </div>
+
+    <div class="hud bl">
+      <div class="toolbar">
+        <span class="pill" id="zoomPill">zoom 1.0× • center (0, 0)</span>
+        <span class="pill" id="followPill" style="display:none">following agent —</span>
+        <span class="pill" id="camPill">cam TOP_DOWN</span>
+      </div>
+    </div>
+
+    <div class="help">
+      <b>Navigation</b><br>
+      <kbd>drag</kbd> pan • <kbd>wheel</kbd> zoom • <kbd>V</kbd> cycle cam • <kbd>F</kbd> follow • <kbd>Esc</kbd> unfollow<br>
+      <kbd>Space</kbd> play/pause • <kbd>S</kbd> step • <kbd>1–5</kbd> vitesse • <kbd>R</kbd> recenter
+    </div>
+
+    <div class="hud br" style="bottom: 110px; right: 12px;">
+      <canvas id="minimap" width="180" height="120"></canvas>
+    </div>
+
+    <div id="replayBar">
+      <div class="rrow">
+        <button id="rpPlay">▶</button>
+        <span id="rpInfo">tick — / —</span>
+        <input type="range" id="rpSlider" min="0" max="0" value="0" step="1">
+        <button id="rpExit">exit replay</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="kpis">
+      <div class="kpi"><div class="label">tick</div><div class="value" id="kpiTick">—</div></div>
+      <div class="kpi"><div class="label">alive</div><div class="value" id="kpiAlive">—</div></div>
+      <div class="kpi"><div class="label">births</div><div class="value" id="kpiBirths">—</div></div>
+      <div class="kpi"><div class="label">deaths</div><div class="value" id="kpiDeaths">—</div></div>
+      <div class="kpi"><div class="label">events</div><div class="value" id="kpiEvents">—</div></div>
+      <div class="kpi"><div class="label">TPS</div><div class="value" id="kpiTps">—</div></div>
+    </div>
+
+    <div class="section-title">Vue</div>
+    <div class="tabs">
+      <button class="active" data-view="biome">biome</button>
+      <button data-view="culture">culture</button>
+      <button data-view="group">groupe</button>
+      <button data-view="action">action</button>
+      <button data-view="hunger">faim</button>
+    </div>
+
+    <div class="section-title">Agents <span style="color:#6e7888">(click pour suivre)</span></div>
+    <div class="agent-list" id="agentList"></div>
+
+    <div class="section-title">Groupes</div>
+    <div class="group-list" id="groupList">—</div>
+
+    <div class="section-title">Agent sélectionné</div>
+    <div id="agentDetail">aucun agent sélectionné.</div>
+
+    <div class="section-title">Événements récents</div>
+    <div class="events" id="events">—</div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+const API = "";
+let view = 'biome';
+let selectedRow = null;
+let followingRow = null;
+let lastAgents = [];
+let lastSnap = null;
+let lastMetrics = null;
+let lastGroups = [];
+
+// Camera modes
+const MODES = ['TOP_DOWN', 'FIRST_PERSON', 'THIRD_PERSON', 'AGENT_SHOULDER', 'REPLAY'];
+let camMode = 'TOP_DOWN';
+
+// God avatar state
+let godState = null;          // {pos:[x,y], heading:rad, visible:bool} or null
+let godAvailable = true;      // false if /api/god/state 404s
+
+// Replay state
+let replayEvents = [];        // cached events for scrubbing
+let replayActive = false;
+let replayTick = 0;
+let replayMinTick = 0, replayMaxTick = 0;
+let replayPlaying = false;
+let replayPlayTimer = null;
+
+// Camera: world bbox shown on viewport (TOP_DOWN)
+let camCenterX = 0, camCenterY = 0;
+let camZoom = 1.0;  // world units per pixel - lower = more zoomed in
+let dragging = false, dragStartX = 0, dragStartY = 0, camStartX = 0, camStartY = 0;
+let imgLoading = false;
+let lastImgRequest = "";
+
+const viewport = document.getElementById('viewport');
+const worldImg = document.getElementById('worldImg');
+const agentLayer = document.getElementById('agentLayer');
+const aCtx = agentLayer.getContext('2d');
+const minimap = document.getElementById('minimap');
+const mCtx = minimap.getContext('2d');
+
+function vpSize() { return { w: viewport.clientWidth, h: viewport.clientHeight }; }
+
+function worldBbox() {
+  const { w, h } = vpSize();
+  const halfW = (w / 2) * camZoom;
+  const halfH = (h / 2) * camZoom;
+  return { xmin: camCenterX - halfW, ymin: camCenterY - halfH,
+           xmax: camCenterX + halfW, ymax: camCenterY + halfH };
+}
+
+function worldToScreen(wx, wy) {
+  const { w, h } = vpSize();
+  return { x: (wx - camCenterX) / camZoom + w / 2,
+           y: (wy - camCenterY) / camZoom + h / 2 };
+}
+
+function screenToWorld(sx, sy) {
+  const { w, h } = vpSize();
+  return { x: (sx - w / 2) * camZoom + camCenterX,
+           y: (sy - h / 2) * camZoom + camCenterY };
+}
+
+function resizeCanvas() {
+  const { w, h } = vpSize();
+  agentLayer.width = w; agentLayer.height = h;
+}
+window.addEventListener('resize', () => { resizeCanvas(); requestRender(); });
+resizeCanvas();
+
+// ---------------------------------------------------------------------------
+// Camera controls (only meaningful in TOP_DOWN)
+// ---------------------------------------------------------------------------
+viewport.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (camMode !== 'TOP_DOWN') return;
+  dragging = true; dragStartX = e.clientX; dragStartY = e.clientY;
+  camStartX = camCenterX; camStartY = camCenterY;
+  followingRow = null; updateFollowPill();
+  viewport.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
+  camCenterX = camStartX - dx * camZoom;
+  camCenterY = camStartY - dy * camZoom;
+  updateZoomPill();
+  requestRender();
+});
+window.addEventListener('mouseup', () => { dragging = false; viewport.style.cursor = ''; });
+
+viewport.addEventListener('wheel', (e) => {
+  if (camMode !== 'TOP_DOWN') return;
+  e.preventDefault();
+  const rect = viewport.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const worldBefore = screenToWorld(mx, my);
+  const factor = Math.exp(e.deltaY * 0.001);
+  camZoom = Math.max(0.05, Math.min(40, camZoom * factor));
+  const worldAfter = screenToWorld(mx, my);
+  camCenterX += worldBefore.x - worldAfter.x;
+  camCenterY += worldBefore.y - worldAfter.y;
+  updateZoomPill();
+  requestRender();
+}, { passive: false });
+
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+  else if (e.code === 'KeyS') { stepOnce(); }
+  else if (e.code === 'KeyF') { followSelected(); }
+  else if (e.code === 'KeyV') { cycleCamMode(); }
+  else if (e.code === 'Escape') { followingRow = null; updateFollowPill(); }
+  else if (e.code === 'KeyR') { recenterOnAgents(); }
+  else if (e.code === 'Digit1') { setSpeed(0.5); }
+  else if (e.code === 'Digit2') { setSpeed(1); }
+  else if (e.code === 'Digit3') { setSpeed(2); }
+  else if (e.code === 'Digit4') { setSpeed(5); }
+  else if (e.code === 'Digit5') { setSpeed(20); }
+});
+
+function updateZoomPill() {
+  document.getElementById('zoomPill').textContent =
+    `zoom ${(1 / camZoom).toFixed(2)}× • centre (${camCenterX.toFixed(0)}, ${camCenterY.toFixed(0)})`;
+}
+function updateFollowPill() {
+  const pill = document.getElementById('followPill');
+  if (followingRow !== null) {
+    pill.style.display = '';
+    pill.textContent = `following agent ${followingRow}`;
+  } else { pill.style.display = 'none'; }
+}
+function updateCamPill() {
+  document.getElementById('camPill').textContent = `cam ${camMode}`;
+  document.querySelectorAll('#modeSelector button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === camMode);
+  });
+}
+
+function recenterOnAgents() {
+  if (!lastAgents.length) return;
+  let minX=1e9, maxX=-1e9, minY=1e9, maxY=-1e9;
+  lastAgents.forEach(a => {
+    minX = Math.min(minX, a.pos[0]); maxX = Math.max(maxX, a.pos[0]);
+    minY = Math.min(minY, a.pos[1]); maxY = Math.max(maxY, a.pos[1]);
+  });
+  camCenterX = (minX + maxX) / 2; camCenterY = (minY + maxY) / 2;
+  const { w, h } = vpSize();
+  const padding = 120;
+  camZoom = Math.max((maxX - minX + padding) / w, (maxY - minY + padding) / h, 0.1);
+  updateZoomPill(); requestRender();
+}
+
+function followSelected() {
+  if (selectedRow !== null) { followingRow = selectedRow; updateFollowPill(); }
+}
+
+// ---------------------------------------------------------------------------
+// Camera mode switching
+// ---------------------------------------------------------------------------
+function setCamMode(mode) {
+  if (!MODES.includes(mode)) return;
+  camMode = mode;
+  updateCamPill();
+  // Replay UI
+  const replayBar = document.getElementById('replayBar');
+  if (mode === 'REPLAY') {
+    replayBar.style.display = '';
+    replayActive = true;
+    loadReplayEvents();
+  } else {
+    replayBar.style.display = 'none';
+    replayActive = false;
+    stopReplayPlayback();
+  }
+  // In non-TOP_DOWN modes, terrain image is hidden (we draw our own background)
+  worldImg.style.display = (mode === 'TOP_DOWN') ? '' : 'none';
+  requestRender();
+}
+function cycleCamMode() {
+  const idx = MODES.indexOf(camMode);
+  setCamMode(MODES[(idx + 1) % MODES.length]);
+}
+document.querySelectorAll('#modeSelector button').forEach(b => {
+  b.addEventListener('click', () => setCamMode(b.dataset.mode));
+});
+
+// ---------------------------------------------------------------------------
+// View tabs
+// ---------------------------------------------------------------------------
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  view = b.dataset.view;
+  drawAgents();
+}));
+
+// ---------------------------------------------------------------------------
+// Control
+// ---------------------------------------------------------------------------
+async function togglePause() {
+  const s = await (await fetch(API + '/api/control')).json();
+  await postCtl(s.paused ? 'play' : 'pause');
+}
+async function stepOnce() { await postCtl('step'); }
+async function setSpeed(v) { await postCtl('speed', v); }
+async function postCtl(action, speed) {
+  const r = await fetch(API + '/api/control', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action, speed})
+  });
+  const s = await r.json();
+  document.getElementById('speedPill').textContent = `${s.paused ? 'paused' : 'playing'} ${s.speed.toFixed(1)}×`;
+  document.getElementById('btnPause').textContent = s.paused ? '▶ play' : '⏸ pause';
+}
+document.getElementById('btnPause').addEventListener('click', togglePause);
+document.getElementById('btnStep').addEventListener('click', stepOnce);
+document.getElementById('btnSpeed05').addEventListener('click', () => setSpeed(0.5));
+document.getElementById('btnSpeed1').addEventListener('click', () => setSpeed(1));
+document.getElementById('btnSpeed2').addEventListener('click', () => setSpeed(2));
+document.getElementById('btnSpeed5').addEventListener('click', () => setSpeed(5));
+document.getElementById('btnSpeedMax').addEventListener('click', () => setSpeed(20));
+
+// ---------------------------------------------------------------------------
+// Rendering — terrain image via /api/render, agents via canvas
+// ---------------------------------------------------------------------------
+let renderTimer = null;
+function requestRender() {
+  if (renderTimer) clearTimeout(renderTimer);
+  renderTimer = setTimeout(() => { if (camMode === 'TOP_DOWN') loadTerrain(); }, 50);
+  drawAgents();
+}
+
+function loadTerrain() {
+  if (imgLoading) return;
+  if (camMode !== 'TOP_DOWN') return;
+  const { w, h } = vpSize();
+  const bbox = worldBbox();
+  // Cap image size to keep render cheap
+  const ow = Math.min(w, 900), oh = Math.min(h, 600);
+  const url = `${API}/api/render?xmin=${bbox.xmin.toFixed(1)}&ymin=${bbox.ymin.toFixed(1)}` +
+              `&xmax=${bbox.xmax.toFixed(1)}&ymax=${bbox.ymax.toFixed(1)}&w=${ow}&h=${oh}&t=${Date.now()}`;
+  if (url === lastImgRequest) return;
+  lastImgRequest = url;
+  imgLoading = true;
+  const newImg = new Image();
+  newImg.onload = () => {
+    worldImg.src = newImg.src;
+    worldImg.style.left = '0px';
+    worldImg.style.top = '0px';
+    worldImg.style.width = w + 'px';
+    worldImg.style.height = h + 'px';
+    imgLoading = false;
+  };
+  newImg.onerror = () => { imgLoading = false; };
+  newImg.src = url;
+}
+
+const CULTURE_COLORS = ['#a3be8c','#d08770','#88c0d0','#b48ead','#ebcb8b','#bf616a','#5e81ac','#8fbcbb'];
+const ACTION_COLORS = {0:'#6e7888',1:'#88c0d0',2:'#5e81ac',3:'#a3be8c',4:'#b48ead',
+  5:'#a3be8c',6:'#ebcb8b',7:'#bf616a',8:'#88c0d0',9:'#a3be8c',10:'#bf616a',
+  11:'#d08770',12:'#bf616a',13:'#ebcb8b'};
+
+function agentColor(a) {
+  if (view === 'culture') return CULTURE_COLORS[a.culture % CULTURE_COLORS.length];
+  if (view === 'group') return a.group_id ? CULTURE_COLORS[a.group_id % CULTURE_COLORS.length] : '#3a3f4a';
+  if (view === 'action') return ACTION_COLORS[a.action] || '#88c0d0';
+  if (view === 'hunger') {
+    const h = Math.min(1, a.drives[0]);
+    return `rgb(${Math.floor(80 + 175*h)},${Math.floor(180 - 100*h)},${Math.floor(140 - 100*h)})`;
+  }
+  return '#eceff4';
+}
+
+// ---------------------------------------------------------------------------
+// Biome estimation: very rough — based on world position parity
+// (the real biome lives in the server's terrain map; for the fake-perspective
+//  background tint we approximate via simple hashing of chunk coords).
+// ---------------------------------------------------------------------------
+const BIOMES = ['#3b5a3a','#4a6238','#6b7e4a','#7a6a40','#465a4d','#4d4d3a'];
+function biomeAt(wx, wy) {
+  const cx = Math.floor(wx / 32), cy = Math.floor(wy / 32);
+  // hash
+  let h = (cx * 73856093) ^ (cy * 19349663);
+  h = (h >>> 0) % BIOMES.length;
+  return BIOMES[h];
+}
+
+// ---------------------------------------------------------------------------
+// Drawing dispatch by mode
+// ---------------------------------------------------------------------------
+function drawAgents() {
+  const { w, h } = vpSize();
+  aCtx.clearRect(0, 0, w, h);
+  if (camMode === 'TOP_DOWN') return drawTopDown(w, h);
+  if (camMode === 'FIRST_PERSON') return drawPerspective(w, h, 'first');
+  if (camMode === 'THIRD_PERSON') return drawPerspective(w, h, 'third');
+  if (camMode === 'AGENT_SHOULDER') return drawAgentShoulder(w, h);
+  if (camMode === 'REPLAY') return drawReplay(w, h);
+}
+
+// ---------------------------------------------------------------------------
+// TOP_DOWN (original behavior)
+// ---------------------------------------------------------------------------
+function drawTopDown(w, h) {
+  if (!lastAgents.length) { drawMinimap(); return; }
+  if (followingRow !== null) {
+    const a = lastAgents.find(x => x.row === followingRow);
+    if (a) { camCenterX = a.pos[0]; camCenterY = a.pos[1]; updateZoomPill(); }
+  }
+  lastAgents.forEach(a => {
+    const p = worldToScreen(a.pos[0], a.pos[1]);
+    if (p.x < -20 || p.x > w + 20 || p.y < -20 || p.y > h + 20) return;
+    aCtx.fillStyle = agentColor(a);
+    const r = Math.max(2, 6 / camZoom);
+    aCtx.beginPath(); aCtx.arc(p.x, p.y, Math.min(8, r), 0, Math.PI * 2); aCtx.fill();
+    if (a.row === selectedRow) {
+      aCtx.strokeStyle = '#ebcb8b'; aCtx.lineWidth = 2;
+      aCtx.beginPath(); aCtx.arc(p.x, p.y, Math.min(11, r + 3), 0, Math.PI * 2); aCtx.stroke();
+    }
+    if (a.row === followingRow) {
+      aCtx.strokeStyle = '#88c0d0'; aCtx.lineWidth = 1.5;
+      aCtx.beginPath(); aCtx.arc(p.x, p.y, Math.min(14, r + 6), 0, Math.PI * 2); aCtx.stroke();
+    }
+  });
+  if (view === 'group') {
+    lastGroups.forEach(g => {
+      const p = worldToScreen(g.centroid[0], g.centroid[1]);
+      aCtx.strokeStyle = CULTURE_COLORS[g.group_id % CULTURE_COLORS.length];
+      aCtx.lineWidth = 1.5; aCtx.setLineDash([4, 3]);
+      aCtx.beginPath(); aCtx.arc(p.x, p.y, 18 / camZoom + 6, 0, Math.PI * 2); aCtx.stroke();
+      aCtx.setLineDash([]);
+      aCtx.fillStyle = '#eceff4'; aCtx.font = '10px ui-monospace';
+      aCtx.fillText(`G${g.group_id}·${g.size}`, p.x + 12, p.y - 4);
+    });
+  }
+  // God avatar overlay (top-down: gold crown icon)
+  if (godState && godState.visible) {
+    const p = worldToScreen(godState.pos[0], godState.pos[1]);
+    drawCrownIcon(aCtx, p.x, p.y, 14);
+  }
+  drawMinimap();
+}
+
+// ---------------------------------------------------------------------------
+// PERSPECTIVE rendering shared by FIRST_PERSON and THIRD_PERSON
+// Camera = god avatar + heading; offset for third-person.
+// Simple pinhole projection: depth = forward-distance; screen_x = lateral/depth*focal
+// ---------------------------------------------------------------------------
+function drawPerspective(w, h, kind) {
+  // Background: sky band + ground band + foreground biome tint
+  const horizonY = h * 0.45;
+  // Sky
+  const skyGrad = aCtx.createLinearGradient(0, 0, 0, horizonY);
+  skyGrad.addColorStop(0, '#1c2738');
+  skyGrad.addColorStop(1, '#3b4a64');
+  aCtx.fillStyle = skyGrad; aCtx.fillRect(0, 0, w, horizonY);
+  // Ground
+  let camWx = 0, camWy = 0, camHeading = 0, eyeH = 1.6;
+  if (godState) { camWx = godState.pos[0]; camWy = godState.pos[1]; camHeading = godState.heading || 0; }
+  else if (lastAgents.length) {
+    // Fallback: use camera center direction toward agents
+    camWx = camCenterX; camWy = camCenterY;
+  }
+  if (kind === 'third') {
+    // Camera 8m behind, 4m above
+    camWx -= Math.cos(camHeading) * 8.0;
+    camWy -= Math.sin(camHeading) * 8.0;
+    eyeH = 4.0 + 1.6;
+  }
+  const groundTint = biomeAt(camWx, camWy);
+  aCtx.fillStyle = groundTint; aCtx.fillRect(0, horizonY, w, h - horizonY);
+  // Add darker far ground band fading from horizon
+  const groundGrad = aCtx.createLinearGradient(0, horizonY, 0, h);
+  groundGrad.addColorStop(0, 'rgba(0,0,0,0.55)');
+  groundGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  aCtx.fillStyle = groundGrad; aCtx.fillRect(0, horizonY, w, h - horizonY);
+
+  // Project agents
+  const focal = w * 0.7;   // arbitrary focal length in pixels
+  const cosH = Math.cos(camHeading), sinH = Math.sin(camHeading);
+
+  // Sort by depth desc so nearer agents draw on top
+  const projected = [];
+  lastAgents.forEach(a => {
+    const dx = a.pos[0] - camWx, dy = a.pos[1] - camWy;
+    // forward = dot with heading vector
+    const fwd = dx * cosH + dy * sinH;
+    if (fwd < 0.5) return; // behind camera
+    // lateral = perpendicular
+    const lat = -dx * sinH + dy * cosH;
+    const sx = lat / fwd * focal + w / 2;
+    // vertical: agent is on ground at height 0, camera at eyeH
+    const sy = horizonY + (eyeH / fwd) * focal;
+    if (sx < -50 || sx > w + 50) return;
+    projected.push({ a, sx, sy, depth: fwd });
+  });
+  projected.sort((p, q) => q.depth - p.depth);
+
+  projected.forEach(({ a, sx, sy, depth }) => {
+    // Agent ~1.7m tall, size = (height/depth)*focal
+    const sizePx = Math.max(2, (1.7 / depth) * focal * 0.4);
+    aCtx.fillStyle = agentColor(a);
+    aCtx.globalAlpha = Math.max(0.15, Math.min(1.0, 60 / depth));
+    aCtx.beginPath(); aCtx.arc(sx, sy - sizePx * 0.5, sizePx * 0.5, 0, Math.PI * 2); aCtx.fill();
+    // ground shadow
+    aCtx.globalAlpha *= 0.5;
+    aCtx.fillStyle = '#000';
+    aCtx.beginPath(); aCtx.ellipse(sx, sy, sizePx * 0.5, sizePx * 0.18, 0, 0, Math.PI * 2); aCtx.fill();
+    aCtx.globalAlpha = 1.0;
+    if (a.row === selectedRow) {
+      aCtx.strokeStyle = '#ebcb8b'; aCtx.lineWidth = 2;
+      aCtx.beginPath(); aCtx.arc(sx, sy - sizePx * 0.5, sizePx * 0.5 + 3, 0, Math.PI * 2); aCtx.stroke();
+    }
+  });
+
+  // Third-person: draw god avatar as a figure ahead of the camera
+  if (kind === 'third' && godState && godState.visible) {
+    // god is 8m forward
+    const sx = w / 2;
+    const depth = 8.0;
+    const sizePx = (1.7 / depth) * focal * 0.5;
+    const sy = horizonY + ((4.0 + 1.6) / depth) * focal;
+    aCtx.fillStyle = '#ebcb8b';
+    aCtx.beginPath(); aCtx.arc(sx, sy - sizePx * 0.5, sizePx * 0.5, 0, Math.PI * 2); aCtx.fill();
+    drawCrownIcon(aCtx, sx, sy - sizePx, sizePx * 0.6);
+  }
+  // First-person: draw a HUD crown in corner
+  if (kind === 'first' && godState && godState.visible) {
+    drawCrownIcon(aCtx, 30, 30, 14);
+  }
+  // HUD: compass/heading
+  aCtx.fillStyle = 'rgba(255,255,255,0.75)';
+  aCtx.font = '11px ui-monospace';
+  aCtx.fillText(`heading ${(camHeading * 180 / Math.PI).toFixed(0)}°`, 12, h - 16);
+  if (!godState) {
+    aCtx.fillStyle = '#bf616a';
+    aCtx.fillText('(god avatar not available — using camera center)', 12, h - 32);
+  }
+  drawMinimap();
+}
+
+// ---------------------------------------------------------------------------
+// AGENT_SHOULDER: camera at selected agent, looking along velocity, fog beyond
+// perception_radius (60m default).
+// ---------------------------------------------------------------------------
+function drawAgentShoulder(w, h) {
+  const horizonY = h * 0.45;
+  const skyGrad = aCtx.createLinearGradient(0, 0, 0, horizonY);
+  skyGrad.addColorStop(0, '#1c2738'); skyGrad.addColorStop(1, '#3b4a64');
+  aCtx.fillStyle = skyGrad; aCtx.fillRect(0, 0, w, horizonY);
+
+  const a = selectedRow !== null ? lastAgents.find(x => x.row === selectedRow) : null;
+  if (!a) {
+    aCtx.fillStyle = '#2a3140'; aCtx.fillRect(0, horizonY, w, h - horizonY);
+    aCtx.fillStyle = '#ebcb8b'; aCtx.font = '13px ui-monospace';
+    aCtx.fillText('select an agent (click on list or map) to enable shoulder cam', 30, h / 2);
+    return;
+  }
+  const camWx = a.pos[0], camWy = a.pos[1];
+  // heading from velocity if present, else random
+  let camHeading = 0;
+  if (a.vel && (a.vel[0] !== 0 || a.vel[1] !== 0)) {
+    camHeading = Math.atan2(a.vel[1], a.vel[0]);
+  } else if (typeof a.heading === 'number') {
+    camHeading = a.heading;
+  }
+  const eyeH = 1.6;
+  const perception = (a.perception_radius || 60.0);
+
+  const groundTint = biomeAt(camWx, camWy);
+  aCtx.fillStyle = groundTint; aCtx.fillRect(0, horizonY, w, h - horizonY);
+  const groundGrad = aCtx.createLinearGradient(0, horizonY, 0, h);
+  groundGrad.addColorStop(0, 'rgba(0,0,0,0.5)');
+  groundGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  aCtx.fillStyle = groundGrad; aCtx.fillRect(0, horizonY, w, h - horizonY);
+
+  const focal = w * 0.7;
+  const cosH = Math.cos(camHeading), sinH = Math.sin(camHeading);
+
+  const projected = [];
+  lastAgents.forEach(o => {
+    if (o.row === a.row) return;
+    const dx = o.pos[0] - camWx, dy = o.pos[1] - camWy;
+    const dist = Math.hypot(dx, dy);
+    const fwd = dx * cosH + dy * sinH;
+    if (fwd < 0.5) return;
+    const lat = -dx * sinH + dy * cosH;
+    const sx = lat / fwd * focal + w / 2;
+    const sy = horizonY + (eyeH / fwd) * focal;
+    if (sx < -50 || sx > w + 50) return;
+    projected.push({ a: o, sx, sy, depth: fwd, dist });
+  });
+  projected.sort((p, q) => q.depth - p.depth);
+  projected.forEach(({ a: o, sx, sy, depth, dist }) => {
+    const sizePx = Math.max(2, (1.7 / depth) * focal * 0.4);
+    let alpha = 1.0;
+    if (dist > perception) {
+      // fog of war: fade out beyond perception
+      alpha = Math.max(0.05, 1.0 - (dist - perception) / 30.0);
+    }
+    aCtx.globalAlpha = alpha;
+    aCtx.fillStyle = agentColor(o);
+    aCtx.beginPath(); aCtx.arc(sx, sy - sizePx * 0.5, sizePx * 0.5, 0, Math.PI * 2); aCtx.fill();
+    aCtx.globalAlpha = alpha * 0.5;
+    aCtx.fillStyle = '#000';
+    aCtx.beginPath(); aCtx.ellipse(sx, sy, sizePx * 0.5, sizePx * 0.18, 0, 0, Math.PI * 2); aCtx.fill();
+    aCtx.globalAlpha = 1.0;
+  });
+  // fog vignette overlay
+  const vg = aCtx.createRadialGradient(w/2, h*0.6, Math.min(w,h)*0.25, w/2, h*0.6, Math.max(w,h)*0.7);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.65)');
+  aCtx.fillStyle = vg; aCtx.fillRect(0, 0, w, h);
+
+  aCtx.fillStyle = '#ebcb8b'; aCtx.font = '11px ui-monospace';
+  aCtx.fillText(`agent ${a.row} • perception ${perception.toFixed(0)}m • heading ${(camHeading*180/Math.PI).toFixed(0)}°`, 12, h - 16);
+  drawMinimap();
+}
+
+// ---------------------------------------------------------------------------
+// REPLAY: pause refresh, scrub through cached events
+// ---------------------------------------------------------------------------
+async function loadReplayEvents() {
+  try {
+    const r = await (await fetch(API + '/api/events/recent?n=500')).json();
+    replayEvents = (r.events || []).slice().sort((a, b) => a.tick - b.tick);
+    if (replayEvents.length) {
+      replayMinTick = replayEvents[0].tick;
+      replayMaxTick = replayEvents[replayEvents.length - 1].tick;
+      replayTick = replayMinTick;
+      const slider = document.getElementById('rpSlider');
+      slider.min = replayMinTick; slider.max = replayMaxTick; slider.value = replayTick;
+      updateReplayInfo();
+    } else {
+      document.getElementById('rpInfo').textContent = 'no events cached';
+    }
+  } catch (e) {
+    document.getElementById('rpInfo').textContent = 'replay error: ' + e.message;
+  }
+  drawAgents();
+}
+function updateReplayInfo() {
+  document.getElementById('rpInfo').textContent =
+    `tick ${replayTick} / ${replayMaxTick} (${replayEvents.length} events)`;
+}
+document.getElementById('rpSlider').addEventListener('input', (e) => {
+  replayTick = parseInt(e.target.value, 10);
+  updateReplayInfo();
+  drawAgents();
+});
+document.getElementById('rpPlay').addEventListener('click', () => {
+  if (replayPlaying) stopReplayPlayback();
+  else startReplayPlayback();
+});
+document.getElementById('rpExit').addEventListener('click', () => {
+  setCamMode('TOP_DOWN');
+});
+function startReplayPlayback() {
+  replayPlaying = true;
+  document.getElementById('rpPlay').textContent = '⏸';
+  replayPlayTimer = setInterval(() => {
+    replayTick = Math.min(replayMaxTick, replayTick + 1);
+    document.getElementById('rpSlider').value = replayTick;
+    updateReplayInfo();
+    drawAgents();
+    if (replayTick >= replayMaxTick) stopReplayPlayback();
+  }, 80);
+}
+function stopReplayPlayback() {
+  replayPlaying = false;
+  document.getElementById('rpPlay').textContent = '▶';
+  if (replayPlayTimer) { clearInterval(replayPlayTimer); replayPlayTimer = null; }
+}
+
+// Build a positional snapshot at a tick by interpolating across nearest events
+// that carry positions. Events without positions just contribute their tick.
+function snapshotAtTick(tick) {
+  // Map: uuid -> {tick, pos}
+  // Walk events in order, keep last known pos per participant <= tick,
+  // and lerp toward next known pos > tick if present.
+  const latestBefore = new Map();
+  const nextAfter = new Map();
+  for (const e of replayEvents) {
+    if (!e.positions) continue;
+    Object.keys(e.positions).forEach(uuid => {
+      const pos = e.positions[uuid];
+      if (e.tick <= tick) {
+        latestBefore.set(uuid, { tick: e.tick, pos });
+      } else if (!nextAfter.has(uuid)) {
+        nextAfter.set(uuid, { tick: e.tick, pos });
+      }
+    });
+  }
+  const out = [];
+  let row = 0;
+  for (const [uuid, before] of latestBefore.entries()) {
+    let pos = before.pos;
+    const after = nextAfter.get(uuid);
+    if (after && after.tick > before.tick) {
+      const t = (tick - before.tick) / (after.tick - before.tick);
+      pos = [
+        before.pos[0] + (after.pos[0] - before.pos[0]) * t,
+        before.pos[1] + (after.pos[1] - before.pos[1]) * t,
+      ];
+    }
+    out.push({ row: row++, uuid, pos, drives: [0,0,0], culture: 0, group_id: 0, action: 0, gen: 0 });
+  }
+  return out;
+}
+
+function drawReplay(w, h) {
+  // dark background with grid
+  aCtx.fillStyle = '#0a0d12'; aCtx.fillRect(0, 0, w, h);
+  aCtx.strokeStyle = 'rgba(80,90,110,0.15)'; aCtx.lineWidth = 1;
+  for (let x = 0; x < w; x += 40) { aCtx.beginPath(); aCtx.moveTo(x,0); aCtx.lineTo(x,h); aCtx.stroke(); }
+  for (let y = 0; y < h; y += 40) { aCtx.beginPath(); aCtx.moveTo(0,y); aCtx.lineTo(w,y); aCtx.stroke(); }
+
+  if (!replayEvents.length) {
+    aCtx.fillStyle = '#a0aaba'; aCtx.font = '13px ui-monospace';
+    aCtx.fillText('No replay events cached. Server may not expose positions on events.', 30, h / 2);
+    return;
+  }
+  const snap = snapshotAtTick(replayTick);
+  if (!snap.length) {
+    // Fall back: just plot recent event participants near origin
+    aCtx.fillStyle = '#a0aaba'; aCtx.font = '12px ui-monospace';
+    aCtx.fillText('Event positions not available in this stream; showing live agents (paused).',
+                  30, 30);
+    // Plot lastAgents using current zoom
+    lastAgents.forEach(a => {
+      const p = worldToScreen(a.pos[0], a.pos[1]);
+      aCtx.fillStyle = agentColor(a);
+      aCtx.beginPath(); aCtx.arc(p.x, p.y, 3, 0, Math.PI * 2); aCtx.fill();
+    });
+    return;
+  }
+  // Auto-fit replay snapshot
+  let minX=1e9, maxX=-1e9, minY=1e9, maxY=-1e9;
+  snap.forEach(a => {
+    minX=Math.min(minX,a.pos[0]); maxX=Math.max(maxX,a.pos[0]);
+    minY=Math.min(minY,a.pos[1]); maxY=Math.max(maxY,a.pos[1]);
+  });
+  const pad = 50; minX-=pad; maxX+=pad; minY-=pad; maxY+=pad;
+  const sx = w / Math.max(1, maxX-minX), sy = h / Math.max(1, maxY-minY);
+  const s = Math.min(sx, sy) * 0.9;
+  const ox = (w - (maxX-minX)*s)/2, oy = (h - (maxY-minY)*s)/2;
+  snap.forEach(a => {
+    const x = (a.pos[0]-minX)*s + ox, y = (a.pos[1]-minY)*s + oy;
+    aCtx.fillStyle = '#88c0d0';
+    aCtx.beginPath(); aCtx.arc(x, y, 4, 0, Math.PI * 2); aCtx.fill();
+  });
+  aCtx.fillStyle = '#ebcb8b'; aCtx.font = '12px ui-monospace';
+  aCtx.fillText(`REPLAY @ tick ${replayTick} • ${snap.length} entities`, 12, 24);
+}
+
+// ---------------------------------------------------------------------------
+// Crown icon (god avatar marker)
+// ---------------------------------------------------------------------------
+function drawCrownIcon(ctx, cx, cy, size) {
+  ctx.save();
+  ctx.fillStyle = '#ebcb8b';
+  ctx.strokeStyle = '#8a6d2a';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  // crown base
+  ctx.moveTo(cx - size, cy + size * 0.3);
+  ctx.lineTo(cx + size, cy + size * 0.3);
+  ctx.lineTo(cx + size * 0.8, cy + size * 0.7);
+  ctx.lineTo(cx - size * 0.8, cy + size * 0.7);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // crown points
+  ctx.beginPath();
+  ctx.moveTo(cx - size, cy + size * 0.3);
+  ctx.lineTo(cx - size * 0.6, cy - size * 0.6);
+  ctx.lineTo(cx - size * 0.3, cy + size * 0.1);
+  ctx.lineTo(cx, cy - size * 0.9);
+  ctx.lineTo(cx + size * 0.3, cy + size * 0.1);
+  ctx.lineTo(cx + size * 0.6, cy - size * 0.6);
+  ctx.lineTo(cx + size, cy + size * 0.3);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // jewel
+  ctx.fillStyle = '#bf616a';
+  ctx.beginPath(); ctx.arc(cx, cy + size * 0.5, size * 0.15, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Minimap
+// ---------------------------------------------------------------------------
+function drawMinimap() {
+  const W = minimap.width, H = minimap.height;
+  mCtx.fillStyle = '#0a0d12'; mCtx.fillRect(0, 0, W, H);
+  if (!lastAgents.length) return;
+  let minX=1e9, maxX=-1e9, minY=1e9, maxY=-1e9;
+  lastAgents.forEach(a => {
+    minX=Math.min(minX,a.pos[0]); maxX=Math.max(maxX,a.pos[0]);
+    minY=Math.min(minY,a.pos[1]); maxY=Math.max(maxY,a.pos[1]);
+  });
+  const padding = 30;
+  minX -= padding; maxX += padding; minY -= padding; maxY += padding;
+  const sx = W / Math.max(1, maxX - minX), sy = H / Math.max(1, maxY - minY);
+  const s = Math.min(sx, sy);
+  lastAgents.forEach(a => {
+    const x = (a.pos[0] - minX) * s, y = (a.pos[1] - minY) * s;
+    mCtx.fillStyle = agentColor(a);
+    mCtx.fillRect(x - 1, y - 1, 2, 2);
+  });
+  // god marker
+  if (godState && godState.visible) {
+    const x = (godState.pos[0] - minX) * s, y = (godState.pos[1] - minY) * s;
+    mCtx.fillStyle = '#ebcb8b';
+    mCtx.fillRect(x - 2, y - 2, 4, 4);
+  }
+  // Camera rectangle (TOP_DOWN only)
+  if (camMode === 'TOP_DOWN') {
+    const bbox = worldBbox();
+    const cx = (bbox.xmin - minX) * s, cy = (bbox.ymin - minY) * s;
+    const cw = (bbox.xmax - bbox.xmin) * s, ch = (bbox.ymax - bbox.ymin) * s;
+    mCtx.strokeStyle = '#ebcb8b'; mCtx.lineWidth = 1; mCtx.strokeRect(cx, cy, cw, ch);
+  }
+}
+
+// Click on viewport to select agent (TOP_DOWN only — other modes are immersive)
+viewport.addEventListener('click', (e) => {
+  if (dragging) return;
+  if (camMode !== 'TOP_DOWN') return;
+  const rect = viewport.getBoundingClientRect();
+  const wpt = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+  let best = null, bd = Infinity;
+  lastAgents.forEach(a => {
+    const dx = a.pos[0] - wpt.x, dy = a.pos[1] - wpt.y;
+    const d = dx * dx + dy * dy;
+    if (d < bd) { bd = d; best = a; }
+  });
+  if (best && Math.sqrt(bd) < 5 * camZoom + 3) selectAgent(best.row);
+});
+
+// ---------------------------------------------------------------------------
+// Sidebar
+// ---------------------------------------------------------------------------
+function drawAgentList() {
+  const el = document.getElementById('agentList');
+  const sorted = [...lastAgents].sort((a, b) => b.gen - a.gen || a.row - b.row).slice(0, 50);
+  el.innerHTML = sorted.map(a => `
+    <div class="row ${a.row === selectedRow ? 'selected' : ''}" onclick="selectAgent(${a.row})">
+      <div>#${a.row}</div>
+      <div>gen ${a.gen} · c${a.culture}${a.group_id ? ' · G' + a.group_id : ''}</div>
+      <div style="color:#bf616a">H ${a.drives[0].toFixed(2)}</div>
+    </div>`).join('');
+}
+
+function drawGroupList() {
+  const el = document.getElementById('groupList');
+  if (!lastGroups.length) { el.textContent = 'aucun groupe formé'; return; }
+  el.innerHTML = lastGroups.map(g => `
+    <div class="row">
+      <div style="color:${CULTURE_COLORS[g.group_id % CULTURE_COLORS.length]}">G${g.group_id}</div>
+      <div>size ${g.size} · formé t${g.formed_tick}</div>
+      <div style="color:#6e7888">${g.centroid.map(n => n.toFixed(0)).join(',')}</div>
+    </div>`).join('');
+}
+
+let prevTick = 0, prevTime = performance.now();
+function updateKPIs(snap) {
+  document.getElementById('kpiTick').textContent = snap.tick;
+  document.getElementById('kpiAlive').textContent = snap.alive;
+  document.getElementById('kpiBirths').textContent = snap.cum_births;
+  document.getElementById('kpiDeaths').textContent = snap.cum_deaths;
+  document.getElementById('kpiEvents').textContent = snap.cum_events;
+  const now = performance.now();
+  if (snap.tick > prevTick) {
+    const tps = (snap.tick - prevTick) / ((now - prevTime) / 1000.0);
+    document.getElementById('kpiTps').textContent = tps.toFixed(1);
+  }
+  prevTick = snap.tick; prevTime = now;
+  document.getElementById('tickPill').textContent = `tick ${snap.tick}`;
+  document.getElementById('aliveePill').textContent = `pop ${snap.alive}`;
+  document.getElementById('statusPill').textContent = `sim ${snap.sim_id.slice(0,8)} • ${snap.last_tick_ms.toFixed(0)}ms`;
+}
+
+async function selectAgent(row) {
+  selectedRow = row;
+  drawAgentList();
+  drawAgents();
+  const r = await (await fetch(API + '/api/agent?row=' + row)).json();
+  if (r.error) { document.getElementById('agentDetail').textContent = r.error; return; }
+  function bar(label, v, max, danger) {
+    const pct = Math.min(100, (v / max) * 100);
+    const cls = (danger && v >= danger) ? 'danger' : '';
+    return `<div>${label}: ${v.toFixed(2)}</div><div class="bar"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>`;
+  }
+  const p = r.personality;
+  document.getElementById('agentDetail').innerHTML = `
+    <div><b>${r.uuid.slice(0,8)}…</b> · gen ${r.generation} · culture ${r.culture}${r.group_id ? ' · G'+r.group_id : ''}</div>
+    <div style="color:#6e7888">pos (${r.pos[0].toFixed(1)}, ${r.pos[1].toFixed(1)}) · né tick ${r.born_tick} · ${r.offspring} enfants · ${r.relations_count} relations</div>
+    <div style="margin-top:6px">
+      ${bar('hunger', r.drives.hunger, 1.5, 0.85)}
+      ${bar('thirst', r.drives.thirst, 1.5, 0.85)}
+      ${bar('vitality', r.vitality, 1.0)}
+      ${bar('stress', r.drives.stress, 1.5, 1.0)}
+    </div>
+    <div style="color:#a0aaba; font-size:10px; margin-top:6px">
+      O ${p.openness.toFixed(2)} · C ${p.conscientiousness.toFixed(2)} · E ${p.extraversion.toFixed(2)} · A ${p.agreeableness.toFixed(2)} · N ${p.neuroticism.toFixed(2)}<br>
+      ambition ${p.ambition.toFixed(2)} · agression ${p.aggression.toFixed(2)} · curiosité ${p.curiosity.toFixed(2)}
+    </div>`;
+}
+window.selectAgent = selectAgent;
+
+function drawEvents(events) {
+  const el = document.getElementById('events');
+  if (!events.length) { el.textContent = '—'; return; }
+  const lines = events.slice(-50).reverse().map(e => {
+    const cls = e.kind || 'event';
+    const who = (e.participants || []).map(u => u.slice(0,6)).join('·');
+    return `<div class="event-line ${cls}">t${e.tick} ${e.kind} ${who}</div>`;
+  });
+  el.innerHTML = lines.join('');
+}
+
+// ---------------------------------------------------------------------------
+// God avatar polling
+// ---------------------------------------------------------------------------
+async function pollGod() {
+  if (!godAvailable) return;
+  try {
+    const r = await fetch(API + '/api/god/state');
+    if (r.status === 404) { godAvailable = false; godState = null; return; }
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data && data.pos) {
+      godState = {
+        pos: data.pos,
+        heading: typeof data.heading === 'number' ? data.heading : 0,
+        visible: data.visible !== false,
+      };
+    } else {
+      godState = null;
+    }
+  } catch (e) {
+    // network error — keep retrying silently
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Refresh loop
+// ---------------------------------------------------------------------------
+async function refresh() {
+  if (replayActive) return; // freeze live updates during replay
+  try {
+    const [snap, agents, groups, events, ctl] = await Promise.all([
+      (await fetch(API + '/api/state')).json(),
+      (await fetch(API + '/api/agents')).json(),
+      (await fetch(API + '/api/groups')).json(),
+      (await fetch(API + '/api/events/recent?n=80')).json(),
+      (await fetch(API + '/api/control')).json(),
+    ]);
+    lastSnap = snap; lastAgents = agents.agents; lastGroups = groups.groups;
+    if (camCenterX === 0 && camCenterY === 0 && lastAgents.length) {
+      recenterOnAgents();
+    }
+    updateKPIs(snap);
+    drawAgentList();
+    drawGroupList();
+    drawEvents(events.events || []);
+    drawAgents();
+    document.getElementById('speedPill').textContent =
+      `${ctl.paused ? 'paused' : 'playing'} ${ctl.speed.toFixed(1)}×`;
+    document.getElementById('btnPause').textContent = ctl.paused ? '▶ play' : '⏸ pause';
+  } catch (e) {
+    document.getElementById('statusPill').textContent = 'error: ' + e.message;
+  }
+}
+
+setInterval(refresh, 500);
+setInterval(() => { if (!replayActive) loadTerrain(); }, 2500);
+setInterval(pollGod, 500);
+updateCamPill();
+refresh();
+</script>
+<script src="/audio_overlay.js"></script>
+<div id="lift-panel" style="position:fixed;bottom:12px;left:12px;background:rgba(0,0,0,0.65);color:#e8e8e8;font:11px/1.4 monospace;padding:8px 10px;border-radius:6px;border:1px solid #444;z-index:9999;min-width:180px;pointer-events:none">
+  <div style="color:#9cf;font-weight:bold;margin-bottom:4px">L2 lift layer</div>
+  <div id="lift-body">loading…</div>
+</div>
+<script>
+(function(){
+  async function refreshLift(){
+    try{
+      const r = await fetch('/api/lift_state');
+      if(!r.ok) return;
+      const d = await r.json();
+      const veg = d.veg_distribution || {};
+      const rows = Object.keys(veg).sort().map(k=>`<div>${k}: ${(veg[k]*100).toFixed(1)}%</div>`).join('');
+      document.getElementById('lift-body').innerHTML =
+        `<div>chunks: ${d.chunks ?? 0}</div>`+
+        `<div>max ravine: ${(d.max_ravine_depth ?? 0).toFixed(2)} m</div>`+
+        (rows || '<div style="color:#888">no veg data</div>');
+    }catch(e){}
+  }
+  refreshLift(); setInterval(refreshLift, 5000);
+})();
+</script>
+<div id="demo-panel" style="position:fixed;bottom:12px;right:12px;background:rgba(0,0,0,0.65);color:#e8e8e8;font:11px/1.4 monospace;padding:8px 10px;border-radius:6px;border:1px solid #444;z-index:9999;min-width:200px;pointer-events:none">
+  <div style="color:#fc9;font-weight:bold;margin-bottom:4px" id="demo-banner">Demography</div>
+  <div id="demo-counters" style="color:#aaa;margin-bottom:4px">loading…</div>
+  <div id="demo-gens" style="display:flex;align-items:flex-end;height:32px;gap:2px;margin-bottom:4px"></div>
+  <div id="demo-prog" style="color:#cde"></div>
+</div>
+<script>
+(function(){
+  async function refreshDemo(){
+    try{
+      const r = await fetch('/api/demography');
+      if(!r.ok) return;
+      const d = await r.json();
+      const gens = d.generations || {};
+      const keys = Object.keys(gens).map(Number).sort((a,b)=>a-b).slice(0,10);
+      let total=0, weighted=0;
+      keys.forEach(k=>{ total+=gens[k]; weighted+=k*gens[k]; });
+      const avg = total ? (weighted/total).toFixed(1) : '0.0';
+      document.getElementById('demo-banner').textContent =
+        `Demography — tick ${d.tick} · alive ${d.alive}/${d.spawned} · gen avg ${avg}`;
+      document.getElementById('demo-counters').textContent =
+        `births ${d.births_cum||0} · deaths ${d.deaths_cum||0} · matings ${d.matings_cum||0} · lineage ${d.lineage_size||0}`;
+      const maxc = Math.max(1, ...keys.map(k=>gens[k]));
+      document.getElementById('demo-gens').innerHTML = keys.map(k=>{
+        const h = Math.round((gens[k]/maxc)*30)+1;
+        return `<div title="gen ${k}: ${gens[k]}" style="width:10px;height:${h}px;background:#fc9"></div>`;
+      }).join('') || '<div style="color:#888">no generations</div>';
+      const top = (d.top_progenitors||[]).slice(0,5);
+      document.getElementById('demo-prog').innerHTML = top.length
+        ? top.map(p=>`<div>row ${p.row} · gen ${p.generation} · ${p.descendants} desc · ${p.alive?'alive':'dead'}</div>`).join('')
+        : '<div style="color:#888">no progenitors</div>';
+    }catch(e){}
+  }
+  refreshDemo(); setInterval(refreshDemo, 5000);
+})();
+</script>
+<!-- Sprint A5 — Observatory HUD unified widget (§23 Mode 'God' & Observatoire) -->
+<style>
+#observatory-panel{position:fixed;top:12px;left:12px;width:250px;max-height:400px;
+  background:rgba(0,0,0,0.72);color:#eee;font:11px/1.45 monospace;
+  padding:8px 10px;border-radius:6px;border:1px solid #555;z-index:9998;
+  pointer-events:none;overflow:hidden}
+#observatory-panel .obs-h{color:#ff9;font-weight:bold;margin-bottom:3px;
+  border-bottom:1px solid #444;padding-bottom:3px;font-size:11px}
+#observatory-panel .obs-sub{color:#bbb;font-size:10px;margin-bottom:5px}
+#observatory-panel .obs-row{margin:2px 0;color:#dde}
+#observatory-panel .obs-lbl{color:#9cf;font-weight:bold;margin-top:5px;
+  font-size:10px;letter-spacing:0.5px}
+#observatory-panel .obs-pyra{display:flex;align-items:flex-end;height:34px;
+  gap:2px;margin:3px 0 4px;border-bottom:1px dotted #333;padding-bottom:2px}
+#observatory-panel .obs-pyra div{width:11px;background:linear-gradient(180deg,#fc9,#a63);
+  border-radius:1px 1px 0 0}
+#observatory-panel .obs-prog{color:#cde;font-size:10px}
+#observatory-panel .obs-err{color:#f66;font-size:10px}
+</style>
+<div id="observatory-panel">
+  <div class="obs-h" id="obs-header">Observatory — loading…</div>
+  <div class="obs-sub" id="obs-time">tick · · year · day · hour ·</div>
+  <div class="obs-lbl">CLIMATE</div>
+  <div class="obs-row" id="obs-climate">…</div>
+  <div class="obs-lbl">WILDLIFE</div>
+  <div class="obs-row" id="obs-wildlife">…</div>
+  <div class="obs-lbl">POPULATION</div>
+  <div class="obs-row" id="obs-pop">…</div>
+  <div class="obs-lbl">GENERATIONS</div>
+  <div class="obs-pyra" id="obs-pyra"></div>
+  <div class="obs-lbl">TOP PROGENITORS</div>
+  <div class="obs-prog" id="obs-prog">…</div>
+</div>
+<script>
+(function(){
+  async function safeFetch(url){
+    try{ const r = await fetch(url); if(!r.ok) return null;
+      return await r.json(); }catch(e){ return null; }
+  }
+  function pctFmt(x){ return ((x||0)*100).toFixed(1)+'%'; }
+  function dominantVeg(veg){
+    if(!veg) return {forest:0, garrigue:0};
+    const f = (veg.FOREST||0)+(veg.MATURE_FOREST||0)+(veg.YOUNG_FOREST||0);
+    const g = (veg.GARRIGUE||0)+(veg.PRAIRIE||0)+(veg.GRASSLAND||0);
+    return {forest:f, garrigue:g};
+  }
+  async function refreshObservatory(){
+    const [state, realism, lift, demo] = await Promise.all([
+      safeFetch('/api/state'),
+      safeFetch('/api/realism_state'),
+      safeFetch('/api/lift_state'),
+      safeFetch('/api/demography'),
+    ]);
+    // Header
+    try{
+      const sid = state ? String(state.sim_id||'').slice(0,8) : '????????';
+      const tk = state ? state.tick : '–';
+      const al = state ? state.alive : '–';
+      document.getElementById('obs-header').textContent =
+        `Observatory · ${sid} · tick ${tk} · alive ${al}`;
+      const s = (realism && realism.seasons) || {};
+      const y = s.year ?? '–', d = s.day_of_year ?? '–';
+      const h = (s.hour_of_day!=null) ? Number(s.hour_of_day).toFixed(1) : '–';
+      const sn = s.season || '–';
+      document.getElementById('obs-time').textContent =
+        `year ${y} · day ${d} · hour ${h} · ${sn}`;
+    }catch(e){}
+    // Climate
+    try{
+      const veg = dominantVeg(lift && lift.veg_distribution);
+      const slope = lift ? (lift.mean_slope_deg||0).toFixed(1) : '–';
+      const river = (realism && realism.hydrology)
+        ? pctFmt(realism.hydrology.river_cells_pct) : 'n/a';
+      const imp = lift ? pctFmt(lift.impassable_pct) : '–';
+      document.getElementById('obs-climate').innerHTML =
+        `🌳 ${pctFmt(veg.forest)} · 🌾 ${pctFmt(veg.garrigue)}<br>`+
+        `🏔️ ${slope}° · 🌊 river ${river} · imp ${imp}`;
+    }catch(e){ document.getElementById('obs-climate').innerHTML =
+      '<span class="obs-err">climate err</span>'; }
+    // Wildlife
+    try{
+      const w = (realism && realism.wildlife) || {};
+      const deer = w.deer_total ?? 0, wolf = w.wolf_total ?? 0,
+            fish = w.fish_total ?? 0;
+      const dis = (realism && realism.disease)
+        ? ` · 🦠 ${realism.disease.infected_now||0}` : '';
+      document.getElementById('obs-wildlife').innerHTML =
+        `🦌 ${Math.round(deer)} · 🐺 ${Math.round(wolf)} · 🐟 ${Math.round(fish)}${dis}`;
+    }catch(e){ document.getElementById('obs-wildlife').innerHTML =
+      '<span class="obs-err">wildlife err</span>'; }
+    // Population
+    try{
+      const b = state ? state.cum_births : 0;
+      const dd = state ? state.cum_deaths : 0;
+      const ev = state ? state.cum_events : 0;
+      const wt = (realism && realism.trails)
+        ? realism.trails.well_trodden_cells : 0;
+      document.getElementById('obs-pop').innerHTML =
+        `births ${b} · deaths ${dd}<br>trails ${wt} cells · events ${ev}`;
+    }catch(e){ document.getElementById('obs-pop').innerHTML =
+      '<span class="obs-err">pop err</span>'; }
+    // Generations pyramid
+    try{
+      const gens = (demo && demo.generations) || {};
+      const keys = Object.keys(gens).map(Number).sort((a,b)=>a-b).slice(0,8);
+      const maxc = Math.max(1, ...keys.map(k=>gens[k]));
+      document.getElementById('obs-pyra').innerHTML = keys.length
+        ? keys.map(k=>{ const h=Math.round((gens[k]/maxc)*30)+1;
+            return `<div title="gen ${k}: ${gens[k]}" style="height:${h}px"></div>`;
+          }).join('')
+        : '<span style="color:#666;font-size:10px">no gen data</span>';
+    }catch(e){}
+    // Top progenitors
+    try{
+      const top = ((demo && demo.top_progenitors) || []).slice(0,3);
+      document.getElementById('obs-prog').innerHTML = top.length
+        ? top.map(p=>`gen${p.generation} · ${p.descendants} desc`).join('<br>')
+        : '<span style="color:#666">no progenitors</span>';
+    }catch(e){}
+  }
+  refreshObservatory();
+  setInterval(refreshObservatory, 3000);
+})();
+</script>
+</body></html>

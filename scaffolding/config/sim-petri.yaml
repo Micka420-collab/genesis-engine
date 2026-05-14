@@ -1,0 +1,55 @@
+# Genesis Engine — config Petri (dev local, 100 agents max)
+simulation:
+  name: "petri-default"
+  seed: 0xC0FFEE_DEADBEEF_FEEDFACE_BAADC0DE
+  tier: petri
+  time_scale: standard            # x10
+  max_agents: 100
+
+world:
+  size: bounded
+  bounds_km: [4, 4]
+  voxel_size_m: 0.5
+  chunk_size: [64, 64, 128]
+  biome_distribution: realistic
+  initial_biomes:
+    - tropical_humid
+    - temperate_humid
+    - savanna
+
+biology:
+  metabolic_rate: 1.0
+  reproduction_cooldown_days: 30
+  child_dependency_years: 10
+  base_lifespan_years: 80
+
+cognition:
+  policy_model: "policy-tx-50m"
+  world_model: "dreamer-v3-tiny"
+  perception_encoder: "dinov3-small"
+  memory_capacity_episodic: 10000
+
+evolution:
+  mutation_rate: 0.001
+  crossover: gene_wise
+  selection: fitness_proportional
+
+events:
+  earthquake_per_century: 3
+  volcano_per_century: 1
+  pandemic_per_century: 0.5
+
+snapshots:
+  interval_ticks: 100000
+  retention_count: 10
+  storage: "minio://genesis-snapshots/petri/"
+
+observability:
+  trace_sampling_rate: 1.0
+  metrics_endpoint: "http://otel-collector:4317"
+
+founders:
+  count: 2
+  spawn_strategy: "near-water-and-food"
+  initial_genome: "balanced-baseline"
+  knowledge: ["survive", "reproduce", "interact"]

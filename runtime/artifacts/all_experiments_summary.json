@@ -1,0 +1,72 @@
+[
+  {
+    "name": "exp1_scarcity",
+    "ticks": 250,
+    "wall_s": 9.9,
+    "tps": 25.3,
+    "final_alive": 49,
+    "cum_births": 54,
+    "cum_deaths": 5,
+    "max_gen": 8,
+    "matings": 44,
+    "conflicts": 0,
+    "shares": 0,
+    "top_death_cause": "EXHAUSTION"
+  },
+  {
+    "name": "exp2_food_pressure",
+    "ticks": 200,
+    "wall_s": 42.6,
+    "tps": 4.7,
+    "final_alive": 137,
+    "cum_births": 200,
+    "cum_deaths": 63,
+    "max_gen": 10,
+    "matings": 150,
+    "conflicts": 0,
+    "shares": 0,
+    "top_death_cause": "EXHAUSTION"
+  },
+  {
+    "name": "exp3_two_cultures",
+    "ticks": 250,
+    "wall_s": 29.6,
+    "tps": 8.4,
+    "final_alive": 196,
+    "cum_births": 200,
+    "cum_deaths": 4,
+    "max_gen": 13,
+    "matings": 176,
+    "conflicts": 0,
+    "shares": 0,
+    "top_death_cause": "EXHAUSTION"
+  },
+  {
+    "name": "exp4_catastrophe",
+    "ticks": 200,
+    "wall_s": 22.1,
+    "tps": 9.0,
+    "final_alive": 136,
+    "cum_births": 153,
+    "cum_deaths": 17,
+    "max_gen": 14,
+    "matings": 123,
+    "conflicts": 0,
+    "shares": 0,
+    "top_death_cause": "DEHYDRATION"
+  },
+  {
+    "name": "stress_100",
+    "ticks": 150,
+    "wall_s": 40.7,
+    "tps": 3.7,
+    "final_alive": 255,
+    "cum_births": 258,
+    "cum_deaths": 3,
+    "max_gen": 4,
+    "matings": 158,
+    "conflicts": 0,
+    "shares": 0,
+    "top_death_cause": "DEHYDRATION"
+  }
+]

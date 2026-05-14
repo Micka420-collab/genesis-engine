@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="fr"><head>
+<meta charset="utf-8">
+<title>Genesis Engine — God View</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { background: #0a0d12; color: #d8dee9; font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; }
+.app { display: grid; grid-template-columns: 1fr 320px; height: 100vh; }
+.viewport { position: relative; background: #000; overflow: hidden; }
+#worldImg { position: absolute; image-rendering: pixelated; user-select: none; pointer-events: none; }
+#agentLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.sidebar { background: #0e1116; border-left: 1px solid #1f2530; padding: 14px 16px; overflow-y: auto; }
+.hud { position: absolute; pointer-events: none; }
+.hud.tl { top: 12px; left: 12px; }
+.hud.tr { top: 12px; right: 12px; }
+.hud.bl { bottom: 12px; left: 12px; }
+.hud.br { bottom: 12px; right: 12px; }
+.pill { background: rgba(14,17,22,0.85); border: 1px solid #1f2530; border-radius: 999px; padding: 4px 10px; font-size: 11px; color: #88c0d0; backdrop-filter: blur(6px); margin-right: 6px; pointer-events: auto; }
+.pill button { background: transparent; border: none; color: inherit; font: inherit; cursor: pointer; padding: 0 4px; }
+.pill button:hover { color: #eceff4; }
+.toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+.kpi { background: #161b22; padding: 6px 10px; border-radius: 4px; border-left: 2px solid #88c0d0; }
+.kpi .label { color: #6e7888; font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; }
+.kpi .value { color: #eceff4; font-size: 16px; font-weight: 600; }
+.section-title { color: #88c0d0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin: 12px 0 6px 0; border-bottom: 1px solid #1f2530; padding-bottom: 4px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.tabs button { background: #1a1f28; color: #a0aaba; border: 1px solid #2a3140; padding: 4px 8px; border-radius: 3px; font-family: inherit; font-size: 10px; cursor: pointer; }
+.tabs button.active { background: #2a3140; color: #88c0d0; }
+.agent-list, .group-list, .events { font-size: 11px; max-height: 180px; overflow-y: auto; }
+.row { padding: 3px 4px; border-bottom: 1px solid #1a1f28; cursor: pointer; display: grid; grid-template-columns: 30px 1fr 60px; gap: 4px; align-items: center; }
+.row:hover { background: #161b22; }
+.row.selected { background: #2a3140; }
+.bar { background: #1a1f28; height: 4px; border-radius: 2px; overflow: hidden; margin: 2px 0 4px 0; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #5e81ac, #88c0d0); }
+.bar-fill.danger { background: linear-gradient(90deg, #d08770, #bf616a); }
+.help { position: absolute; right: 12px; bottom: 12px; background: rgba(14,17,22,0.92); border: 1px solid #1f2530; border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #a0aaba; line-height: 1.5; max-width: 280px; }
+.help b { color: #88c0d0; }
+.help kbd { background: #1a1f28; border: 1px solid #2a3140; padding: 1px 4px; border-radius: 3px; color: #d8dee9; font-size: 10px; }
+#minimap { background: #0a0d12; border: 1px solid #1f2530; }
+.event-line { padding: 2px 0; font-size: 10px; }
+.event-line.birth { color: #a3be8c; }
+.event-line.death { color: #bf616a; }
+.event-line.fight, .event-line.conflict { color: #d08770; }
+.event-line.share { color: #88c0d0; }
+.event-line.mating { color: #b48ead; }
+.event-line.vocalization { color: #ebcb8b; }
+.event-line.group_formed { color: #88c0d0; font-weight: bold; }
+.event-line.competition { color: #6e7888; }
+#agentDetail { background: #161b22; padding: 8px; margin-top: 8px; font-size: 11px; border-radius: 4px; min-height: 100px; }
+</style></head>
+<body>
+
+<div class="app">
+  <div class="viewport" id="viewport">
+    <img id="worldImg" alt="">
+    <canvas id="agentLayer"></canvas>
+
+    <div class="hud tl">
+      <div class="toolbar">
+        <span class="pill" id="statusPill">connecting…</span>
+        <span class="pill" id="tickPill">tick —</span>
+        <span class="pill" id="aliveePill">pop —</span>
+      </div>
+    </div>
+
+    <div class="hud tr">
+      <div class="toolbar">
+        <span class="pill"><button id="btnPause">⏸ pause</button></span>
+        <span class="pill"><button id="btnStep">⏯ step</button></span>
+        <span class="pill"><button id="btnSpeed05">0.5×</button> <button id="btnSpeed1">1×</button> <button id="btnSpeed2">2×</button> <button id="btnSpeed5">5×</button> <button id="btnSpeedMax">max</button></span>
+        <span class="pill" id="speedPill">speed 1.0×</span>
+      </div>
+    </div>
+
+    <div class="hud bl">
+      <div class="toolbar">
+        <span class="pill" id="zoomPill">zoom 1.0× • center (0, 0)</span>
+        <span class="pill" id="followPill" style="display:none">following agent —</span>
+      </div>
+    </div>
+
+    <div class="help">
+      <b>Navigation</b><br>
+      <kbd>drag</kbd> pan • <kbd>wheel</kbd> zoom • <kbd>F</kbd> follow agent • <kbd>Esc</kbd> unfollow<br>
+      <kbd>Space</kbd> play/pause • <kbd>S</kbd> step • <kbd>1–5</kbd> vitesse • <kbd>R</kbd> recenter
+    </div>
+
+    <div class="hud br" style="bottom: 110px; right: 12px;">
+      <canvas id="minimap" width="180" height="120"></canvas>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="kpis">
+      <div class="kpi"><div class="label">tick</div><div class="value" id="kpiTick">—</div></div>
+      <div class="kpi"><div class="label">alive</div><div class="value" id="kpiAlive">—</div></div>
+      <div class="kpi"><div class="label">births</div><div class="value" id="kpiBirths">—</div></div>
+      <div class="kpi"><div class="label">deaths</div><div class="value" id="kpiDeaths">—</div></div>
+      <div class="kpi"><div class="label">events</div><div class="value" id="kpiEvents">—</div></div>
+      <div class="kpi"><div class="label">TPS</div><div class="value" id="kpiTps">—</div></div>
+    </div>
+
+    <div class="section-title">Vue</div>
+    <div class="tabs">
+      <button class="active" data-view="biome">biome</button>
+      <button data-view="culture">culture</button>
+      <button data-view="group">groupe</button>
+      <button data-view="action">action</button>
+      <button data-view="hunger">faim</button>
+    </div>
+
+    <div class="section-title">Agents <span style="color:#6e7888">(click pour suivre)</span></div>
+    <div class="agent-list" id="agentList"></div>
+
+    <div class="section-title">Groupes</div>
+    <div class="group-list" id="groupList">—</div>
+
+    <div class="section-title">Agent sélectionné</div>
+    <div id="agentDetail">aucun agent sélectionné.</div>
+
+    <div class="section-title">Événements récents</div>
+    <div class="events" id="events">—</div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+const API = "";
+let view = 'biome';
+let selectedRow = null;
+let followingRow = null;
+let lastAgents = [];
+let lastSnap = null;
+let lastMetrics = null;
+let lastGroups = [];
+
+// Camera: world bbox shown on viewport
+let camCenterX = 0, camCenterY = 0;
+let camZoom = 1.0;  // world units per pixel - lower = more zoomed in
+let dragging = false, dragStartX = 0, dragStartY = 0, camStartX = 0, camStartY = 0;
+let imgLoading = false;
+let lastImgRequest = "";
+
+const viewport = document.getElementById('viewport');
+const worldImg = document.getElementById('worldImg');
+const agentLayer = document.getElementById('agentLayer');
+const aCtx = agentLayer.getContext('2d');
+const minimap = document.getElementById('minimap');
+const mCtx = minimap.getContext('2d');
+
+function vpSize() { return { w: viewport.clientWidth, h: viewport.clientHeight }; }
+
+function worldBbox() {
+  const { w, h } = vpSize();
+  const halfW = (w / 2) * camZoom;
+  const halfH = (h / 2) * camZoom;
+  return { xmin: camCenterX - halfW, ymin: camCenterY - halfH,
+           xmax: camCenterX + halfW, ymax: camCenterY + halfH };
+}
+
+function worldToScreen(wx, wy) {
+  const { w, h } = vpSize();
+  return { x: (wx - camCenterX) / camZoom + w / 2,
+           y: (wy - camCenterY) / camZoom + h / 2 };
+}
+
+function screenToWorld(sx, sy) {
+  const { w, h } = vpSize();
+  return { x: (sx - w / 2) * camZoom + camCenterX,
+           y: (sy - h / 2) * camZoom + camCenterY };
+}
+
+function resizeCanvas() {
+  const { w, h } = vpSize();
+  agentLayer.width = w; agentLayer.height = h;
+}
+window.addEventListener('resize', () => { resizeCanvas(); requestRender(); });
+resizeCanvas();
+
+// ---------------------------------------------------------------------------
+// Camera controls
+// ---------------------------------------------------------------------------
+viewport.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  dragging = true; dragStartX = e.clientX; dragStartY = e.clientY;
+  camStartX = camCenterX; camStartY = camCenterY;
+  followingRow = null; updateFollowPill();
+  viewport.style.cursor = 'grabbing';
+});
+window.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
+  camCenterX = camStartX - dx * camZoom;
+  camCenterY = camStartY - dy * camZoom;
+  updateZoomPill();
+  requestRender();
+});
+window.addEventListener('mouseup', () => { dragging = false; viewport.style.cursor = ''; });
+
+viewport.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = viewport.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const worldBefore = screenToWorld(mx, my);
+  const factor = Math.exp(e.deltaY * 0.001);
+  camZoom = Math.max(0.05, Math.min(40, camZoom * factor));
+  const worldAfter = screenToWorld(mx, my);
+  camCenterX += worldBefore.x - worldAfter.x;
+  camCenterY += worldBefore.y - worldAfter.y;
+  updateZoomPill();
+  requestRender();
+}, { passive: false });
+
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+  else if (e.code === 'KeyS') { stepOnce(); }
+  else if (e.code === 'KeyF') { followSelected(); }
+  else if (e.code === 'Escape') { followingRow = null; updateFollowPill(); }
+  else if (e.code === 'KeyR') { recenterOnAgents(); }
+  else if (e.code === 'Digit1') { setSpeed(0.5); }
+  else if (e.code === 'Digit2') { setSpeed(1); }
+  else if (e.code === 'Digit3') { setSpeed(2); }
+  else if (e.code === 'Digit4') { setSpeed(5); }
+  else if (e.code === 'Digit5') { setSpeed(20); }
+});
+
+function updateZoomPill() {
+  document.getElementById('zoomPill').textContent =
+    `zoom ${(1 / camZoom).toFixed(2)}× • centre (${camCenterX.toFixed(0)}, ${camCenterY.toFixed(0)})`;
+}
+function updateFollowPill() {
+  const pill = document.getElementById('followPill');
+  if (followingRow !== null) {
+    pill.style.display = '';
+    pill.textContent = `following agent ${followingRow}`;
+  } else { pill.style.display = 'none'; }
+}
+
+function recenterOnAgents() {
+  if (!lastAgents.length) return;
+  let minX=1e9, maxX=-1e9, minY=1e9, maxY=-1e9;
+  lastAgents.forEach(a => {
+    minX = Math.min(minX, a.pos[0]); maxX = Math.max(maxX, a.pos[0]);
+    minY = Math.min(minY, a.pos[1]); maxY = Math.max(maxY, a.pos[1]);
+  });
+  camCenterX = (minX + maxX) / 2; camCenterY = (minY + maxY) / 2;
+  const { w, h } = vpSize();
+  const padding = 120;
+  camZoom = Math.max((maxX - minX + padding) / w, (maxY - minY + padding) / h, 0.1);
+  updateZoomPill(); requestRender();
+}
+
+function followSelected() {
+  if (selectedRow !== null) { followingRow = selectedRow; updateFollowPill(); }
+}
+
+// ---------------------------------------------------------------------------
+// View tabs
+// ---------------------------------------------------------------------------
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  view = b.dataset.view;
+  drawAgents();
+}));
+
+// ---------------------------------------------------------------------------
+// Control
+// ---------------------------------------------------------------------------
+async function togglePause() {
+  const s = await (await fetch(API + '/api/control')).json();
+  await postCtl(s.paused ? 'play' : 'pause');
+}
+async function stepOnce() { await postCtl('step'); }
+async function setSpeed(v) { await postCtl('speed', v); }
+async function postCtl(action, speed) {
+  const r = await fetch(API + '/api/control', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action, speed})
+  });
+  const s = await r.json();
+  document.getElementById('speedPill').textContent = `${s.paused ? 'paused' : 'playing'} ${s.speed.toFixed(1)}×`;
+  document.getElementById('btnPause').textContent = s.paused ? '▶ play' : '⏸ pause';
+}
+document.getElementById('btnPause').addEventListener('click', togglePause);
+document.getElementById('btnStep').addEventListener('click', stepOnce);
+document.getElementById('btnSpeed05').addEventListener('click', () => setSpeed(0.5));
+document.getElementById('btnSpeed1').addEventListener('click', () => setSpeed(1));
+document.getElementById('btnSpeed2').addEventListener('click', () => setSpeed(2));
+document.getElementById('btnSpeed5').addEventListener('click', () => setSpeed(5));
+document.getElementById('btnSpeedMax').addEventListener('click', () => setSpeed(20));
+
+// ---------------------------------------------------------------------------
+// Rendering — terrain image via /api/render, agents via canvas
+// ---------------------------------------------------------------------------
+let renderTimer = null;
+function requestRender() {
+  if (renderTimer) clearTimeout(renderTimer);
+  renderTimer = setTimeout(loadTerrain, 50);
+  drawAgents();
+}
+
+function loadTerrain() {
+  if (imgLoading) return;
+  const { w, h } = vpSize();
+  const bbox = worldBbox();
+  // Cap image size to keep render cheap
+  const ow = Math.min(w, 900), oh = Math.min(h, 600);
+  const url = `${API}/api/render?xmin=${bbox.xmin.toFixed(1)}&ymin=${bbox.ymin.toFixed(1)}` +
+              `&xmax=${bbox.xmax.toFixed(1)}&ymax=${bbox.ymax.toFixed(1)}&w=${ow}&h=${oh}&t=${Date.now()}`;
+  if (url === lastImgRequest) return;
+  lastImgRequest = url;
+  imgLoading = true;
+  const newImg = new Image();
+  newImg.onload = () => {
+    worldImg.src = newImg.src;
+    worldImg.style.left = '0px';
+    worldImg.style.top = '0px';
+    worldImg.style.width = w + 'px';
+    worldImg.style.height = h + 'px';
+    imgLoading = false;
+  };
+  newImg.onerror = () => { imgLoading = false; };
+  newImg.src = url;
+}
+
+const CULTURE_COLORS = ['#a3be8c','#d08770','#88c0d0','#b48ead','#ebcb8b','#bf616a','#5e81ac','#8fbcbb'];
+const ACTION_COLORS = {0:'#6e7888',1:'#88c0d0',2:'#5e81ac',3:'#a3be8c',4:'#b48ead',
+  5:'#a3be8c',6:'#ebcb8b',7:'#bf616a',8:'#88c0d0',9:'#a3be8c',10:'#bf616a',
+  11:'#d08770',12:'#bf616a',13:'#ebcb8b'};
+
+function agentColor(a) {
+  if (view === 'culture') return CULTURE_COLORS[a.culture % CULTURE_COLORS.length];
+  if (view === 'group') return a.group_id ? CULTURE_COLORS[a.group_id % CULTURE_COLORS.length] : '#3a3f4a';
+  if (view === 'action') return ACTION_COLORS[a.action] || '#88c0d0';
+  if (view === 'hunger') {
+    const h = Math.min(1, a.drives[0]);
+    return `rgb(${Math.floor(80 + 175*h)},${Math.floor(180 - 100*h)},${Math.floor(140 - 100*h)})`;
+  }
+  return '#eceff4';
+}
+
+function drawAgents() {
+  const { w, h } = vpSize();
+  aCtx.clearRect(0, 0, w, h);
+  if (!lastAgents.length) return;
+  // Follow camera
+  if (followingRow !== null) {
+    const a = lastAgents.find(x => x.row === followingRow);
+    if (a) { camCenterX = a.pos[0]; camCenterY = a.pos[1]; updateZoomPill(); }
+  }
+  lastAgents.forEach(a => {
+    const p = worldToScreen(a.pos[0], a.pos[1]);
+    if (p.x < -20 || p.x > w + 20 || p.y < -20 || p.y > h + 20) return;
+    aCtx.fillStyle = agentColor(a);
+    const r = Math.max(2, 6 / camZoom);
+    aCtx.beginPath(); aCtx.arc(p.x, p.y, Math.min(8, r), 0, Math.PI * 2); aCtx.fill();
+    if (a.row === selectedRow) {
+      aCtx.strokeStyle = '#ebcb8b'; aCtx.lineWidth = 2;
+      aCtx.beginPath(); aCtx.arc(p.x, p.y, Math.min(11, r + 3), 0, Math.PI * 2); aCtx.stroke();
+    }
+    if (a.row === followingRow) {
+      aCtx.strokeStyle = '#88c0d0'; aCtx.lineWidth = 1.5;
+      aCtx.beginPath(); aCtx.arc(p.x, p.y, Math.min(14, r + 6), 0, Math.PI * 2); aCtx.stroke();
+    }
+  });
+  // Group centroids
+  if (view === 'group') {
+    lastGroups.forEach(g => {
+      const p = worldToScreen(g.centroid[0], g.centroid[1]);
+      aCtx.strokeStyle = CULTURE_COLORS[g.group_id % CULTURE_COLORS.length];
+      aCtx.lineWidth = 1.5; aCtx.setLineDash([4, 3]);
+      aCtx.beginPath(); aCtx.arc(p.x, p.y, 18 / camZoom + 6, 0, Math.PI * 2); aCtx.stroke();
+      aCtx.setLineDash([]);
+      aCtx.fillStyle = '#eceff4'; aCtx.font = '10px ui-monospace';
+      aCtx.fillText(`G${g.group_id}·${g.size}`, p.x + 12, p.y - 4);
+    });
+  }
+  drawMinimap();
+}
+
+function drawMinimap() {
+  const W = minimap.width, H = minimap.height;
+  mCtx.fillStyle = '#0a0d12'; mCtx.fillRect(0, 0, W, H);
+  if (!lastAgents.length) return;
+  let minX=1e9, maxX=-1e9, minY=1e9, maxY=-1e9;
+  lastAgents.forEach(a => {
+    minX=Math.min(minX,a.pos[0]); maxX=Math.max(maxX,a.pos[0]);
+    minY=Math.min(minY,a.pos[1]); maxY=Math.max(maxY,a.pos[1]);
+  });
+  const padding = 30;
+  minX -= padding; maxX += padding; minY -= padding; maxY += padding;
+  const sx = W / Math.max(1, maxX - minX), sy = H / Math.max(1, maxY - minY);
+  const s = Math.min(sx, sy);
+  lastAgents.forEach(a => {
+    const x = (a.pos[0] - minX) * s, y = (a.pos[1] - minY) * s;
+    mCtx.fillStyle = agentColor(a);
+    mCtx.fillRect(x - 1, y - 1, 2, 2);
+  });
+  // Camera rectangle
+  const bbox = worldBbox();
+  const cx = (bbox.xmin - minX) * s, cy = (bbox.ymin - minY) * s;
+  const cw = (bbox.xmax - bbox.xmin) * s, ch = (bbox.ymax - bbox.ymin) * s;
+  mCtx.strokeStyle = '#ebcb8b'; mCtx.lineWidth = 1; mCtx.strokeRect(cx, cy, cw, ch);
+}
+
+// Click on viewport to select agent
+viewport.addEventListener('click', (e) => {
+  if (dragging) return;
+  const rect = viewport.getBoundingClientRect();
+  const wpt = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+  let best = null, bd = Infinity;
+  lastAgents.forEach(a => {
+    const dx = a.pos[0] - wpt.x, dy = a.pos[1] - wpt.y;
+    const d = dx * dx + dy * dy;
+    if (d < bd) { bd = d; best = a; }
+  });
+  if (best && Math.sqrt(bd) < 5 * camZoom + 3) selectAgent(best.row);
+});
+
+// ---------------------------------------------------------------------------
+// Sidebar
+// ---------------------------------------------------------------------------
+function drawAgentList() {
+  const el = document.getElementById('agentList');
+  const sorted = [...lastAgents].sort((a, b) => b.gen - a.gen || a.row - b.row).slice(0, 50);
+  el.innerHTML = sorted.map(a => `
+    <div class="row ${a.row === selectedRow ? 'selected' : ''}" onclick="selectAgent(${a.row})">
+      <div>#${a.row}</div>
+      <div>gen ${a.gen} · c${a.culture}${a.group_id ? ' · G' + a.group_id : ''}</div>
+      <div style="color:#bf616a">H ${a.drives[0].toFixed(2)}</div>
+    </div>`).join('');
+}
+
+function drawGroupList() {
+  const el = document.getElementById('groupList');
+  if (!lastGroups.length) { el.textContent = 'aucun groupe formé'; return; }
+  el.innerHTML = lastGroups.map(g => `
+    <div class="row">
+      <div style="color:${CULTURE_COLORS[g.group_id % CULTURE_COLORS.length]}">G${g.group_id}</div>
+      <div>size ${g.size} · formé t${g.formed_tick}</div>
+      <div style="color:#6e7888">${g.centroid.map(n => n.toFixed(0)).join(',')}</div>
+    </div>`).join('');
+}
+
+let prevTick = 0, prevTime = performance.now();
+function updateKPIs(snap) {
+  document.getElementById('kpiTick').textContent = snap.tick;
+  document.getElementById('kpiAlive').textContent = snap.alive;
+  document.getElementById('kpiBirths').textContent = snap.cum_births;
+  document.getElementById('kpiDeaths').textContent = snap.cum_deaths;
+  document.getElementById('kpiEvents').textContent = snap.cum_events;
+  const now = performance.now();
+  if (snap.tick > prevTick) {
+    const tps = (snap.tick - prevTick) / ((now - prevTime) / 1000.0);
+    document.getElementById('kpiTps').textContent = tps.toFixed(1);
+  }
+  prevTick = snap.tick; prevTime = now;
+  document.getElementById('tickPill').textContent = `tick ${snap.tick}`;
+  document.getElementById('aliveePill').textContent = `pop ${snap.alive}`;
+  document.getElementById('statusPill').textContent = `sim ${snap.sim_id.slice(0,8)} • ${snap.last_tick_ms.toFixed(0)}ms`;
+}
+
+async function selectAgent(row) {
+  selectedRow = row;
+  drawAgentList();
+  drawAgents();
+  const r = await (await fetch(API + '/api/agent?row=' + row)).json();
+  if (r.error) { document.getElementById('agentDetail').textContent = r.error; return; }
+  function bar(label, v, max, danger) {
+    const pct = Math.min(100, (v / max) * 100);
+    const cls = (danger && v >= danger) ? 'danger' : '';
+    return `<div>${label}: ${v.toFixed(2)}</div><div class="bar"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>`;
+  }
+  const p = r.personality;
+  document.getElementById('agentDetail').innerHTML = `
+    <div><b>${r.uuid.slice(0,8)}…</b> · gen ${r.generation} · culture ${r.culture}${r.group_id ? ' · G'+r.group_id : ''}</div>
+    <div style="color:#6e7888">pos (${r.pos[0].toFixed(1)}, ${r.pos[1].toFixed(1)}) · né tick ${r.born_tick} · ${r.offspring} enfants · ${r.relations_count} relations</div>
+    <div style="margin-top:6px">
+      ${bar('hunger', r.drives.hunger, 1.5, 0.85)}
+      ${bar('thirst', r.drives.thirst, 1.5, 0.85)}
+      ${bar('vitality', r.vitality, 1.0)}
+      ${bar('stress', r.drives.stress, 1.5, 1.0)}
+    </div>
+    <div style="color:#a0aaba; font-size:10px; margin-top:6px">
+      O ${p.openness.toFixed(2)} · C ${p.conscientiousness.toFixed(2)} · E ${p.extraversion.toFixed(2)} · A ${p.agreeableness.toFixed(2)} · N ${p.neuroticism.toFixed(2)}<br>
+      ambition ${p.ambition.toFixed(2)} · agression ${p.aggression.toFixed(2)} · curiosité ${p.curiosity.toFixed(2)}
+    </div>`;
+}
+window.selectAgent = selectAgent;
+
+function drawEvents(events) {
+  const el = document.getElementById('events');
+  if (!events.length) { el.textContent = '—'; return; }
+  const lines = events.slice(-50).reverse().map(e => {
+    const cls = e.kind || 'event';
+    const who = (e.participants || []).map(u => u.slice(0,6)).join('·');
+    return `<div class="event-line ${cls}">t${e.tick} ${e.kind} ${who}</div>`;
+  });
+  el.innerHTML = lines.join('');
+}
+
+// ---------------------------------------------------------------------------
+// Refresh loop
+// ---------------------------------------------------------------------------
+async function refresh() {
+  try {
+    const [snap, agents, groups, events, ctl] = await Promise.all([
+      (await fetch(API + '/api/state')).json(),
+      (await fetch(API + '/api/agents')).json(),
+      (await fetch(API + '/api/groups')).json(),
+      (await fetch(API + '/api/events/recent?n=80')).json(),
+      (await fetch(API + '/api/control')).json(),
+    ]);
+    lastSnap = snap; lastAgents = agents.agents; lastGroups = groups.groups;
+    if (camCenterX === 0 && camCenterY === 0 && lastAgents.length) {
+      recenterOnAgents();
+    }
+    updateKPIs(snap);
+    drawAgentList();
+    drawGroupList();
+    drawEvents(events.events || []);
+    drawAgents();
+    document.getElementById('speedPill').textContent =
+      `${ctl.paused ? 'paused' : 'playing'} ${ctl.speed.toFixed(1)}×`;
+    document.getElementById('btnPause').textContent = ctl.paused ? '▶ play' : '⏸ pause';
+  } catch (e) {
+    document.getElementById('statusPill').textContent = 'error: ' + e.message;
+  }
+}
+
+setInterval(refresh, 500);
+setInterval(loadTerrain, 2500);
+refresh();
+</script>
+
+<!-- P2 — audio overlay HUD (2026-05-13) -->
+<script src="/static/audio_overlay.js"></script>
+<script src="/audio_overlay.js"></script>
+</body></html>

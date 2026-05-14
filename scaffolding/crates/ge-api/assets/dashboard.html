@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Genesis Engine — Observation Console</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --fg: #e9eefb;
+    --muted: #99a4c1;
+    --card: #131a36;
+    --grid: #1c2755;
+    --accent: #74c0fc;
+    --good: #80f3a2;
+    --warn: #ffd58a;
+    --bad:  #ff7a8a;
+    --gen0: #74c0fc;
+    --gen1: #80f3a2;
+    --gen2: #ffd58a;
+    --gen3: #ff7a8a;
+    --gen4: #d39bff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  header {
+    padding: 16px 24px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--grid);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 { margin: 0; font-size: 18px; letter-spacing: 0.5px; }
+  header .meta { color: var(--muted); font-size: 12px; font-family: monospace; }
+  main { padding: 16px; display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .card h2 { margin: 0 0 8px 0; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .kpi { font-size: 28px; font-weight: 600; }
+  .kpi-sub { font-size: 12px; color: var(--muted); }
+  .span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; }
+  .span-6 { grid-column: span 6; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
+  @media (max-width: 1200px) {
+    .span-3 { grid-column: span 6; }
+    .span-4 { grid-column: span 6; }
+    .span-8, .span-6 { grid-column: span 12; }
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--grid); font-family: monospace; }
+  th { color: var(--muted); font-weight: 500; }
+  .live-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--good); margin-right: 6px; vertical-align: middle;
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.35; } 100% { opacity: 1; } }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    background: var(--accent); border: none; padding: 6px 12px; border-radius: 4px;
+    color: #0b1020; font-weight: 600; cursor: pointer; font-size: 12px;
+  }
+  button:hover { filter: brightness(1.1); }
+  button.secondary { background: var(--grid); color: var(--fg); }
+  .legend { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  canvas { display: block; }
+  .event-row { display: grid; grid-template-columns: 70px 90px 1fr; gap: 6px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-family: monospace; font-size: 11.5px; }
+  .event-row .tick { color: var(--muted); }
+  .event-row .kind.birth { color: var(--good); }
+  .event-row .kind.death { color: var(--bad); }
+  .event-row .kind.other { color: var(--accent); }
+  details summary { cursor: pointer; color: var(--muted); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .stat { flex: 1; min-width: 130px; }
+  .bar { background: var(--grid); border-radius: 3px; height: 6px; overflow: hidden; margin-top: 4px; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+  .footer { color: var(--muted); font-size: 11px; padding: 16px 24px; border-top: 1px solid var(--grid); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="live-dot"></span>GENESIS ENGINE — Observation Console</h1>
+  <div class="meta" id="meta">sim: --  seed: --  tick: --</div>
+  <div class="controls">
+    <button id="btn-step">Step</button>
+    <button class="secondary" id="btn-pause">Pause polling</button>
+    <button class="secondary" id="btn-clear">Clear chart</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- KPI row -->
+  <section class="card span-3">
+    <h2>Population vivante</h2>
+    <div class="kpi" id="kpi-alive">--</div>
+    <div class="kpi-sub" id="kpi-alive-sub">--</div>
+  </section>
+  <section class="card span-3">
+    <h2>Naissances cumulées</h2>
+    <div class="kpi" id="kpi-births">--</div>
+    <div class="kpi-sub">incl. fondateurs</div>
+  </section>
+  <section class="card span-3">
+    <h2>Décès cumulés</h2>
+    <div class="kpi" id="kpi-deaths">--</div>
+    <div class="kpi-sub" id="kpi-deaths-sub">--</div>
+  </section>
+  <section class="card span-3">
+    <h2>Génération max</h2>
+    <div class="kpi" id="kpi-gen">--</div>
+    <div class="kpi-sub" id="kpi-gen-sub">lignée la plus profonde</div>
+  </section>
+
+  <!-- Population chart -->
+  <section class="card span-8">
+    <h2>Population — alive / births / deaths au cours du temps</h2>
+    <canvas id="popChart" height="220"></canvas>
+    <div class="legend">
+      <span><span class="swatch" style="background: var(--good)"></span>alive</span>&nbsp;&nbsp;
+      <span><span class="swatch" style="background: var(--accent)"></span>births cumulatives</span>&nbsp;&nbsp;
+      <span><span class="swatch" style="background: var(--bad)"></span>deaths cumulatives</span>
+    </div>
+  </section>
+
+  <!-- Deaths by cause -->
+  <section class="card span-4">
+    <h2>Décès par cause</h2>
+    <canvas id="causeChart" height="160"></canvas>
+    <table id="causeTable">
+      <thead><tr><th>Cause</th><th>Total</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- Agent map -->
+  <section class="card span-8">
+    <h2>Carte des agents (XY, couleur = génération)</h2>
+    <canvas id="map" height="320"></canvas>
+    <div class="legend">
+      <span><span class="swatch" style="background: var(--gen0)"></span>Gen 0 (fondateurs)</span>
+      <span style="margin-left:8px"><span class="swatch" style="background: var(--gen1)"></span>Gen 1</span>
+      <span style="margin-left:8px"><span class="swatch" style="background: var(--gen2)"></span>Gen 2</span>
+      <span style="margin-left:8px"><span class="swatch" style="background: var(--gen3)"></span>Gen 3</span>
+      <span style="margin-left:8px"><span class="swatch" style="background: var(--gen4)"></span>Gen 4+</span>
+      <span style="margin-left:16px;color:var(--muted)">les ✚ sont morts ; les ● sont fertiles</span>
+    </div>
+  </section>
+
+  <!-- Event feed -->
+  <section class="card span-4">
+    <h2>Flux d'événements (derniers 200)</h2>
+    <div id="events" style="max-height: 360px; overflow-y: auto;"></div>
+  </section>
+
+  <!-- Personality distribution -->
+  <section class="card span-6">
+    <h2>Distribution de personnalité (OCEAN + Genesis)</h2>
+    <canvas id="personaChart" height="200"></canvas>
+    <div class="legend">moyenne des traits chez les agents vivants. À surveiller pour repérer une dérive génétique (sélection naturelle ⇒ traits favorables augmentent).</div>
+  </section>
+
+  <!-- Agents table -->
+  <section class="card span-6">
+    <h2>Agents (top 50)</h2>
+    <table id="agentTable">
+      <thead><tr>
+        <th>gen</th><th>id</th><th>born</th><th>life</th><th>vit</th><th>kids</th><th>fert</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+</main>
+
+<div class="footer">
+  Genesis Engine — Phase 3+ Observation Console. Polling toutes les <span id="rate">1.0</span> s.
+  API : <code>/api/v1/sim/state</code> · <code>/sim/agents</code> · <code>/sim/events</code> · <code>/sim/lineage</code>
+</div>
+
+<script>
+// =================================================================
+// Genesis Engine — Observation Console (zero deps, pure ES2017).
+// Polls the API and renders charts on canvas without external libs.
+// =================================================================
+
+const RATE_MS = 1000;
+const POPULATION_WINDOW = 240; // ~4 min @1 Hz
+let paused = false;
+
+const popHistory = []; // {tick, alive, births, deaths}
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => (n === null || n === undefined ? "--" : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "));
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+function genColor(g) {
+  if (g <= 0) return cssVar("--gen0");
+  if (g === 1) return cssVar("--gen1");
+  if (g === 2) return cssVar("--gen2");
+  if (g === 3) return cssVar("--gen3");
+  return cssVar("--gen4");
+}
+
+async function fetchJSON(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(url + " -> " + r.status);
+  return r.json();
+}
+
+function drawLineChart(canvas, series, opts) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width = canvas.clientWidth * window.devicePixelRatio;
+  const h = canvas.height = (opts.height || 220) * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const W = w / window.devicePixelRatio, H = h / window.devicePixelRatio;
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 36, padR = 12, padT = 8, padB = 18;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  if (!series.length || !series[0].data.length) {
+    ctx.fillStyle = cssVar("--muted");
+    ctx.font = "12px monospace";
+    ctx.fillText("waiting for data…", padL, padT + 14);
+    return;
+  }
+  const allValues = series.flatMap(s => s.data.map(p => p.y));
+  const ymax = Math.max(1, ...allValues);
+  const tmin = series[0].data[0].x;
+  const tmax = series[0].data[series[0].data.length - 1].x;
+  const tspan = Math.max(1, tmax - tmin);
+
+  // grid
+  ctx.strokeStyle = cssVar("--grid");
+  ctx.lineWidth = 1;
+  ctx.font = "10px monospace";
+  ctx.fillStyle = cssVar("--muted");
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + innerH * (1 - i / 4);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    ctx.fillText(String(Math.round(ymax * i / 4)), 2, y + 3);
+  }
+  // x labels: tmin / tmax
+  ctx.fillText("t=" + tmin, padL, H - 2);
+  const rTxt = "t=" + tmax;
+  ctx.fillText(rTxt, W - padR - ctx.measureText(rTxt).width, H - 2);
+
+  // lines
+  for (const s of series) {
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    s.data.forEach((p, i) => {
+      const x = padL + innerW * (p.x - tmin) / tspan;
+      const y = padT + innerH * (1 - p.y / ymax);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }
+}
+
+function drawBarChart(canvas, labels, values, color) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width = canvas.clientWidth * window.devicePixelRatio;
+  const h = canvas.height = 160 * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const W = w / window.devicePixelRatio, H = h / window.devicePixelRatio;
+  ctx.clearRect(0, 0, W, H);
+  if (!values.length) {
+    ctx.fillStyle = cssVar("--muted"); ctx.font = "12px monospace";
+    ctx.fillText("no deaths yet", 6, 20);
+    return;
+  }
+  const max = Math.max(1, ...values);
+  const bw = (W - 24) / values.length;
+  ctx.font = "10px monospace";
+  values.forEach((v, i) => {
+    const x = 12 + i * bw;
+    const bh = (H - 30) * v / max;
+    ctx.fillStyle = color;
+    ctx.fillRect(x + 4, H - 18 - bh, bw - 8, bh);
+    ctx.fillStyle = cssVar("--muted");
+    const lbl = labels[i].slice(0, 8);
+    ctx.fillText(lbl, x + 4, H - 4);
+  });
+}
+
+function drawTraitBars(canvas, traitMeans) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width = canvas.clientWidth * window.devicePixelRatio;
+  const h = canvas.height = 200 * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const W = w / window.devicePixelRatio, H = h / window.devicePixelRatio;
+  ctx.clearRect(0, 0, W, H);
+  const labels = ["open", "consc", "extra", "agree", "neuro", "ambit", "risk", "aggr"];
+  const padL = 50, padR = 12, padT = 8, padB = 18;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  ctx.font = "10px monospace";
+  const bw = innerW / labels.length;
+  labels.forEach((lbl, i) => {
+    const v = traitMeans[i] || 0;
+    const x = padL + i * bw;
+    const bh = innerH * v;
+    ctx.fillStyle = cssVar("--accent");
+    ctx.fillRect(x + 4, padT + innerH - bh, bw - 8, bh);
+    ctx.fillStyle = cssVar("--muted");
+    ctx.fillText(lbl, x + 4, H - 4);
+    ctx.fillText(v.toFixed(2), x + 4, padT + innerH - bh - 2);
+  });
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + innerH * (1 - i / 4);
+    ctx.strokeStyle = cssVar("--grid"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    ctx.fillStyle = cssVar("--muted");
+    ctx.fillText((i / 4).toFixed(2), 2, y + 3);
+  }
+}
+
+function drawAgentMap(canvas, agents) {
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width = canvas.clientWidth * window.devicePixelRatio;
+  const h = canvas.height = 320 * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const W = w / window.devicePixelRatio, H = h / window.devicePixelRatio;
+  ctx.clearRect(0, 0, W, H);
+  if (!agents.length) {
+    ctx.fillStyle = cssVar("--muted"); ctx.font = "12px monospace";
+    ctx.fillText("no agents", 6, 20);
+    return;
+  }
+  // compute bbox
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const a of agents) {
+    if (a.pos[0] < minX) minX = a.pos[0];
+    if (a.pos[0] > maxX) maxX = a.pos[0];
+    if (a.pos[1] < minY) minY = a.pos[1];
+    if (a.pos[1] > maxY) maxY = a.pos[1];
+  }
+  // pad bbox
+  const padW = Math.max(2, (maxX - minX) * 0.05);
+  const padH = Math.max(2, (maxY - minY) * 0.05);
+  minX -= padW; maxX += padW; minY -= padH; maxY += padH;
+  const sx = W / Math.max(0.001, maxX - minX);
+  const sy = H / Math.max(0.001, maxY - minY);
+  const s = Math.min(sx, sy);
+  const offX = (W - s * (maxX - minX)) / 2;
+  const offY = (H - s * (maxY - minY)) / 2;
+  // grid
+  ctx.strokeStyle = cssVar("--grid"); ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const x = i * W / 4, y = i * H / 4;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  for (const a of agents) {
+    const x = offX + s * (a.pos[0] - minX);
+    const y = offY + s * (a.pos[1] - minY);
+    const color = genColor(a.generation);
+    if (a.deceased) {
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x - 3, y); ctx.lineTo(x + 3, y);
+      ctx.moveTo(x, y - 3); ctx.lineTo(x, y + 3); ctx.stroke();
+    } else {
+      ctx.fillStyle = color;
+      ctx.globalAlpha = a.fertile ? 1.0 : 0.55;
+      ctx.beginPath(); ctx.arc(x, y, a.fertile ? 4 : 3, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1.0;
+    }
+  }
+  // bbox label
+  ctx.fillStyle = cssVar("--muted"); ctx.font = "10px monospace";
+  ctx.fillText(`x:[${minX.toFixed(1)}, ${maxX.toFixed(1)}]  y:[${minY.toFixed(1)}, ${maxY.toFixed(1)}]`, 6, H - 4);
+}
+
+function renderEvents(events) {
+  const div = $("events");
+  div.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  for (const ev of events.slice().reverse()) {
+    const row = document.createElement("div");
+    row.className = "event-row";
+    const k = String(ev.kind || "?").toLowerCase();
+    const cls = k === "birth" ? "birth" : (k === "death" ? "death" : "other");
+    const meta = ev.metadata || {};
+    const detail =
+      cls === "birth" ? `gen=${meta.generation ?? 0}` :
+      cls === "death" ? `cause=${meta.cause ?? "?"}` :
+      JSON.stringify(meta);
+    // Tick is serialized as a plain number (newtype struct in Rust).
+    const tick = (typeof ev.tick === "object" && ev.tick !== null && "0" in ev.tick)
+      ? ev.tick["0"] : ev.tick;
+    row.innerHTML =
+      `<span class="tick">t=${tick}</span>` +
+      `<span class="kind ${cls}">${ev.kind}</span>` +
+      `<span>${detail}</span>`;
+    frag.appendChild(row);
+  }
+  div.appendChild(frag);
+}
+
+function renderAgentTable(agents) {
+  const tbody = $("agentTable").querySelector("tbody");
+  tbody.innerHTML = "";
+  agents.slice(0, 50).forEach(a => {
+    const tr = document.createElement("tr");
+    const idShort = a.id.slice(0, 8);
+    tr.innerHTML =
+      `<td style="color:${genColor(a.generation)}">${a.generation}</td>` +
+      `<td>${idShort}</td>` +
+      `<td>${a.born_tick}</td>` +
+      `<td>${a.lifespan_ticks}</td>` +
+      `<td>${(a.vitality ?? 0).toFixed(2)}</td>` +
+      `<td>${a.offspring_count ?? 0}</td>` +
+      `<td>${a.fertile ? "✓" : a.deceased ? "—" : "·"}</td>`;
+    if (a.deceased) tr.style.opacity = 0.45;
+    tbody.appendChild(tr);
+  });
+}
+
+function updateCausesUi(deathsByCause) {
+  const labels = Object.keys(deathsByCause || {});
+  const values = labels.map(l => deathsByCause[l]);
+  drawBarChart($("causeChart"), labels, values, cssVar("--bad"));
+  const tbody = $("causeTable").querySelector("tbody");
+  tbody.innerHTML = "";
+  labels.forEach((l, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${l}</td><td>${values[i]}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function meanPersonalityOf(agents) {
+  const alive = agents.filter(a => !a.deceased);
+  if (!alive.length) return [0,0,0,0,0,0,0,0];
+  const sum = [0,0,0,0,0,0,0,0];
+  for (const a of alive) {
+    const p = a.personality || [0,0,0,0,0,0,0,0];
+    for (let i = 0; i < 8; i++) sum[i] += p[i] || 0;
+  }
+  return sum.map(x => x / alive.length);
+}
+
+async function tick() {
+  if (paused) return schedule();
+  try {
+    const [state, agents, events] = await Promise.all([
+      fetchJSON("/api/v1/sim/state"),
+      fetchJSON("/api/v1/sim/agents?limit=10000"),
+      fetchJSON("/api/v1/sim/events?limit=200"),
+    ]);
+    $("meta").textContent = `sim: ${state.sim_id.slice(0,8)}  seed: ${state.seed_hex}  tick: ${state.tick}`;
+    $("kpi-alive").textContent = fmt(state.agents_alive);
+    $("kpi-alive-sub").textContent = `chunks chargés : ${state.chunks_in_memory}`;
+    $("kpi-births").textContent = fmt(state.births_total);
+    $("kpi-deaths").textContent = fmt(state.agents_dead);
+    const causes = state.deaths_by_cause || {};
+    const topCause = Object.entries(causes).sort((a,b) => b[1]-a[1])[0];
+    $("kpi-deaths-sub").textContent = topCause ? `cause #1 : ${topCause[0]} (${topCause[1]})` : "aucune mort observée";
+    $("kpi-gen").textContent = fmt(state.max_generation);
+    $("kpi-gen-sub").textContent = state.max_generation >= 2
+      ? "≥ 3 générations : critère Phase 2 atteint"
+      : (state.max_generation >= 1 ? "1ʳᵉ génération née" : "fondateurs seuls");
+
+    popHistory.push({
+      tick: state.tick,
+      alive: state.agents_alive,
+      births: Number(state.births_total),
+      deaths: state.agents_dead,
+    });
+    while (popHistory.length > POPULATION_WINDOW) popHistory.shift();
+
+    drawLineChart($("popChart"), [
+      { color: cssVar("--good"),   data: popHistory.map(p => ({ x: p.tick, y: p.alive })) },
+      { color: cssVar("--accent"), data: popHistory.map(p => ({ x: p.tick, y: p.births })) },
+      { color: cssVar("--bad"),    data: popHistory.map(p => ({ x: p.tick, y: p.deaths })) },
+    ], { height: 220 });
+
+    updateCausesUi(causes);
+    drawAgentMap($("map"), agents);
+    drawTraitBars($("personaChart"), meanPersonalityOf(agents));
+    renderEvents(events);
+    renderAgentTable(agents);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    schedule();
+  }
+}
+
+function schedule() { setTimeout(tick, RATE_MS); }
+
+$("btn-step").addEventListener("click", async () => {
+  try { await fetch("/api/v1/sim/step", { method: "POST" }); } catch (e) { console.error(e); }
+});
+$("btn-pause").addEventListener("click", (e) => {
+  paused = !paused;
+  e.target.textContent = paused ? "Resume polling" : "Pause polling";
+});
+$("btn-clear").addEventListener("click", () => { popHistory.length = 0; });
+
+tick();
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+[package]
+name = "ge-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "ge-api"
+path = "src/main.rs"
+
+[dependencies]
+ge-core    = { path = "../ge-core" }
+ge-world   = { path = "../ge-world" }
+ge-agents  = { path = "../ge-agents" }
+ge-cognition = { path = "../ge-cognition" }
+ge-ann     = { path = "../ge-ann" }
+
+tokio.workspace = true
+axum.workspace = true
+tonic.workspace = true
+prost.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+clap.workspace = true
+uuid.workspace = true
+glam.workspace = true
+bevy_ecs.workspace = true
+blake3.workspace = true

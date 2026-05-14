@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ge-sim-node
+  namespace: genesis-engine
+  labels: { app: ge-sim-node, component: simulation-plane }
+spec:
+  replicas: 10                 # autoscaled by Karpenter+KEDA
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: ge-sim-node }
+  template:
+    metadata:
+      labels: { app: ge-sim-node }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      serviceAccountName: ge-sim-node
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: sim-node
+          image: ghcr.io/genesis-engine/ge-sim-node:0.1.0
+          imagePullPolicy: IfNotPresent
+          args: ["--config", "/etc/ge/config.yaml"]
+          ports:
+            - { name: grpc,    containerPort: 7000 }
+            - { name: metrics, containerPort: 9090 }
+          env:
+            - name: RUST_LOG
+              value: "info,ge_world=debug"
+            - name: SIM_NODE_ID
+              valueFrom: { fieldRef: { fieldPath: metadata.name } }
+          envFrom:
+            - secretRef: { name: ge-sim-secrets }
+          resources:
+            requests: { cpu: "8",  memory: "16Gi" }
+            limits:   { cpu: "16", memory: "32Gi" }
+          volumeMounts:
+            - { name: config,    mountPath: /etc/ge, readOnly: true }
+            - { name: spire-agent, mountPath: /run/spire/sockets, readOnly: true }
+          livenessProbe:
+            grpc: { port: 7000 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            grpc: { port: 7000, service: "ge.sim.v1.Health" }
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+      volumes:
+        - name: config
+          configMap: { name: ge-sim-config }
+        - name: spire-agent
+          csi:
+            driver: csi.spiffe.io
+            readOnly: true
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ge-sim-node
+  namespace: genesis-engine
+spec:
+  podSelector:
+    matchLabels: { app: ge-sim-node }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: { matchLabels: { app: ge-tick-coordinator } }
+        - podSelector: { matchLabels: { app: ge-annaliste } }
+      ports: [{ port: 7000, protocol: TCP }]
+  egress:
+    - to:
+        - podSelector: { matchLabels: { app: ge-tick-coordinator } }
+        - podSelector: { matchLabels: { app: triton-inference } }
+        - podSelector: { matchLabels: { app: cockroachdb } }
+        - podSelector: { matchLabels: { app: dragonflydb } }
+        - podSelector: { matchLabels: { app: redpanda } }
+      ports:
+        - { port: 7000,  protocol: TCP }
+        - { port: 8001,  protocol: TCP }
+        - { port: 26257, protocol: TCP }
+        - { port: 6379,  protocol: TCP }
+        - { port: 9092,  protocol: TCP }

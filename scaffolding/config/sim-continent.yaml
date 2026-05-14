@@ -1,0 +1,43 @@
+# Genesis Engine — config Continent (1 M agents)
+simulation:
+  name: "continent-prod"
+  seed: 0x__REPLACE_WITH_SECURE_RANDOM__
+  tier: continent
+  time_scale: fast                # x100
+  max_agents: 1000000
+
+world:
+  size: infinite
+  voxel_size_m: 0.5
+  chunk_size: [64, 64, 128]
+
+biology:
+  metabolic_rate: 1.0
+  reproduction_cooldown_days: 30
+
+cognition:
+  policy_model: "policy-tx-200m"
+  world_model: "dreamer-v3-base"
+  perception_encoder: "dinov3-small"
+  inference_pool:
+    triton_endpoint: "triton.inference.svc.cluster.local:8001"
+    batch_window_ms: 5
+    max_batch_size: 256
+
+evolution:
+  mutation_rate: 0.001
+
+snapshots:
+  interval_ticks: 1000000
+  retention_count: 50
+  storage: "s3://ge-snapshots/continent/"
+
+observability:
+  trace_sampling_rate: 0.1
+  metrics_endpoint: "http://otel-collector:4317"
+
+infra:
+  sim_nodes: 100
+  inference_gpus: 80
+  data_replicas: 5
+  region_strategy: multi-region   # us-east, eu-west, ap-south

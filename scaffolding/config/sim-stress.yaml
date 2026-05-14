@@ -1,0 +1,54 @@
+# Genesis Engine — config Stress (Phase 1 — 100 fondateurs sur petri élargi)
+#
+# Permet de vérifier que la boucle de sim soutient ≥100 agents simultanés
+# sans dépasser la cadence cible (100 ms / tick à 10 Hz).
+# À utiliser pour les sessions longues d'observation comportementale.
+
+simulation:
+  name: "stress-100"
+  seed: 0xC0FFEE_DEADBEEF_FEEDFACE_BAADC0DE
+  tier: petri
+  time_scale: standard
+  max_agents: 500
+
+world:
+  size: bounded
+  bounds_km: [4, 4]
+  voxel_size_m: 0.5
+  chunk_size: [64, 64, 128]
+  biome_distribution: realistic
+  initial_biomes:
+    - tropical_humid
+    - temperate_humid
+    - savanna
+
+biology:
+  metabolic_rate: 1.0
+  reproduction_cooldown_days: 30
+  child_dependency_years: 10
+  base_lifespan_years: 80
+
+cognition:
+  policy_model: "policy-r0-reflex"
+
+evolution:
+  mutation_rate: 0.001
+
+events:
+  earthquake_per_century: 0
+  volcano_per_century: 0
+  pandemic_per_century: 0
+
+snapshots:
+  interval_ticks: 100000
+  retention_count: 10
+  storage: "minio://genesis-snapshots/stress/"
+
+observability:
+  trace_sampling_rate: 1.0
+
+founders:
+  count: 100
+  spawn_strategy: "near-water-and-food"
+  initial_genome: "balanced-baseline"
+  knowledge: ["survive", "reproduce", "interact"]

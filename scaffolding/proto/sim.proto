@@ -1,0 +1,132 @@
+// Genesis Engine — Simulation Plane gRPC contracts
+syntax = "proto3";
+package ge.sim.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// ── Tick coordination ──────────────────────────────────────────────────
+service TickCoordinator {
+  // Sim node registers and asks for next tick.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  // Stream of tick assignments + barrier signals.
+  rpc TickStream(TickStreamRequest) returns (stream TickAssignment);
+  // Sim node reports tick completion.
+  rpc CompleteTick(CompleteTickRequest) returns (CompleteTickResponse);
+}
+
+message HeartbeatRequest {
+  string sim_node_id = 1;
+  string sim_id = 2;
+  ShardCapacity capacity = 3;
+}
+
+message HeartbeatResponse {
+  bool accepted = 1;
+  repeated ChunkCoord assigned_chunks = 2;
+}
+
+message ShardCapacity {
+  uint32 max_chunks = 1;
+  uint32 max_agents = 2;
+  uint32 cpu_cores = 3;
+  uint64 ram_bytes = 4;
+}
+
+message ChunkCoord {
+  int32 x = 1;
+  int32 y = 2;
+  int32 z = 3;
+}
+
+message TickStreamRequest {
+  string sim_node_id = 1;
+  string sim_id = 2;
+  uint64 last_completed_tick = 3;
+}
+
+message TickAssignment {
+  uint64 tick = 1;
+  // Agents handed over to this node since last tick.
+  repeated AgentHandover handovers = 2;
+  bytes prev_tick_root = 3; // 32 bytes BLAKE3
+}
+
+message AgentHandover {
+  string agent_id = 1;
+  bytes serialized_state = 2; // rkyv
+  ChunkCoord origin_chunk = 3;
+}
+
+message CompleteTickRequest {
+  string sim_node_id = 1;
+  uint64 tick = 2;
+  bytes tick_delta_root = 3;
+  uint32 events_emitted = 4;
+}
+
+message CompleteTickResponse {
+  bool accepted = 1;
+}
+
+// ── Cognition (Triton-compatible) ──────────────────────────────────────
+service CognitionService {
+  rpc BatchInfer(BatchInferRequest) returns (BatchInferResponse);
+}
+
+message BatchInferRequest {
+  uint64 tick = 1;
+  repeated AgentObservation observations = 2;
+  string model_id = 3;
+}
+
+message AgentObservation {
+  string agent_id = 1;
+  bytes vision_emb = 2;        // float32[384]
+  bytes audio_emb = 3;
+  repeated float drives = 4;   // 8 floats
+  repeated float mood = 5;     // 8 floats
+  bytes memory_summary = 6;
+}
+
+message BatchInferResponse {
+  uint64 tick = 1;
+  repeated AgentDecision decisions = 2;
+}
+
+message AgentDecision {
+  string agent_id = 1;
+  uint32 action_id = 2;
+  bytes action_args = 3;       // protobuf any
+  float confidence = 4;
+}
+
+// ── Event stream (also published on Redpanda) ──────────────────────────
+message Event {
+  string event_id = 1;
+  string sim_id = 2;
+  uint64 tick = 3;
+  EventKind kind = 4;
+  repeated string participants = 5;
+  Vec3 location = 6;
+  bytes metadata_json = 7;
+  google.protobuf.Timestamp wall_clock = 8;
+}
+
+enum EventKind {
+  EVENT_UNSPECIFIED = 0;
+  EVENT_BIRTH = 1;
+  EVENT_DEATH = 2;
+  EVENT_INNOVATION = 3;
+  EVENT_CONFLICT = 4;
+  EVENT_FOUNDING = 5;
+  EVENT_CATASTROPHE = 6;
+  EVENT_TRADE = 7;
+  EVENT_VOCALIZATION = 8;
+  EVENT_BUILD = 9;
+}
+
+message Vec3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
