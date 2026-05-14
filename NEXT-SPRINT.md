@@ -1,5 +1,46 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 24 — Phase 4 COMPLÈTE : agriculture + writing + polity).
+**Dernière mise à jour :** 14 mai 2026 (session 25 — Wave 9d cognition wiring : agents utilisent PLANT/HARVEST).
+
+---
+
+## ✅ Livré session 25 (2026-05-14) — Wave 9d cognition wiring
+
+Le dernier pré-requis Phase 5. Les modules Phase 4 (agriculture +
+writing + polity) sont maintenant **accessibles depuis les actions
+agents** via le pattern dispatch global.
+
+### Pattern d'extension
+
+`engine/agriculture.py` installe maintenant aussi un wrapper sur
+`engine.cognition.apply_decision` :
+- Si `action == PLANT` → appelle `plant_seed` avec le clade par
+  défaut le plus rentable du seed_library de l'agent's culture
+- Si `action == HARVEST` → appelle `harvest`
+- Pour toute autre action : pass-through au handler original
+- Side-effect : sur `FORAGE` réussi → `maybe_record_forage_discovery`
+  pour que la culture apprenne les clades édibles présents
+
+Pattern identique à `physiology._physio_global_wrapper` avec
+`_AG_DISPATCH[id(agents)] = (sim, state)` pour multi-sims sûrs.
+
+### Smoke `p33_cognition_wiring_smoke` **5/5 PASS** :
+- Autonomous PLANT via apply_decision wrapper (50→90 kg poaceae_c3)
+- Autonomous HARVEST (inv_food 0→10 kg)
+- FORAGE déclenche découverte de seeds (lib_size 2→12)
+- 200 ticks sim full sans crash
+- Déterminisme bit-identique `dd0d167f333a2057c9ef0f98`
+
+Non-régression : p20 (physio + cholera fix), p30 (agriculture),
+p31 (writing), p32 (polity) tous PASS.
+
+Pré-requis Phase 5 :
+- ✅ 14 modules Wave 1-9c
+- ✅ P-NEW.22 cholera + P-NEW.24 cache
+- ✅ **Wave 9d cognition wiring**
+- ⏳ Wave 10 : personality drives politics (ambition→fonde polities)
+- ⏳ Wave 11 : optim run 10K sim-yr sans crash
+
+---
 
 ---
 

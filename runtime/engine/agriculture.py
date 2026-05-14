@@ -308,13 +308,110 @@ def tick_agriculture(sim, state: AgricultureState) -> None:
 # Installer + reporter
 # ---------------------------------------------------------------------------
 
+# Module-level dispatch table : id(agents) -> (sim, state). The
+# apply_decision wrapper is installed once per process and routes each
+# call to the matching sim's AgricultureState — same pattern as
+# engine.physiology._PHYSIO_DISPATCH. Allows multiple sims to coexist.
+_AG_DISPATCH: Dict[int, Tuple[object, "AgricultureState"]] = {}
+
+
+def _ag_global_wrapper(agents, row, decision, streamer, tick):
+    """Stacked wrapper around the previous ``apply_decision``.
+
+    Handles ActionKind.PLANT and ActionKind.HARVEST + side-effects
+    on FORAGE (seed discovery). Falls through to ``inner`` for all
+    other actions.
+    """
+    import engine.cognition as _cog
+    from engine.agent import ActionKind
+
+    inner = getattr(_cog, "_ag_inner_apply_decision", None)
+    if inner is None:
+        return None
+    pair = _AG_DISPATCH.get(id(agents))
+    if pair is None:
+        return inner(agents, row, decision, streamer, tick)
+    sim, state = pair
+    act = int(decision.action)
+
+    # PLANT — bridge to plant_seed. The agent needs a target clade ;
+    # we encode it in decision.target_x as a hash of the clade name
+    # (cognition.decide may stash it). Fallback : pick the highest-
+    # yield seed in the agent's culture library.
+    if act == int(ActionKind.PLANT):
+        culture = _agent_culture(sim, row)
+        lib = state.culture_seed_library.get(culture, set())
+        clade = ""
+        # Try the agent's intent first (target_x encodes the index).
+        try:
+            idx = int(decision.target_x)
+            ordered = sorted(lib)
+            if 0 <= idx < len(ordered):
+                clade = ordered[idx]
+        except Exception:
+            pass
+        if not clade and lib:
+            # Pick the highest-edible-kcal clade we know.
+            best = ("", 0.0)
+            for c in lib:
+                cl = CLADE_BY_NAME.get(c)
+                if cl is None:
+                    continue
+                if cl.edible_kcal_per_kg > best[1]:
+                    best = (c, cl.edible_kcal_per_kg)
+            clade = best[0]
+        if clade:
+            plant_seed(sim, state, row, clade)
+        # Velocity reset like other stationary actions.
+        try:
+            agents.vel[row, :2] = 0.0
+        except Exception:
+            pass
+        return []
+
+    # HARVEST — bridge to harvest() ; result already credited inv_food.
+    if act == int(ActionKind.HARVEST):
+        harvest(sim, state, row)
+        try:
+            agents.vel[row, :2] = 0.0
+        except Exception:
+            pass
+        return []
+
+    # All other actions : delegate, then hook FORAGE side-effect.
+    events = inner(agents, row, decision, streamer, tick)
+    if act == int(ActionKind.FORAGE):
+        try:
+            maybe_record_forage_discovery(sim, state, row)
+        except Exception:
+            pass
+    return events
+
+
+def _patch_actions(sim, state: AgricultureState) -> None:
+    """Register sim in the dispatch table and install the global
+    wrapper exactly once per process."""
+    import engine.cognition as _cog
+    import engine.sim as _sim_mod
+    _AG_DISPATCH[id(sim.agents)] = (sim, state)
+    if getattr(_cog, "_ag_inner_apply_decision", None) is None:
+        # First install — capture current apply_decision as inner.
+        _cog._ag_inner_apply_decision = _cog.apply_decision
+        _cog.apply_decision = _ag_global_wrapper
+        if hasattr(_sim_mod, "apply_decision"):
+            _sim_mod.apply_decision = _ag_global_wrapper
+
+
 def install_agriculture(sim) -> AgricultureState:
-    """Idempotent installer. Wraps sim.step with the agriculture tick."""
+    """Idempotent installer. Wraps sim.step with the agriculture tick
+    AND wraps cognition.apply_decision so agents can actually use
+    PLANT / HARVEST and so FORAGE triggers seed discovery."""
     existing: Optional[AgricultureState] = getattr(sim, "_ag_state", None)
     if existing is not None:
         return existing
     state = AgricultureState()
     sim._ag_state = state
+    _patch_actions(sim, state)
     orig_step = sim.step
 
     def wrapped_step():
