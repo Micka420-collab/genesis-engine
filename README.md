@@ -5,6 +5,13 @@
 ### Plateforme de Simulation Civilisationnelle Autonome
 **An Artificial-Life Laboratory for Emergent Civilizations**
 
+🌐 **Languages** :
+[🇫🇷 Français](README.md) ·
+[🇬🇧 English](README.en.md) ·
+[🇪🇸 Español](README.es.md) ·
+[🇨🇳 中文](README.zh-CN.md) ·
+[🇸🇦 العربية](README.ar.md)
+
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/release/python-3140/)
 [![Status: Phase 5g](https://img.shields.io/badge/status-Phase_5g_alpha-orange.svg)](#-roadmap)
