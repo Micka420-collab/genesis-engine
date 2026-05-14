@@ -1,5 +1,37 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 12 — P-NEW.21 path (b) mask cache + flag cache).
+**Dernière mise à jour :** 14 mai 2026 (session 13 — FUTURE-VISION Wave 2 livrée).
+
+---
+
+## ✅ Livré session 13 (2026-05-14) — FUTURE-VISION Wave 2
+
+Pilier 2 ("Invention émergente de matériaux") élargi : alliages
+ternaires + **dopage non-linéaire** + registre par culture +
+transmission de recettes.
+
+**Mécanisme neuf** : `_detect_doping(composition)` identifie un pattern
+host (≥80 %) + dopants (<10 %). `_doping_hardness_boost` ajoute un
+delta non-linéaire en Mohs (6× pour interstitiels C/N/B/H, 2× pour
+substitutionnels, saturation sqrt à ~5 %, cap +5 Mohs).
+
+**Effet** : Fe pur 1.79 Mohs → acier (Fe + 1.5 % C + 1.5 % Mn) **6.17
+Mohs** (+4.4 du dopage). Bronze Cu70Sn30 (binaire) reste sous la règle
+linéaire Wave 1 (1.79 Mohs), phosphor bronze Cu94Sn5P1 (host+dopants)
+gagne +2.89 Mohs. Le pattern discrimine correctement solution solide
+vs dopage interstitiel.
+
+`scripts/p19_wave2_integration.py` (6/6 PASS) valide ternaire +
+dopage + isolation per-culture + transmission de recettes. Wave 1
+(`p15`, `p17`) sans régression.
+
+Voir `docs/sprints/2026-05-14_PHASE9-WAVE2.md`.
+
+### Wave 3 (R&D future)
+Composites bois-céramique, matrices fibre-renforcée, chimie hors
+lithosphère (atmosphères CO2-rich, températures extrêmes). Cible :
+permettre les matériaux que notre histoire a négligés.
+
+---
 
 ---
 

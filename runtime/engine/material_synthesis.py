@@ -445,11 +445,77 @@ def _canonical_name(composition: Dict[str, float]) -> str:
     return f"{prefix}_{body}"
 
 
+# ----------------------------------------------------------------------------
+# --- Doping (Wave 2) --------------------------------------------------------
+# ----------------------------------------------------------------------------
+# Wave 2 of FUTURE-VISION introduces *non-linear* property effects from
+# small concentrations of one element added to a major host. Real-world
+# calibrations:
+#   Fe + 0.2-2 % C   -> martensitic steel, +3 to +5 Mohs vs pure Fe
+#   Cu + 1-10 % Sn   -> phosphor / tin bronze, +1 to +2 Mohs vs pure Cu
+#   Si + ppm B/P     -> semiconductor (out of scope for hardness, but tagged)
+# The mechanism is lattice-distortion / dislocation pinning, which is
+# strongest when the dopant is *interstitial* (much smaller than host)
+# rather than *substitutional* (similar size). Effect saturates with
+# concentration -> we use a sqrt growth and a hard cap.
+
+_DOPING_HOST_THRESHOLD = 0.80   # min fraction to be considered the host
+_DOPING_MAX_DOPANT_FRAC = 0.10  # max fraction to qualify as dopant
+_INTERSTITIAL_DOPANTS = frozenset({"C", "N", "B", "H"})
+
+
+def _detect_doping(composition: Dict[str, float]):
+    """Identify a doping pattern.
+
+    Returns ``(host_symbol, [(dopant, fraction), ...])`` if exactly one
+    element has ``fraction >= 0.80`` and at least one other element has
+    ``0 < fraction < 0.10``. Else ``(None, [])``.
+
+    A material like ``{Fe: 0.97, C: 0.015, Mn: 0.015}`` (steel) qualifies;
+    a bronze ``{Cu: 0.70, Sn: 0.30}`` does NOT (Sn fraction too high), so
+    bronze stays governed by the linear Vegard rule of Wave 1.
+    """
+    major = [(el, f) for el, f in composition.items()
+             if f >= _DOPING_HOST_THRESHOLD]
+    if len(major) != 1:
+        return None, []
+    host = major[0][0]
+    dopants = [(el, f) for el, f in composition.items()
+               if el != host and 0.0 < f < _DOPING_MAX_DOPANT_FRAC]
+    if not dopants:
+        return None, []
+    return host, dopants
+
+
+def _doping_hardness_boost(host: str, dopants) -> float:
+    """Compute the non-linear hardness boost from lattice doping.
+
+    Boost per dopant scales as ``sqrt(min(20 * frac, 1.0))`` (saturates
+    around 5 % concentration) and is multiplied by 6.0 for interstitial
+    dopants (C, N, B, H) or 2.0 for substitutional. The total is capped
+    at +5 Mohs so a single material can never exceed Mohs 10.
+    """
+    boost = 0.0
+    for dopant, frac in dopants:
+        if not _has_element(dopant):
+            continue
+        base = 6.0 if dopant in _INTERSTITIAL_DOPANTS else 2.0
+        boost += base * math.sqrt(min(frac * 20.0, 1.0))
+    return min(boost, 5.0)
+
+
 def _derive_properties(
     composition: Dict[str, float],
     conditions: SynthesisConditions,
 ) -> Dict[str, float]:
-    """Compute density, melting point, hardness, conductivity heuristics."""
+    """Compute density, melting point, hardness, conductivity heuristics.
+
+    Wave 1 (linear) properties are computed first; Wave 2 doping then
+    layers a non-linear hardness boost on top when the composition
+    matches a host+dopant pattern. The boost is intentionally null for
+    Wave 1 stoichiometries (binary near-50/50 alloys) so legacy callers
+    see identical numbers.
+    """
     # Density — use chemistry.density_alloy if available, else weighted avg.
     rho = float(density_alloy(composition))
 
@@ -478,8 +544,13 @@ def _derive_properties(
     if total_w > 0:
         mean_bond /= total_w
     # Calibration: 100 kJ/mol -> Mohs 1, 800 kJ/mol -> Mohs 9.
-    hardness = 0.5 + (mean_bond - 100.0) * (9.0 / 700.0)
-    hardness = max(0.5, min(10.0, hardness))
+    hardness_linear = 0.5 + (mean_bond - 100.0) * (9.0 / 700.0)
+    hardness_linear = max(0.5, min(10.0, hardness_linear))
+
+    # Wave 2 — non-linear doping correction.
+    host, dopants = _detect_doping(composition)
+    doping_boost = _doping_hardness_boost(host, dopants) if host else 0.0
+    hardness = min(10.0, hardness_linear + doping_boost)
 
     # Electrical conductivity — coarse "good" / "poor". >50% metals -> good.
     metal_frac = sum(
@@ -491,8 +562,11 @@ def _derive_properties(
         "density_g_cm3": rho,
         "melting_point_K": melting_K,
         "hardness_mohs_estimate": hardness,
+        "hardness_linear_only": hardness_linear,
+        "doping_boost_mohs": doping_boost,
         "electrical_conductivity_estimate": conductivity_good,
         "metal_fraction": metal_frac,
+        "is_doped": 1.0 if host else 0.0,
     }
 
 
