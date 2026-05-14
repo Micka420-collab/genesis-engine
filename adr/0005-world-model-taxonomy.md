@@ -81,6 +81,11 @@ publiquement engagée (cas de `world_model.py` P8).
 | `sim_lift` | Genesis-L2 Sim-Lift | paper-L2 Simulator | Markov succession 5-states + érosion par tick. Multi-step. Lois biophysiques. |
 | `ai_detail` (à venir) | Genesis-L3 AI Detail | paper-L1 Predictor | NCA conditionné biome. One-step détail. |
 | `realism` | Genesis-L4 Feedback | paper-L2 Simulator | Hydrologie + saisons + wildlife — rollouts multi-tick. |
+| `physiology` (Wave 3) | Genesis-L4 Feedback | paper-L2 Simulator | Excrétion, hygiène, peau, pathogènes contagieux. Logistique non-linéaire. |
+| `photosynthesis` (Wave 4) | Genesis-L4 Feedback | paper-L2 Simulator | Farquhar-von Caemmerer-Berry C3/C4/CAM. Lit Ca, PAR, T → kcal/cell/tick. |
+| `material_aging` (Wave 4) | Genesis-L4 Feedback | paper-L1 Predictor | Corrosion / rot / fatigue per-instance. One-step decay par tick. |
+| `marine` (Wave 5, P5) | Genesis-L4 Feedback | paper-L2 Simulator | Courants, marées M2, plancton → poisson → prédateur. Rollouts multi-tick. |
+| `global_world` (Phase 15, P3) | Genesis-L4 Feedback | paper-L2 Simulator | Atmosphère + horloge + migration partagées entre N régions. Rollouts CO2 multi-régions respectent la conservation de masse. |
 | `world_model` (P8) | Genesis-L5 World Models | paper-L2 Simulator → paper-L3 Evolver | DreamerV3 par culture. Naissance en Simulator pur ; cible Evolver. |
 
 ### Endpoint d'observation
