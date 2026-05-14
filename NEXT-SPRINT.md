@@ -1,5 +1,57 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 25 — Wave 9d cognition wiring : agents utilisent PLANT/HARVEST).
+**Dernière mise à jour :** 14 mai 2026 (session 26 — Wave 10 géologie : 36 minerais réels + strates).
+
+---
+
+## ✅ Livré session 26 (2026-05-14) — Wave 10 géologie ultra-réaliste
+
+**`engine/mineral_catalog.py` (~580 LOC) + `engine/geology.py` (~410 LOC)** :
+
+### 36 minéraux scientifiquement catalogués
+- 6 native elements (or, argent, cuivre, soufre, graphite, diamant)
+- 5 oxydes (hématite Fe₂O₃, magnétite, bauxite, cassitérite SnO₂, rutile)
+- 5 sulfures (chalcopyrite, galène, sphalérite, pyrite, cinabre)
+- 3 halides/sels (halite NaCl, sylvite, gypse)
+- 2 carbonates (calcite, dolomie)
+- 3 silicates (quartz, feldspath, mica)
+- 9 roches (3 ignées, 3 sédimentaires, 3 métamorphiques)
+- 3 organiques (tourbe, charbon, schiste bitumineux)
+
+Chacun avec **formule chimique réelle**, densité, dureté Mohs,
+biome_affinity, fenêtre de profondeur, `yields_per_kg_ore` (bridge
+Wave 1 chemistry).
+
+### Strates générées par chunk
+Colonne 0→1000m verticale, 4-5 couches : topsoil → regolith →
+sediment (lowland) → bedrock igneous → metamorphic deep (montagnes).
+Choix rock_type par biome (basalte volcanique vs granite continental
+vs gneiss profond).
+
+### Mining déterministe
+`mine_at(sim, row, depth_m, kg)` extrait ore selon ore_mix, crédite
+inv_metal/inv_stone, retourne `{mineral → kg}`. Conversion éléments
+via `yields_per_kg_ore` direct dans material_synthesis (Wave 1/2).
+
+**Émergence Léman** : un chunk a `native_gold 0.48%` en couche
+sédimentaire 5-200m, hematite + pyrite en topsoil. Mining 1.3 kg →
+éléments K/Al/Si/O/Fe/Ca/C ready for synthesis.
+
+### Tests
+- `p34_geology_smoke` **8/8 PASS** (catalogue, strates, extraction,
+  inv credit, element yields, ADR-0005, persistence)
+- Non-régression p18 (**15/15**), p23, p33 PASS
+
+**ActionKind.MINE = 17** ajouté (wiring cognition prévu en Wave 11).
+
+Voir `docs/sprints/2026-05-14_PHASE22-GEOLOGY.md`.
+
+### Wave 11 (suite immédiate)
+- Cognition MINE wiring (pattern agriculture)
+- Smelting (ActionKind.SMELT consomme combustible + ore + outil)
+- Veines/lodes étroites au lieu d'ore_mix uniforme
+- Bridge construction.py → consomme éléments réels
+
+---
 
 ---
 

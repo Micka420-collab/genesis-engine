@@ -21,6 +21,7 @@ GET  /api/animal_evolution_state → Wave 8 fauna: 50 species populations, preda
 GET  /api/agriculture_state  → Phase 4 agriculture: cultivated fields, harvests, seed libraries
 GET  /api/writing_state      → Phase 4 writing: inscriptions, legibility, culture knowledge banks
 GET  /api/polity_state       → Phase 4 polity: emergent proto-governments, taxation, redistribution
+GET  /api/geology_state      → Wave 10 geology: strata columns, mineral extraction stats
 GET  /api/demography         → lineage tree size, generations, cultures, top progenitors
 GET  /api/agent?row=N        → one-agent detail
 GET  /api/world?cx=&cy=      → one-chunk PNG (legacy)
@@ -100,6 +101,10 @@ try:
     from engine.polity import polity_state
 except Exception:  # pragma: no cover
     polity_state = None  # type: ignore[assignment]
+try:
+    from engine.geology import geology_state
+except Exception:  # pragma: no cover
+    geology_state = None  # type: ignore[assignment]
 from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 
 
@@ -551,6 +556,10 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/polity_state":
             payload = (polity_state(self.sim_ref)
                        if polity_state is not None else {})
+            self._json(200, payload); return
+        if path == "/api/geology_state":
+            payload = (geology_state(self.sim_ref)
+                       if geology_state is not None else {})
             self._json(200, payload); return
         if path == "/api/demography":
             self._json(200, self._demography()); return

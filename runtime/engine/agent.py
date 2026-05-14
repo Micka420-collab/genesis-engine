@@ -54,6 +54,8 @@ class ActionKind(IntEnum):
     # Phase 4 — Émergence civilisationnelle.
     PLANT = 15       # sow a known seed clade onto the current chunk
     HARVEST = 16     # gather standing biomass from a cultivated chunk
+    # Wave 10 — Mining.
+    MINE = 17        # extract ore/rock from the chunk's strata column
 
 
 @dataclass
