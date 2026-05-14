@@ -1,5 +1,45 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 16 — P1 persistence + sous-agents P5/P3/P10 délégués).
+**Dernière mise à jour :** 14 mai 2026 (session 17 — P5 marine + P3 inter-region mergés ; P10 long-run en cours).
+
+---
+
+## ✅ Livré session 17 (2026-05-14) — sous-agents P5 + P3 mergés
+
+Deux gros sprints landed via worktrees Git isolés, validés et pushés.
+
+### P5 marine (commit e3af810)
+- `engine/marine.py` (~530 LOC) — OceanCurrentField, lunar M2 tides
+  (12h25m), Lotka-Volterra plancton → poisson → prédateur.
+- `BIOME_PATHWAY_MIX[OCEAN] = (1.0, 0, 0)` pour activer le phytoplancton.
+- `/api/marine_state` + overlay `marine` (blue→cyan current speed).
+- Smoke `p25_marine_smoke` 6/6 PASS (currents, tide, plankton 3549 kg,
+  fish 538 kg, predator 3689 kg, determinism d50ff5d2…).
+- Saint-Venant Rust crate (fc3d472) NOT wired — API stable pour swap.
+
+### P3 inter-region (commit 4d351b5)
+- `engine/global_world.py` (~570 LOC) — GlobalAtmosphere + GlobalClock +
+  MigrationCoordinator + attach_to_global.
+- Plusieurs sims partagent une atmosphère (same identity), horloge
+  monotone partagée, migration sérialise agent → MigrationBlob → injecte
+  dans le sim cible.
+- `/api/global_world_state` endpoint.
+- Smoke `p26_inter_region_smoke` **16/16 PASS** : shared atmosphere,
+  migration préserve hunger/curiosity/genome/physio, deterministic
+  global hash `f0d99ab614388cc076bbf366`.
+
+### ADR-0005 → 8 modules requis taggés
+`engine.global_world` ajouté. Linter `p18` passe 8/8 OK.
+
+### Non-régression
+Tous les smokes Wave 1-4 + P5 + P3 PASS ensemble :
+p18, p20, p21, p22, p23, p25, p26.
+
+### En cours
+**P10 long-run stability** — sub-agent en arrière-plan, mesure
+100 000 ticks (mémoire, perf, déterminisme). Notification automatique
+quand fini.
+
+---
 
 ---
 
