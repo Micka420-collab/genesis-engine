@@ -1,5 +1,79 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 22 — P-NEW.22/.24 fixés + Phase 4 agriculture).
+**Dernière mise à jour :** 14 mai 2026 (session 23 — Phase 4 writing : transmission inter-générationnelle).
+
+---
+
+## ✅ Livré session 23 (2026-05-14) — Phase 4 writing (Wave 9b)
+
+**`engine/writing.py` (~370 LOC)** — 2e des 3 livrables Phase 4.
+
+### Architecture
+
+Chaque `Inscription` est **bound à un MaterialInstance** de Wave 4
+(`material_aging`). Le contenu (RECIPE / SEED / LAW / LEXICON) survit
+exactement aussi longtemps que le support physique. Quand l'intégrité
+du host < 0.10, l'inscription devient **illegible**.
+
+### API
+
+| Fonction | Effet |
+|---|---|
+| `inscribe(sim, state, instance_id, type, key, culture)` | Crée une inscription sur un material physique existant. |
+| `read_inscription(sim, state, row, id)` | Reader gagne la knowledge si culture ne l'a pas. Retourne `(success, outcome)` où outcome ∈ {`new_knowledge`, `already_known`, `illegible`}. |
+| `_propagate_to_authoritative` | Push SEED → `agriculture.culture_seed_library`, RECIPE → `material_synthesis.MaterialRegistry`. |
+
+### Calibration des supports (depuis `material_aging.ANNUAL_LOSS_FRACTION`)
+
+| Support | Loss/yr | Lifespan utile |
+|---|---|---|
+| `stone_granite` | 0.005 % | ~immortel |
+| `ceramic` (tablette argile cuite) | 0.08 % | ~6 000 ans (Sumer) |
+| `stone_limestone` | 0.08 % | 5-6K ans |
+| `wood` | 18 % | ~5-10 ans (humide) |
+| `leather` (parchemin) | 20 % | ~5 ans |
+
+### Smoke `p31_writing_smoke` **12/12 PASS** :
+- install idempotent
+- inscribe (3 supports, 3 types)
+- culture 2 reader gains recipe (cross-culture transmission)
+- re-read returns "already_known"
+- **wood inscription devient illegible après 10 sim-yr wet_soil** (integrity 0 → illegible)
+- **granite reste lisible** (integrity 0.9999 après 10 sim-yr)
+- SEED inscription propage vers `agriculture.culture_seed_library`
+- ADR-0005 13/13 OK
+- persistence round-trip preserves state
+
+### Boucle de rétroaction complète
+
+```
+agent dies
+  ↓
+without writing → recipe lost
+        OR
+agent inscribed recipe on clay tablet
+  ↓
+clay tablet survives 6000 yr  ←─── material_aging tick
+  ↓
+future generation reads tablet
+  ↓
+recipe restored to culture's MaterialRegistry
+  ↓
+they craft bronze again
+```
+
+C'est exactement le mécanisme historique (transmission orale → écrite
+= saut civilisationnel néolithique → âge du bronze).
+
+**ADR-0005 → 13 modules requis taggés**.
+
+Voir `docs/sprints/2026-05-14_PHASE20-WRITING.md`.
+
+### Phase 4 — Reste : polity (Wave 9c)
+État proto-gouvernemental quand N agents partagent territoire +
+règles écrites (rules = inscriptions LAW). Taxation, distribution,
+autorité.
+
+---
 
 ---
 
