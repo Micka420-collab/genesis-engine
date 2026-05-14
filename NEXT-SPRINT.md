@@ -1,9 +1,44 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 16 mai 2026 (session 5, autonome cron — voir `SPRINT-2026-05-16.md`)
+**Dernière mise à jour :** 14 mai 2026 (session 9, FUTURE-VISION Wave 1 livrée en 5 agents parallèles).
 
 Ce fichier est la **source de vérité** pour la prochaine session de travail
 (planifiée ou manuelle). À chaque sprint, on prend la PREMIÈRE priorité
 non terminée, on livre, on coche, on actualise.
+
+---
+
+## ✅ Livré session 9 (2026-05-14) — FUTURE-VISION Wave 1 (5 agents parallèles)
+
+Première vague de la vision long-terme (`FUTURE-VISION.md` Pilier 1 — *Bases
+du monde réel*). 4 modules de connaissance livrés en parallèle + intégration
++ doc, exécution simultanée par 5 agents (B1–B5).
+
+- **B1 — `engine/physics.py`** : constantes CODATA (`G_EARTH`, `R_GAS`,
+  `SIGMA_SB`, …), mécanique (`weight`, `kinetic_energy`,
+  `compute_acceleration`, `compute_terminal_velocity`,
+  `compute_orbital_period`), friction tables (`MU_STATIC`, `MU_KINETIC`),
+  thermodynamique (`gibbs_free_energy`, `is_thermodynamically_favorable`,
+  `arrhenius_rate`, `heat_transfer_conduction`, `heat_transfer_radiation`).
+  Pures fonctions, vectorisables numpy.
+- **B2 — `engine/chemistry.py`** : `PERIODIC_TABLE` (50 éléments, IUPAC 2021
+  + PubChem 2024) avec dataclass `Element`, `BOND_ENERGY` table (kJ/mol),
+  helpers `bond_energy`, `electronegativity_difference`, `is_metal`,
+  `density_alloy` (Wilke), `melting_point_estimate`, `molar_mass`.
+  Zero dépendance hors stdlib.
+- **B3 — `engine/material_synthesis.py`** : `SynthesisConditions`,
+  `SynthesizedMaterial`, `synthesize(composition, conditions, tools_available)`
+  + `check_physical_validity()` (Δ G, conservation, Ea atteignable).
+- **B4 — `engine/statics.py`** : `Block`, `Structure`, `STRENGTH_TABLE`,
+  `Structure.is_structurally_stable()` (compression, support area, moment).
+- **B5 (cette tâche)** :
+  - `runtime/scripts/p17_wave1_integration.py` — Bronze Age end-to-end
+    (gibbs → Cu/Sn alliage → synthesize bronze → mur 5×2 stable).
+  - `engine/__init__.py` — `__all__` pour discoverability Wave 1.
+  - `WAVE1-KNOWLEDGE-BASE.md` au root : pourquoi cette vague, table modules,
+    exemple copy-paste, limites actuelles, prochaine vague.
+
+**Prochaine étape** : Vague 2 — alliages ternaires + dopage + emergent
+registry par culture + transmission de recettes stœchiométriques.
 
 ---
 
