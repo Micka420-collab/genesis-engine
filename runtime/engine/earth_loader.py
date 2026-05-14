@@ -17,8 +17,18 @@ Design goals:
 The module is intentionally tolerant: optional imports (rasterio, pyproj,
 fiona, boto3) are guarded so the engine still imports cleanly on minimal
 installations.
+
+Taxonomy tags (per ADR 0005, 2026-05-14)
+----------------------------------------
+``PIPELINE_LAYER`` / ``WORLD_MODEL_CAPABILITY`` machine-readable
+constants are published below for the future
+``/api/world_model_capabilities`` endpoint (P-NEW.20).
 """
 from __future__ import annotations
+
+# Taxonomy — see ADR 0005.
+PIPELINE_LAYER = "Genesis-L1 Earth-Seed"
+WORLD_MODEL_CAPABILITY = "paper-L1 Predictor"  # arxiv 2604.22748
 
 import hashlib
 import logging

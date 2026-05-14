@@ -1117,6 +1117,12 @@ refresh();
   border-radius:1px 1px 0 0}
 #observatory-panel .obs-prog{color:#cde;font-size:10px}
 #observatory-panel .obs-err{color:#f66;font-size:10px}
+#observatory-panel .obs-cap{color:#cde;font-size:10px;line-height:1.35}
+#observatory-panel .obs-cap .pl{color:#9cf}
+#observatory-panel .obs-cap .pc{color:#fc9}
+#observatory-panel .obs-cap .st-ok{color:#9f9}
+#observatory-panel .obs-cap .st-bad{color:#f66}
+#observatory-panel .obs-cap .st-rnd{color:#aaa}
 </style>
 <div id="observatory-panel">
   <div class="obs-h" id="obs-header">Observatory — loading…</div>
@@ -1131,6 +1137,8 @@ refresh();
   <div class="obs-pyra" id="obs-pyra"></div>
   <div class="obs-lbl">TOP PROGENITORS</div>
   <div class="obs-prog" id="obs-prog">…</div>
+  <div class="obs-lbl" title="ADR-0005 — Genesis pipeline × paper capability">WORLD-MODEL CAPABILITIES</div>
+  <div class="obs-cap" id="obs-cap">…</div>
 </div>
 <script>
 (function(){
@@ -1146,11 +1154,12 @@ refresh();
     return {forest:f, garrigue:g};
   }
   async function refreshObservatory(){
-    const [state, realism, lift, demo] = await Promise.all([
+    const [state, realism, lift, demo, caps] = await Promise.all([
       safeFetch('/api/state'),
       safeFetch('/api/realism_state'),
       safeFetch('/api/lift_state'),
       safeFetch('/api/demography'),
+      safeFetch('/api/world_model_capabilities'),
     ]);
     // Header
     try{
@@ -1218,6 +1227,35 @@ refresh();
         ? top.map(p=>`gen${p.generation} · ${p.descendants} desc`).join('<br>')
         : '<span style="color:#666">no progenitors</span>';
     }catch(e){}
+    // World-model capabilities — ADR-0005 / P-NEW.20
+    try{
+      const rows = (caps && caps.modules) || [];
+      const summary = (caps && caps.summary) || {};
+      const stClass = st => st==='ok' ? 'st-ok'
+                          : (st==='missing' ? 'st-rnd' : 'st-bad');
+      const short = m => m.replace(/^engine\./, '');
+      const shortPL = pl => pl.replace(/^Genesis-/,'').replace(/^paper-/,'');
+      const lines = rows.map(r=>{
+        const cls = stClass(r.status);
+        if(r.status==='missing'){
+          return `<div><span class="${cls}">○</span> ${short(r.module)} <span class="st-rnd">(R&amp;D)</span></div>`;
+        }
+        const pl = r.pipeline_layer ? shortPL(r.pipeline_layer) : '–';
+        const pc = r.world_model_capability
+                     ? shortPL(r.world_model_capability) : '–';
+        const mark = r.status==='ok' ? '●' : '✕';
+        return `<div title="${r.module}: ${r.error||'ok'}">`+
+               `<span class="${cls}">${mark}</span> ${short(r.module)}<br>`+
+               `<span class="pl">${pl}</span> · <span class="pc">${pc}</span></div>`;
+      });
+      const tag = `tagged ${summary.tagged||0}`+
+                  (summary.untagged? ` · untagged ${summary.untagged}` : '')+
+                  (summary.invalid?  ` · invalid ${summary.invalid}`  : '');
+      document.getElementById('obs-cap').innerHTML =
+        lines.join('') +
+        `<div style="color:#888;margin-top:3px">${tag} · ADR-0005</div>`;
+    }catch(e){ document.getElementById('obs-cap').innerHTML =
+      '<span class="obs-err">caps err</span>'; }
   }
   refreshObservatory();
   setInterval(refreshObservatory, 3000);

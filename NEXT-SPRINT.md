@@ -1,9 +1,33 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 9, FUTURE-VISION Wave 1 livrée en 5 agents parallèles).
+**Dernière mise à jour :** 14 mai 2026 (session 10 — P-NEW.20 livré, ADR-0005 horizon-30j atteint).
 
 Ce fichier est la **source de vérité** pour la prochaine session de travail
 (planifiée ou manuelle). À chaque sprint, on prend la PREMIÈRE priorité
 non terminée, on livre, on coche, on actualise.
+
+---
+
+## ✅ Livré session 10 (2026-05-14) — P-NEW.20 capabilities endpoint
+
+ADR-0005 horizon 30j (cible 2026-06-13) **atteint en J0**.
+
+- **`engine/world_model_capabilities.py`** — agrégateur introspectif des
+  constantes `PIPELINE_LAYER` + `WORLD_MODEL_CAPABILITY` publiées par
+  chaque module layer. Expose `world_model_capabilities()` (table
+  API-ready) + `audit_modules(strict=False)` (hook CI).
+- **`/api/world_model_capabilities`** dans `dashboard.py` — retourne la
+  table en <5 ms (3 tagged, 2 missing R&D, 0 untagged, 0 invalid).
+- **HUD widget** dans `god_view_v2.html` sous `#observatory-panel` —
+  code couleur ●=tagged ○=R&D ✕=invalid, tooltip avec l'erreur.
+- **`scripts/p18_capabilities_lint.py`** — linter CLI. Fail-cases
+  vérifiés : tags absents → failure ; capability hors allow-list →
+  failure. Flag `--strict` pour étendre aux modules R&D présents.
+- **`.github/workflows/capabilities-lint.yml`** — workflow GitHub Actions
+  trigger sur changement de `runtime/engine/*.py` ou ADR.
+
+Voir `docs/sprints/2026-05-14_PHASE6-CAPABILITIES.md`.
+
+### ~~P-NEW.20 ✅~~ Endpoint `/api/world_model_capabilities` — livré.
 
 ---
 

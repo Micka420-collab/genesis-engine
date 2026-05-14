@@ -18,8 +18,18 @@ objects.
 
 Determinism is preserved end-to-end via ``engine.core.prf_rng`` — no
 ``random.random()`` is used.
+
+Taxonomy tags (per ADR 0005, 2026-05-14)
+----------------------------------------
+``PIPELINE_LAYER`` / ``WORLD_MODEL_CAPABILITY`` machine-readable
+constants are published below for the future
+``/api/world_model_capabilities`` endpoint (P-NEW.20).
 """
 from __future__ import annotations
+
+# Taxonomy — see ADR 0005.
+PIPELINE_LAYER = "Genesis-L2 Sim-Lift"
+WORLD_MODEL_CAPABILITY = "paper-L2 Simulator"  # arxiv 2604.22748
 
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -343,6 +353,7 @@ def lift_state(sim) -> Dict:
     lake_cells = 0
     walk_sum = 0.0
     walk_impassable = 0
+    walk_n = 0
     total_cells = 0
     for f in fields.values():
         unique, counts = np.unique(f.veg_state, return_counts=True)
@@ -359,13 +370,14 @@ def lift_state(sim) -> Dict:
         if hasattr(f, "walkability") and f.walkability is not None:
             walk_sum += float(f.walkability.sum())
             walk_impassable += int((f.walkability < 0.3).sum())
+            walk_n += int(f.walkability.size)
     total = sum(veg_counts.values()) or 1
     veg_distribution = {VegState(k).name: round(v / total, 4)
                         for k, v in veg_counts.items() if v > 0}
     mean_slope = (slope_sum / slope_n) if slope_n > 0 else 0.0
     lake_pct = (lake_cells / total_cells) if total_cells > 0 else 0.0
-    mean_walk = (walk_sum / slope_n) if slope_n > 0 else 0.0
-    impassable_pct = (walk_impassable / total_cells) if total_cells > 0 else 0.0
+    mean_walk = (walk_sum / walk_n) if walk_n > 0 else 0.0
+    impassable_pct = (walk_impassable / walk_n) if walk_n > 0 else 0.0
     return {
         "chunks": len(fields),
         "veg_distribution": veg_distribution,

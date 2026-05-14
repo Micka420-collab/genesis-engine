@@ -9,6 +9,7 @@ GET  /api/agents             → live agent positions, drives, traits
 GET  /api/metrics            → full time-series for charts
 GET  /api/lift_state         → L2 lift layer state (chunks, veg distribution, max ravine depth)
 GET  /api/realism_state      → Reality Engine: hydrology, wildlife, trails, seasons, disease
+GET  /api/world_model_capabilities → taxonomy table per ADR-0005 (Genesis L1-L5 × paper-L1/L2/L3)
 GET  /api/demography         → lineage tree size, generations, cultures, top progenitors
 GET  /api/agent?row=N        → one-agent detail
 GET  /api/world?cx=&cy=      → one-chunk PNG (legacy)
@@ -40,6 +41,10 @@ try:
     from engine.realism import realism_state
 except Exception:  # pragma: no cover
     realism_state = None  # type: ignore[assignment]
+try:
+    from engine.world_model_capabilities import world_model_capabilities
+except Exception:  # pragma: no cover
+    world_model_capabilities = None  # type: ignore[assignment]
 from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 
 
@@ -305,6 +310,10 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/realism_state":
             payload = (realism_state(self.sim_ref)
                        if realism_state is not None else {})
+            self._json(200, payload); return
+        if path == "/api/world_model_capabilities":
+            payload = (world_model_capabilities()
+                       if world_model_capabilities is not None else {})
             self._json(200, payload); return
         if path == "/api/demography":
             self._json(200, self._demography()); return

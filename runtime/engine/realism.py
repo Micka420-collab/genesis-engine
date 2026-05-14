@@ -16,6 +16,12 @@ a world that feels alive:
 
 All four are **opt-in** and **deterministic** via ``engine.core.prf_rng``.
 
+Taxonomy tags (per ADR 0005, 2026-05-14)
+----------------------------------------
+``PIPELINE_LAYER`` / ``WORLD_MODEL_CAPABILITY`` machine-readable
+constants are declared at module level (below the imports) for the
+future ``/api/world_model_capabilities`` endpoint (P-NEW.20).
+
 Usage::
 
     from engine.world_builder import WorldBuilder
@@ -44,6 +50,11 @@ import numpy as np
 from engine.core import prf_rng
 from engine.world import (Biome, CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M,
                           world_to_cell, world_to_chunk)
+
+
+# Taxonomy — see ADR 0005.
+PIPELINE_LAYER = "Genesis-L4 Feedback"
+WORLD_MODEL_CAPABILITY = "paper-L2 Simulator"  # arxiv 2604.22748
 
 
 # ---------------------------------------------------------------------------

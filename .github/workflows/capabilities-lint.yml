@@ -1,0 +1,40 @@
+name: capabilities-lint
+
+# ADR-0005 / P-NEW.20 — fail the build if any required Genesis layer
+# module forgets to publish PIPELINE_LAYER + WORLD_MODEL_CAPABILITY.
+
+on:
+  push:
+    paths:
+      - 'runtime/engine/**.py'
+      - 'runtime/scripts/p18_capabilities_lint.py'
+      - 'adr/0005-world-model-taxonomy.md'
+      - '.github/workflows/capabilities-lint.yml'
+  pull_request:
+    paths:
+      - 'runtime/engine/**.py'
+      - 'runtime/scripts/p18_capabilities_lint.py'
+      - 'adr/0005-world-model-taxonomy.md'
+      - '.github/workflows/capabilities-lint.yml'
+  workflow_dispatch: {}
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install minimal deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install numpy
+
+      - name: Run ADR-0005 capability audit
+        working-directory: runtime
+        run: |
+          python scripts/p18_capabilities_lint.py
