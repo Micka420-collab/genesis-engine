@@ -1,5 +1,44 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 20 — Wave 8 animal evolution + coévolution plante-animal).
+**Dernière mise à jour :** 14 mai 2026 (session 21 — P10 long-run 100k ticks complété, 2 anomalies P-NEW.22 + .24).
+
+---
+
+## ✅ Livré session 21 (2026-05-14) — P10 long-run stability (sub-agent)
+
+Sous-agent `a6037cac` a tourné 2h25min wall-clock pour valider la
+stabilité 100k ticks sur Léman.
+
+### Résultats — sim survit + déterminisme intact
+
+- **100 000 ticks reached** ✓ (`stop_reason=target-reached`)
+- **20 segments** × 5000 ticks chacun
+- **Wall-clock** : 119 min sim + 13 min déterminisme = **133 min total**
+- **Mémoire** : 227 MB initial → **145 MB final = Δ −81 MB** (GC reclaim
+  après mort des founders). Bien sous le budget 200 MB.
+- **Pas de slowdown** : `last3/first3 = 0.40×` (ACCELERATION car
+  population shrinks — O(N²) cognition cohérent).
+- **Déterminisme** : `143ba17ef510a024` bit-identique sur 2 builds.
+
+### Anomalies découvertes — nouvelles priorités
+
+#### P-NEW.22 — Cholera bloque la civilisation
+Sur 100k ticks, la population s'effondre à **4 agents stables** au lieu
+de saturer max_agents=200. Cause identifiée : **9/10 founders chopent
+le choléra en segment 1**, ne le clear jamais (charge cumulée), vitalité
+basse → fertilité bloquée. Aucune naissance ne compense les morts.
+
+**Fix candidat** : séparer chunks "eau propre" (rivière, source amont)
+des chunks contaminés. Permettre aux agents de chercher l'eau loin de
+leurs lieux de relief. Ou abaisser le shed-rate cholera de
+contamination per relief.
+
+#### P-NEW.24 — `photosynthesis.PhotosynthesisState.chunk_caches` croît
+Sur le run : 531 → 701 entries (chunks vus pendant la sim). Bornée
+sur 2 km² mais pour Terre-scale il faut **LRU eviction**.
+
+### Sprint doc complet : `docs/sprints/2026-05-14_PHASE13-LONGRUN.md`
+
+---
 
 ---
 
