@@ -56,6 +56,8 @@ class ActionKind(IntEnum):
     HARVEST = 16     # gather standing biomass from a cultivated chunk
     # Wave 10 — Mining.
     MINE = 17        # extract ore/rock from the chunk's strata column
+    # Wave 10c — Metallurgy.
+    SMELT = 18       # reduce ore with fuel in a furnace → pure metal
 
 
 @dataclass

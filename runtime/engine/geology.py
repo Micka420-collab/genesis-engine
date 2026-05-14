@@ -297,17 +297,71 @@ def generate_chunk_geology(sim, chunk) -> ChunkGeology:
 # Public install + reporter
 # ---------------------------------------------------------------------------
 
+# Module-level dispatch table : id(agents) -> (sim, state). Same
+# pattern as engine.agriculture._AG_DISPATCH for the apply_decision
+# wrapper that handles ActionKind.MINE.
+_GEOLOGY_DISPATCH: Dict[int, Tuple[object, "GeologyState"]] = {}
+
+
+def _geology_global_wrapper(agents, row, decision, streamer, tick):
+    """Stacked wrapper around the previous ``apply_decision``.
+
+    Handles ActionKind.MINE — extracts ore from the chunk's strata at
+    a depth encoded in ``decision.target_x`` (metres). Other actions
+    pass through to the inner handler.
+    """
+    import engine.cognition as _cog
+    from engine.agent import ActionKind
+
+    inner = getattr(_cog, "_geology_inner_apply_decision", None)
+    if inner is None:
+        return None
+    pair = _GEOLOGY_DISPATCH.get(id(agents))
+    if pair is None:
+        return inner(agents, row, decision, streamer, tick)
+    sim, _state = pair
+    act = int(decision.action)
+
+    if act == int(ActionKind.MINE):
+        depth_m = max(0.0, float(getattr(decision, "target_x", 0.0)))
+        if depth_m == 0.0:
+            depth_m = 3.0  # default to regolith
+        kg = float(getattr(decision, "target_y", 0.0)) or 10.0
+        mine_at(sim, row, target_depth_m=depth_m, kg_to_extract=kg)
+        try:
+            agents.vel[row, :2] = 0.0
+        except Exception:
+            pass
+        return []
+
+    return inner(agents, row, decision, streamer, tick)
+
+
+def _patch_actions(sim, state: "GeologyState") -> None:
+    """Register sim in the dispatch table and install the wrapper once."""
+    import engine.cognition as _cog
+    import engine.sim as _sim_mod
+    _GEOLOGY_DISPATCH[id(sim.agents)] = (sim, state)
+    if getattr(_cog, "_geology_inner_apply_decision", None) is None:
+        _cog._geology_inner_apply_decision = _cog.apply_decision
+        _cog.apply_decision = _geology_global_wrapper
+        if hasattr(_sim_mod, "apply_decision"):
+            _sim_mod.apply_decision = _geology_global_wrapper
+
+
 def install_geology(sim) -> GeologyState:
     """Idempotent installer. Lazily generates strata on first access.
 
-    No step wrapper — geology is queried on demand by mining actions.
-    Memory is bounded by the existing chunk cache.
+    Also wires ``engine.cognition.apply_decision`` so agents executing
+    ``ActionKind.MINE`` actually trigger ore extraction at the depth
+    encoded in ``decision.target_x``.
     """
     existing: Optional[GeologyState] = getattr(sim, "_geology_state", None)
     if existing is not None:
         return existing
     state = GeologyState()
     sim._geology_state = state
+    _patch_actions(sim, state)
     return state
 
 

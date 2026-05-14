@@ -1,5 +1,68 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 26 — Wave 10 géologie : 36 minerais réels + strates).
+**Dernière mise à jour :** 14 mai 2026 (session 27 — Wave 10b+c : MINE wiring + métallurgie complète).
+
+---
+
+## ✅ Livré session 27 (2026-05-14) — Wave 10b + 10c métallurgie complète
+
+### Wave 10b — MINE cognition wiring
+`engine/geology.py` wrappe maintenant `apply_decision` avec
+`_GEOLOGY_DISPATCH[id(agents)] = (sim, state)` (pattern agriculture).
+ActionKind.MINE = 17 → `mine_at(sim, row, target_x=depth_m,
+target_y=kg)`. Agents peuvent extraire ore via Decision.
+
+### Wave 10c — `engine/metallurgy.py` (~430 LOC)
+**Smelting réel** : réduction d'ore par fuel dans une furnace.
+
+Paramètres calibrés sur métallurgie historique :
+- **Furnace tier** : bonfire 0.10 → pit_kiln 0.40 → bloomery 0.65 →
+  blast_furnace 0.85
+- **Fuel efficiency** : wood 0.50, peat 0.40, charcoal 0.80, coal 0.90
+- **Fuel demand** : 2 kg wood/kg ore, 1.2 kg charcoal/kg ore, etc.
+- **Practices stackables** : bellows ×1.15, flux_limestone ×1.10,
+  coppice_charcoal ×1.05
+- **Agent skill** = 0.5 + 0.25 × intelligence + 0.25 × conscientiousness
+
+`smelt(sim, row, ore_name, ore_kg, fuel_name, furnace)` →
+`(success, elements_kg, reason)`. Crédite `agent_pure_elements[row]`
++ inv_metal pour métaux.
+
+ActionKind.SMELT = 18 + cognition wiring.
+
+### Chaîne complète opérationnelle
+
+```
+chunk strata (Wave 10 L1)
+       ↓ ActionKind.MINE → mine_at
+ore in inv_metal
+       ↓ ActionKind.SMELT → smelt
+pure elements (Fe, Cu, Sn, Au, …) in agent bag
+       ↓ material_synthesis.synthesize (Wave 1/2)
+bronze, steel, … in MaterialRegistry
+       ↓ material_aging (Wave 4)
+material instance decay over centuries
+       ↓ writing inscription on stone (Wave 9b)
+recipe preserved 6000 ans
+```
+
+### Smoke `p35_metallurgy_chain` **8/8 PASS** :
+```
+MINE depth 50m, 15kg → inv_metal 0.000→1.551
+smelt 5kg hematite + charcoal bloomery → Fe 1.134, O 0.486
+pit_kiln yields less (0.698) than bloomery (1.134)
+smelt cassiterite → Sn 0.768
+smelt native_copper → Cu 0.798
+synthesize bronze from smelted Cu + Sn → alloy_Cu70Sn30
+bellows practice raises Fe 1.134 → 1.304 (~15 %)
+ADR-0005 16/16 OK
+```
+
+### ADR-0005 → **16 modules requis taggés**.
+Non-régression p18, p23, p33, p34 PASS.
+
+Voir `docs/sprints/2026-05-14_PHASE23-METALLURGY.md`.
+
+---
 
 ---
 
