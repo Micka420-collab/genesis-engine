@@ -17,6 +17,7 @@ GET  /api/marine_state       → Wave 5 marine: tides, currents, plankton/fish/p
 GET  /api/global_world_state → Phase 15 inter-region: attached sims, shared atmosphere, clock, migration count
 GET  /api/plant_evolution_state → Wave 6 plant evolution: 40-clade phylogeny, biomass, speciation, O2
 GET  /api/meteorology_state  → Wave 7 weather: clouds, rain, wind, UV, storms, solar zenith
+GET  /api/animal_evolution_state → Wave 8 fauna: 50 species populations, predation, trophic stats
 GET  /api/demography         → lineage tree size, generations, cultures, top progenitors
 GET  /api/agent?row=N        → one-agent detail
 GET  /api/world?cx=&cy=      → one-chunk PNG (legacy)
@@ -80,6 +81,10 @@ try:
     from engine.meteorology import meteorology_state
 except Exception:  # pragma: no cover
     meteorology_state = None  # type: ignore[assignment]
+try:
+    from engine.animal_evolution import animal_evolution_state
+except Exception:  # pragma: no cover
+    animal_evolution_state = None  # type: ignore[assignment]
 from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 
 
@@ -515,6 +520,10 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/meteorology_state":
             payload = (meteorology_state(self.sim_ref)
                        if meteorology_state is not None else {})
+            self._json(200, payload); return
+        if path == "/api/animal_evolution_state":
+            payload = (animal_evolution_state(self.sim_ref)
+                       if animal_evolution_state is not None else {})
             self._json(200, payload); return
         if path == "/api/demography":
             self._json(200, self._demography()); return

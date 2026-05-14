@@ -43,6 +43,7 @@ _REQUIRED_MODULES: Tuple[str, ...] = (
     "engine.global_world",
     "engine.plant_evolution",
     "engine.meteorology",
+    "engine.animal_evolution",
 )
 
 # Modules that ADR-0005 references but which are still R&D. They are queried

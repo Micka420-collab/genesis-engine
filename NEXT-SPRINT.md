@@ -1,5 +1,49 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 19 — Wave 7 météorologie ultra-réaliste + bronzage UV).
+**Dernière mise à jour :** 14 mai 2026 (session 20 — Wave 8 animal evolution + coévolution plante-animal).
+
+---
+
+## ✅ Livré session 20 (2026-05-14) — Wave 8 animal evolution
+
+**47 espèces animales réelles** + dynamiques de population + prédation
++ coévolution plante-animal.
+
+### `engine/animal_catalog.py` (~530 LOC)
+Couverture phylogénétique : arthropodes (ants, bees, beetles, butterflies,
+spiders, crabs), mollusques (snails, octopus, mussels), poissons (trout
+→ shark), amphibiens, reptiles, oiseaux (sparrows → eagles), mammifères
+(mice → elephants, lions, whales).
+
+### `engine/animal_evolution.py` (~400 LOC)
+- **Fitness** par chunk : bell(T) × biome × O2 × water aquatic
+- **Démographie** : births logistique, deaths naturels, starvation
+- **Coévolution plante-animal** : herbivores `_consume_plants` réduit
+  `plant_evolution.ChunkVegetation` jusqu'à 20%/tick selon clades
+  browsés
+- **Prédation Lotka-Volterra** par paire predator-prey, par chunk
+- **`_stochastic_round` via prf_rng** : preserves expected value sur
+  events low-rate (births/deaths/predation)
+
+### Émergence Léman 200 ticks
+Top : ants 178K, bees 88K, beetles 35K, herring 9.4K. Per royaume :
+317K Arthropodes, 13K Mammifères, 10K Fish, 9.5K Birds. Pyramide
+trophique réelle (1000:1 entre niveaux).
+
+### Tests
+- `p29_animal_evolution_smoke` **9/9 PASS** (fitness laws, sim
+  integration, evolution, predation, coévolution plant biomass,
+  ADR-0005, déterminisme)
+- Non-régression : p18 (11/11), p23, p27, p28 PASS
+
+### ADR-0005 → **11 modules requis taggés**
+
+Voir `docs/sprints/2026-05-14_PHASE18-ANIMAL-EVOLUTION.md`.
+
+### Wave 9 (futur)
+Agent hunting (ActionKind.HUNT_SPECIES + meat yields), domestication,
+migration saisonnière, speciation animale Wave 8b, HUD widget faune.
+
+---
 
 ---
 
