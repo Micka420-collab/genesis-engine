@@ -1,5 +1,39 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 10 — P-NEW.20 livré, ADR-0005 horizon-30j atteint).
+**Dernière mise à jour :** 14 mai 2026 (session 11 — P-NEW.17 re-profile + optim #3b regression-fix).
+
+---
+
+## ✅ Livré session 11 (2026-05-14) — P-NEW.17 re-profile + optim #3b
+
+Première mesure après optim #3 : **114.3 s** — régression de +59 % vs
+baseline 72.0 s. Diagnostic : la version sparse (`np.nonzero` + fancy
+indexing) cumule (a) 3× nonzero par cache-miss, (b) fancy indexing
+alloué par ressource, (c) `d2` recalculé 3 fois par chunk.
+
+**Correctif (optim #3b)** : `_scan_chunk` réécrit en chemin dense
+bool-mask avec `d2` partagé entre les 3 ressources. `_chunk_resource_indices`
+supprimé. Argument `tick=` conservé pour la compat mais ignoré.
+
+Re-profile : **69.3 s**. Gain net −2.7 s (−3.8 %) vs baseline. Cible
+<60 s manquée de 9.3 s — `_scan_chunk` reste 44 % du frame, plus de
+sub-optim possible sans changement de structure → escalade en P-NEW.21.
+
+**Déterminisme préservé** : SHA-256 bit-identique sur 2 runs même seed.
+
+Voir `docs/sprints/2026-05-14_PHASE7-PROFILE-OPTIM3b.md`.
+
+### ~~P-NEW.17 ✅~~ Re-profile post optim #3 — livré (avec correctif optim #3b inclus).
+
+### P-NEW.21 (nouveau) — Descendre `_scan_chunk` sous 30 µs/call
+Pistes ordonnées :
+- (a) batch `perceive()` pour les agents partageant un chunk →
+  partager `d2` sur tout le batch. Gain estimé 2× sur les chunks denses.
+- (b) max-resource map par chunk → cull précoce avant `_chunk_cell_world_xy`.
+- (c) ré-écriture cython/numba de `_scan_chunk`. Gain estimé 2-3× supp.
+
+Objectif final : 300 ticks à pop=175 en <40 s.
+
+---
 
 Ce fichier est la **source de vérité** pour la prochaine session de travail
 (planifiée ou manuelle). À chaque sprint, on prend la PREMIÈRE priorité

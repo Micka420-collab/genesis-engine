@@ -186,96 +186,69 @@ def evict_cell_grid_cache(keys):
         _CACHED_CELL_GRID.pop(k, None)
 
 
-def _chunk_resource_indices(chunk, tick):
-    """Sparse (row_idx, col_idx) arrays of cells passing each resource
-    threshold, cached at most once per (chunk, tick).
-
-    Three triples are returned in order:
-        (water_y, water_x), (food_y, food_x), (shelter_y, shelter_x)
-
-    Determinism preserved : ``np.nonzero`` returns indices in row-major C order
-    so an ``np.argmin`` on the sparse distance arrays picks the same tie-break
-    cell as the original full-grid ``np.argmin`` (which scanned in flat order).
-    """
-    if tick is not None and getattr(chunk, "_scan_idx_tick", None) == tick:
-        return chunk._scan_idx
-    wy, wx = np.nonzero(chunk.water > 5.0)
-    fy, fx = np.nonzero(chunk.food_kcal > 5.0)
-    sy, sx = np.nonzero(
-        (chunk.wood > 30.0) | ((chunk.stone > 25.0) & (chunk.height > 800.0))
-    )
-    chunk._scan_idx = ((wy, wx), (fy, fx), (sy, sx))
-    chunk._scan_idx_tick = tick
-    return chunk._scan_idx
-
-
 def _scan_chunk(chunk, px, py, radius_m, out, tick=None):
     """Find the nearest water / food / shelter cell in ``chunk``.
 
-    Uses ``_chunk_resource_indices`` to iterate only over cells that pass
-    the resource thresholds. For chunks with zero such cells, this is an
-    O(1) skip per resource type instead of an O(4096) bool-mask allocation.
+    Dense vectorised path (optim #3b, sprint 2026-05-14 session 11) :
+    computes the single 64×64 ``d2`` array once and reuses it for all three
+    resources. The earlier ``np.nonzero`` + fancy-indexing path looked
+    cheaper on paper but was measured 2.4× slower per call on the Léman
+    workload (lac → ~12 % of cells pass the water threshold, so the sparse
+    arrays are still hundreds of elements and the fancy-indexing allocation
+    cost dominates). The ``tick`` argument is kept for API compatibility
+    but is no longer consulted (no per-tick scratch state).
+
+    Determinism : ``np.argmin`` on a 4096-flat ``np.where(mask, d2, inf)``
+    picks the same row-major tie-break as the previous implementation, so
+    SHA-256 of the agents snapshot stays bit-identical across runs.
     """
     XX, YY = _chunk_cell_world_xy(chunk)
-    (water_idx, food_idx, shelter_idx) = _chunk_resource_indices(chunk, tick)
-    r2 = radius_m * radius_m
+    dx = XX - np.float32(px)
+    dy = YY - np.float32(py)
+    d2 = dx * dx + dy * dy
+    r2 = np.float32(radius_m * radius_m)
+    in_r = d2 <= r2
+    if not in_r.any():
+        return
 
-    wy, wx = water_idx
-    if wy.size:
-        wx_world = XX[wy, wx]
-        wy_world = YY[wy, wx]
-        dxw = wx_world - px
-        dyw = wy_world - py
-        d2w = dxw * dxw + dyw * dyw
-        in_r = d2w <= r2
-        if in_r.any():
-            d2w_masked = np.where(in_r, d2w, np.float32(np.inf))
-            idx = int(np.argmin(d2w_masked))
-            ay, ax = int(wy[idx]), int(wx[idx])
-            dist = float(np.sqrt(d2w[idx]))
-            cur = out.get("water")
-            if cur is None or dist < cur.distance:
-                out["water"] = PerceivedTarget(
-                    "water", float(XX[ay, ax]), float(YY[ay, ax]), dist,
-                    float(chunk.water[ay, ax]))
+    water_mask = in_r & (chunk.water > np.float32(5.0))
+    if water_mask.any():
+        d2m = np.where(water_mask, d2, np.float32(np.inf))
+        flat_idx = int(np.argmin(d2m))
+        ay, ax = divmod(flat_idx, d2.shape[1])
+        dist = float(math.sqrt(float(d2[ay, ax])))
+        cur = out.get("water")
+        if cur is None or dist < cur.distance:
+            out["water"] = PerceivedTarget(
+                "water", float(XX[ay, ax]), float(YY[ay, ax]), dist,
+                float(chunk.water[ay, ax]))
 
-    fy, fx = food_idx
-    if fy.size:
-        fx_world = XX[fy, fx]
-        fy_world = YY[fy, fx]
-        dxf = fx_world - px
-        dyf = fy_world - py
-        d2f = dxf * dxf + dyf * dyf
-        in_r = d2f <= r2
-        if in_r.any():
-            d2f_masked = np.where(in_r, d2f, np.float32(np.inf))
-            idx = int(np.argmin(d2f_masked))
-            ay, ax = int(fy[idx]), int(fx[idx])
-            dist = float(np.sqrt(d2f[idx]))
-            cur = out.get("food")
-            if cur is None or dist < cur.distance:
-                out["food"] = PerceivedTarget(
-                    "food", float(XX[ay, ax]), float(YY[ay, ax]), dist,
-                    float(chunk.food_kcal[ay, ax]))
+    food_mask = in_r & (chunk.food_kcal > np.float32(5.0))
+    if food_mask.any():
+        d2m = np.where(food_mask, d2, np.float32(np.inf))
+        flat_idx = int(np.argmin(d2m))
+        ay, ax = divmod(flat_idx, d2.shape[1])
+        dist = float(math.sqrt(float(d2[ay, ax])))
+        cur = out.get("food")
+        if cur is None or dist < cur.distance:
+            out["food"] = PerceivedTarget(
+                "food", float(XX[ay, ax]), float(YY[ay, ax]), dist,
+                float(chunk.food_kcal[ay, ax]))
 
-    sy, sx = shelter_idx
-    if sy.size:
-        sx_world = XX[sy, sx]
-        sy_world = YY[sy, sx]
-        dxs = sx_world - px
-        dys = sy_world - py
-        d2s = dxs * dxs + dys * dys
-        in_r = d2s <= r2
-        if in_r.any():
-            d2s_masked = np.where(in_r, d2s, np.float32(np.inf))
-            idx = int(np.argmin(d2s_masked))
-            ay, ax = int(sy[idx]), int(sx[idx])
-            dist = float(np.sqrt(d2s[idx]))
-            cur = out.get("shelter")
-            if cur is None or dist < cur.distance:
-                out["shelter"] = PerceivedTarget(
-                    "shelter", float(XX[ay, ax]), float(YY[ay, ax]), dist,
-                    float(chunk.wood[ay, ax] + chunk.stone[ay, ax]))
+    shelter_mask = in_r & (
+        (chunk.wood > np.float32(30.0))
+        | ((chunk.stone > np.float32(25.0)) & (chunk.height > np.float32(800.0)))
+    )
+    if shelter_mask.any():
+        d2m = np.where(shelter_mask, d2, np.float32(np.inf))
+        flat_idx = int(np.argmin(d2m))
+        ay, ax = divmod(flat_idx, d2.shape[1])
+        dist = float(math.sqrt(float(d2[ay, ax])))
+        cur = out.get("shelter")
+        if cur is None or dist < cur.distance:
+            out["shelter"] = PerceivedTarget(
+                "shelter", float(XX[ay, ax]), float(YY[ay, ax]), dist,
+                float(chunk.wood[ay, ax] + chunk.stone[ay, ax]))
 
 
 @dataclass
