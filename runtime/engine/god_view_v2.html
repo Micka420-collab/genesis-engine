@@ -1142,6 +1142,9 @@ refresh();
   <div class="obs-lbl" title="Wave 3 — excretion, hygiene, skin, disease">PHYSIOLOGY</div>
   <div class="obs-row" id="obs-physio">…</div>
   <div class="obs-row" id="obs-disease">…</div>
+  <div class="obs-lbl" title="Wave 4 — Farquhar GPP + material aging">BIOSPHERE</div>
+  <div class="obs-row" id="obs-photo">…</div>
+  <div class="obs-row" id="obs-aging">…</div>
 </div>
 <script>
 (function(){
@@ -1157,13 +1160,15 @@ refresh();
     return {forest:f, garrigue:g};
   }
   async function refreshObservatory(){
-    const [state, realism, lift, demo, caps, physio] = await Promise.all([
+    const [state, realism, lift, demo, caps, physio, photo, aging] = await Promise.all([
       safeFetch('/api/state'),
       safeFetch('/api/realism_state'),
       safeFetch('/api/lift_state'),
       safeFetch('/api/demography'),
       safeFetch('/api/world_model_capabilities'),
       safeFetch('/api/physiology_state'),
+      safeFetch('/api/photosynthesis_state'),
+      safeFetch('/api/material_aging_state'),
     ]);
     // Header
     try{
@@ -1287,6 +1292,42 @@ refresh();
       document.getElementById('obs-physio').innerHTML =
         '<span class="obs-err">physio err</span>';
       document.getElementById('obs-disease').innerHTML = '';
+    }
+    // Wave 4 — Farquhar photosynthesis + material aging.
+    try{
+      const g = (photo && photo.global_gpp_kcal_per_tick) || 0;
+      const ca = (photo && photo.Ca_ppm) || 0;
+      const par = (photo && photo.PAR_umol_m2_s) || 0;
+      const t = (photo && photo.temp_c)!=null ? photo.temp_c.toFixed(1) : '–';
+      const ck = (photo && photo.chunks_tracked) || 0;
+      // Find top 3 biomes by GPP.
+      const pb = (photo && photo.per_biome_kcal_per_tick) || {};
+      const sortedBiomes = Object.entries(pb)
+        .sort((a, b) => b[1] - a[1]).slice(0, 3);
+      const biomeLine = sortedBiomes.length
+        ? sortedBiomes.map(([k, v]) => `${k.toLowerCase().slice(0,6)} ${v.toFixed(1)}`).join(' · ')
+        : '–';
+      document.getElementById('obs-photo').innerHTML =
+        `🌱 ${g.toFixed(1)} kcal/tk · ☀️ ${par.toFixed(0)} PAR · `+
+        `🌡️ ${t}°C · CO₂ ${ca}ppm<br>${biomeLine}`;
+    }catch(e){
+      document.getElementById('obs-photo').innerHTML =
+        '<span class="obs-err">photo err</span>';
+    }
+    try{
+      const a = aging || {};
+      const alive = a.alive_instances || 0;
+      const dead = a.destroyed_total || 0;
+      const im = (a.integrity_mean!=null) ? a.integrity_mean.toFixed(2) : '–';
+      const imin = (a.integrity_min!=null) ? a.integrity_min.toFixed(2) : '–';
+      const cult = a.culture_practices || {};
+      const nCulturesWithPractices = Object.keys(cult).length;
+      document.getElementById('obs-aging').innerHTML =
+        `🪙 alive ${alive} · ☠️ dead ${dead} · int ${im}/${imin}min`+
+        (nCulturesWithPractices ? `<br>practices: ${nCulturesWithPractices} cult` : '');
+    }catch(e){
+      document.getElementById('obs-aging').innerHTML =
+        '<span class="obs-err">aging err</span>';
     }
   }
   refreshObservatory();

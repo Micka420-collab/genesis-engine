@@ -11,6 +11,8 @@ GET  /api/lift_state         → L2 lift layer state (chunks, veg distribution, 
 GET  /api/realism_state      → Reality Engine: hydrology, wildlife, trails, seasons, disease
 GET  /api/world_model_capabilities → taxonomy table per ADR-0005 (Genesis L1-L5 × paper-L1/L2/L3)
 GET  /api/physiology_state   → Wave 3 physiology: excretion, hygiene, skin, disease loads
+GET  /api/photosynthesis_state → Wave 4 GPP: global + per-biome kcal/tick, Ca, PAR, T
+GET  /api/material_aging_state → Wave 4 material aging: alive/destroyed counts, integrity
 GET  /api/demography         → lineage tree size, generations, cultures, top progenitors
 GET  /api/agent?row=N        → one-agent detail
 GET  /api/world?cx=&cy=      → one-chunk PNG (legacy)
@@ -50,6 +52,14 @@ try:
     from engine.physiology import physiology_state
 except Exception:  # pragma: no cover
     physiology_state = None  # type: ignore[assignment]
+try:
+    from engine.photosynthesis import photosynthesis_state
+except Exception:  # pragma: no cover
+    photosynthesis_state = None  # type: ignore[assignment]
+try:
+    from engine.material_aging import material_aging_state
+except Exception:  # pragma: no cover
+    material_aging_state = None  # type: ignore[assignment]
 from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 
 
@@ -155,6 +165,15 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
     biome_out = np.zeros((out_h, out_w), dtype=np.int32)
     height_out = np.zeros((out_h, out_w), dtype=np.float32)
     water_out = np.zeros((out_h, out_w), dtype=np.float32)
+    # Overlays that sample per-cell live state when requested.
+    gpp_out = np.zeros((out_h, out_w), dtype=np.float32)
+    food_out = np.zeros((out_h, out_w), dtype=np.float32)
+    food_cap_out = np.zeros((out_h, out_w), dtype=np.float32)
+    wood_out = np.zeros((out_h, out_w), dtype=np.float32)
+
+    photo_state = getattr(sim, "_photo_state", None)
+    photo_caches = (photo_state.chunk_caches
+                    if photo_state is not None else {})
 
     # Determine unique chunks
     pairs = np.stack([cx_arr.ravel(), cy_arr.ravel()], axis=1)
@@ -175,6 +194,13 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
         biome_out[mask] = ch.biome[iy, ix].astype(np.int32)
         height_out[mask] = ch.height[iy, ix]
         water_out[mask] = ch.water[iy, ix]
+        food_out[mask] = ch.food_kcal[iy, ix]
+        food_cap_out[mask] = ch.food_capacity[iy, ix]
+        wood_out[mask] = ch.wood[iy, ix]
+        # GPP overlay : look up the photo cache for this chunk if available.
+        gpp_cache = photo_caches.get(coord)
+        if gpp_cache is not None and gpp_cache.last_gpp_umol is not None:
+            gpp_out[mask] = gpp_cache.last_gpp_umol[iy, ix]
 
     palette = np.array([BIOME_COLORS.get(i, (128, 128, 128)) for i in range(12)],
                        dtype=np.float32)
@@ -186,6 +212,41 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
     # Water overlay (blue tint where water > 5 L/cell)
     water_mask = water_out > 5.0
     cols[water_mask] = cols[water_mask] * 0.4 + np.array([20, 80, 180], np.float32) * 0.6
+
+    # ---- Overlay modes ----------------------------------------------------
+    # Comma-separated; e.g. ``overlay=ndvi,water``. Stacked in order.
+    overlay_set = set(o.strip() for o in (overlay or "").split(",") if o.strip())
+
+    if "ndvi" in overlay_set:
+        # NDVI proxy: forest-style green intensity from food_capacity / wood.
+        ndvi = np.clip(
+            (food_cap_out / 200.0) * 0.5 + (wood_out / 80.0) * 0.5,
+            0.0, 1.0)[..., None]
+        green = np.array([30, 175, 70], np.float32)
+        brown = np.array([135, 95, 55], np.float32)
+        veg_col = green * ndvi + brown * (1.0 - ndvi)
+        cols = cols * 0.35 + veg_col * 0.65
+
+    if "gpp" in overlay_set:
+        # Live primary production intensity. Hot yellow-green for high GPP,
+        # neutral brown when zero.
+        gpp_norm = np.clip(gpp_out / 30.0, 0.0, 1.0)[..., None]
+        hi = np.array([235, 240, 80], np.float32)
+        lo = np.array([90, 75, 50], np.float32)
+        cols = cols * (1.0 - gpp_norm) + (hi * gpp_norm + lo * (1.0 - gpp_norm)) * gpp_norm
+
+    if "food" in overlay_set:
+        # Current standing food (after consumption + regen).
+        food_norm = np.clip(food_out / 200.0, 0.0, 1.0)[..., None]
+        warm = np.array([255, 180, 80], np.float32)
+        cols = cols * (1.0 - food_norm * 0.7) + warm * (food_norm * 0.7)
+
+    if "elev" in overlay_set:
+        # Greyscale elevation, sharp contrast.
+        elev = np.clip(height_out / 3000.0, 0.0, 1.0)[..., None]
+        grey = np.array([240, 240, 240], np.float32)
+        dark = np.array([40, 40, 40], np.float32)
+        cols = cols * 0.30 + (grey * elev + dark * (1.0 - elev)) * 0.70
 
     img[..., 0] = np.clip(cols[..., 0], 0, 255).astype(np.uint8)
     img[..., 1] = np.clip(cols[..., 1], 0, 255).astype(np.uint8)
@@ -323,6 +384,14 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/physiology_state":
             payload = (physiology_state(self.sim_ref)
                        if physiology_state is not None else {})
+            self._json(200, payload); return
+        if path == "/api/photosynthesis_state":
+            payload = (photosynthesis_state(self.sim_ref)
+                       if photosynthesis_state is not None else {})
+            self._json(200, payload); return
+        if path == "/api/material_aging_state":
+            payload = (material_aging_state(self.sim_ref)
+                       if material_aging_state is not None else {})
             self._json(200, payload); return
         if path == "/api/demography":
             self._json(200, self._demography()); return

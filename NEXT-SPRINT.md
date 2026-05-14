@@ -1,5 +1,47 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 14 — Wave 3 physiologie ultra-réaliste).
+**Dernière mise à jour :** 14 mai 2026 (session 15 — Wave 4 photosynthèse + vieillissement matériaux + overlays).
+
+---
+
+## ✅ Livré session 15 (2026-05-14) — Wave 4 biologie + matériaux + visu
+
+**`engine/photosynthesis.py` (~390 LOC)** — modèle Farquhar-von
+Caemmerer-Berry (C3) + Collatz (C4) + CAM. Lit `ecology.Atmosphere.co2_ppm`,
+intègre PAR (jour/nuit + nuage), T foliaire, humidité du sol, mélange
+C3/C4/CAM par biome (Sage 2004, Still 2003). Convertit en
+kcal/cellule/tick et nourrit `chunk.food_kcal`. **191 chunks, 14061
+kcal/tick global GPP** observé à 280 ppm pré-industriel sur sim Léman.
+
+**`engine/material_aging.py` (~245 LOC)** — corrosion, pourriture,
+fatigue. Taux annuels calibrés (fer 3 %/an, bronze 0.35 %/an, granite
+0.005 %/an), facteurs d'exposition (humide air ×1, eau salée ×6),
+pratiques de maintenance par culture (huiler ×0.40, sécher ×0.55,
+saler ×0.65, vernir ×0.30). Les civilisations doivent inventer les
+techniques pour préserver leur capital matériel.
+
+**Overlays visuels** sur `/api/render?overlay=` : `ndvi`, `gpp`,
+`food`, `elev`, empilables (`overlay=gpp,water`). Vis live de
+l'écosystème.
+
+**Endpoints** : `/api/photosynthesis_state`, `/api/material_aging_state`.
+
+**HUD** : nouvelle section BIOSPHERE dans `#observatory-panel` —
+🌱 GPP · ☀️ PAR · 🌡️ T · CO₂ · top 3 biomes / 🪙 alive · ☠️ dead · int.
+
+**ADR-0005** : _REQUIRED_MODULES → 6 (ajout photosynthesis +
+material_aging). Linter `p18` passe 6/6.
+
+**Tests** : `p21_photosynthesis_smoke` 7/7 PASS, `p22_material_aging_smoke`
+6/6 PASS, non-régression Wave 1/2/3 confirmée.
+
+Voir `docs/sprints/2026-05-14_PHASE11-PHOTOSYNTHESIS.md`.
+
+### Wave 5 (futur)
+Évapotranspiration, NPP avec respiration autotrophique, cycle de
+l'azote, maladies végétales, agent-inspector cliquable, heatmap GPP
+historique, slider temporel rewind.
+
+---
 
 ---
 

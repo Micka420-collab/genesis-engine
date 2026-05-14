@@ -37,6 +37,8 @@ _REQUIRED_MODULES: Tuple[str, ...] = (
     "engine.sim_lift",
     "engine.realism",
     "engine.physiology",
+    "engine.photosynthesis",
+    "engine.material_aging",
 )
 
 # Modules that ADR-0005 references but which are still R&D. They are queried
