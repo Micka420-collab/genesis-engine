@@ -616,12 +616,23 @@ def _physio_global_wrapper(agents, row, decision, streamer, tick):
         chunk_c = world_to_chunk(px, py)
         cont = fields.water_contamination.get(chunk_c, 0.0)
         if cont > 0.05:
+            # Immune-gated ingestion. Real biology: gastric acid + IgA
+            # in the gut neutralise low doses when adaptive immunity
+            # is established. An agent with mem=1.0 essentially never
+            # gets clinically reinfected via DRINK ; partial memory
+            # scales linearly. Fix for P-NEW.22 (P10 long-run finding).
+            immune = float(fields.immune_cholera[row])
+            innate = float(fields.immune_baseline[row])
+            protection = min(1.0, immune + 0.5 * innate)
+            infect_prob = cont * 0.5 * max(0.0, 1.0 - protection)
             rng = prf_rng(sim.cfg.seed,
                           ["physiology", "cholera_ingest"],
                           [int(tick), int(row)])
-            if rng.random() < cont * 0.5:
+            if rng.random() < infect_prob:
+                # Dose-load also scaled by remaining susceptibility.
+                dose_load = cont * 0.2 * max(0.0, 1.0 - 0.5 * protection)
                 fields.cholera_load[row] = float(min(
-                    1.0, fields.cholera_load[row] + cont * 0.2))
+                    1.0, fields.cholera_load[row] + dose_load))
     if act in (int(ActionKind.FORAGE), int(ActionKind.EAT)):
         if post_hunger < prev_hunger:
             delta = prev_hunger - post_hunger

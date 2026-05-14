@@ -349,9 +349,24 @@ def compute_chunk_gpp(
 # Per-sim install + tick
 # ---------------------------------------------------------------------------
 
+# Maximum live chunk_caches entries before LRU eviction. Bounded so
+# Earth-scale runs (millions of chunks) can't exhaust RAM via this
+# diagnostic cache. Fix for P-NEW.24 (P10 long-run finding).
+CHUNK_CACHES_CAPACITY = 4096
+
+
 @dataclass
 class PhotosynthesisState:
-    """Global state attached to ``sim`` by install_photosynthesis."""
+    """Global state attached to ``sim`` by install_photosynthesis.
+
+    ``chunk_caches`` is an LRU-style dict (insertion order is the
+    "least-recently-used" axis since Python 3.7+ dicts preserve
+    insertion order). When the dict exceeds ``CHUNK_CACHES_CAPACITY``,
+    the oldest entries are evicted in ``tick_photosynthesis`` after the
+    fresh update. Last-touch can be observed by simply re-inserting
+    into the dict — handled implicitly via the ``cache_store[coord] = …``
+    statement in the tick.
+    """
     chunk_caches: Dict[Tuple[int, int, int], ChunkGppCache] = field(default_factory=dict)
     last_global_gpp_kcal_per_tick: float = 0.0
     last_per_biome_gpp: Dict[int, float] = field(default_factory=dict)
@@ -411,6 +426,10 @@ def tick_photosynthesis(sim, state: PhotosynthesisState) -> None:
     # In some sim builds the cache is a dict-like; iterate via .items().
     for coord, chunk in list(cache_iter.items()):
         gpp_cache = compute_chunk_gpp(chunk, weather, Ca_ppm, drive_accel)
+        # Pop + reinsert so the LRU axis (insertion order) marks this as
+        # most-recently-used regardless of prior insertion time.
+        if coord in cache_store:
+            cache_store.pop(coord, None)
         cache_store[coord] = gpp_cache
         # Inject the locally produced kcal into food_kcal, clipped at
         # food_capacity so we don't overshoot the chunk's local biome
@@ -426,6 +445,15 @@ def tick_photosynthesis(sim, state: PhotosynthesisState) -> None:
         biomes, counts = np.unique(chunk.biome, return_counts=True)
         dominant = int(biomes[np.argmax(counts)])
         per_biome[dominant] = per_biome.get(dominant, 0.0) + produced
+
+    # LRU eviction — drop the oldest entries past the cap (Fix for
+    # P-NEW.24 from the 100k-tick long-run finding).
+    while len(cache_store) > CHUNK_CACHES_CAPACITY:
+        try:
+            oldest_coord = next(iter(cache_store))
+        except StopIteration:
+            break
+        cache_store.pop(oldest_coord, None)
 
     state.last_global_gpp_kcal_per_tick = global_kcal
     state.last_per_biome_gpp = per_biome
