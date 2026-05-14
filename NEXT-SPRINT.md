@@ -1,5 +1,77 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 23 — Phase 4 writing : transmission inter-générationnelle).
+**Dernière mise à jour :** 14 mai 2026 (session 24 — Phase 4 COMPLÈTE : agriculture + writing + polity).
+
+---
+
+## ✅ Livré session 24 (2026-05-14) — Phase 4 polity (Wave 9c) → **Phase 4 100% complète**
+
+**`engine/polity.py` (~450 LOC)** — proto-gouvernement émergent.
+
+### 4 sous-systèmes par tick
+1. **Leader election** (re-élu chaque 1000 ticks) — score = offspring +
+   0.5×inscriptions authored + age. Tie-break déterministe prf_rng.
+2. **Tax** 5%/tick : `inv_food × TAX_RATE` → `treasury_kcal`
+3. **Redistribute** : agents hunger>0.55 reçoivent food proportionnel
+4. **Law enforcement** : compte violations sur lois adoptées (ex.
+   `"no_relief_upstream"` → relief près d'eau contaminée flag)
+
+### Emergence automatique
+`maybe_emerge_polity` fonde une nouvelle polity dès que ≥4 agents sont
+dans un rayon de 200 m sans appartenance préalable. Appelé tous les
+100 ticks.
+
+### Disband
+Polity collapse quand membres alive < 2.
+
+### Smoke `p32_polity_smoke` **8/8 PASS** :
+- install idempotent
+- found_polity 5 membres
+- tax (2.000→1.900 kg, treasury 1250 kcal)
+- redistribute (hungry 1.900→2.150)
+- leader election : agent avec 5 offspring élu
+- disband quand <2 membres
+- ADR-0005 14/14 OK
+- persistence round-trip
+
+**ADR-0005 → 14 modules requis taggés**.
+
+Voir `docs/sprints/2026-05-14_PHASE21-POLITY.md`.
+
+---
+
+## 🎯 Phase 4 — Status final
+
+| Sprint | État | Commit |
+|---|---|---|
+| Wave 9 — Agriculture | ✅ | 4a8f187 |
+| Wave 9b — Writing | ✅ | 97e6f6c |
+| **Wave 9c — Polity** | ✅ | **(ce sprint)** |
+| Wave 9d — Cognition wiring | ⏳ optionnel | — |
+
+**Roadmap §44-49** :
+- Phase 0 ✅
+- Phase 1 ✅
+- Phase 2 ✅
+- Phase 3 🟡 partiel
+- **Phase 4 ✅ COMPLÈTE**
+- Phase 5 ⏳ Genesis-α Public (2 fondateurs, 10K ans sim)
+
+---
+
+## Phase 5 — Cible
+
+> **Genesis-α Public** : 2 fondateurs, 10 années réelles wall-clock = 10 000
+> années simulées. Une civilisation complète émergente, observable jour par jour.
+
+Pré-requis :
+- ✅ Tous modules Wave 1-9c (14 modules ADR-0005)
+- ✅ P-NEW.22 cholera bloquant corrigé
+- ✅ P-NEW.24 photo cache LRU
+- ⏳ Wave 9d : router PLANT/HARVEST/READ/INSCRIBE dans cognition.decide
+- ⏳ Wave 10 : personality drives politics (ambition → fonde polities)
+- ⏳ Wave 11 : optim run 10K sim-yr sans crash + déterminisme intact
+
+---
 
 ---
 
