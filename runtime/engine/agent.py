@@ -51,6 +51,9 @@ class ActionKind(IntEnum):
     FLEE = 12
     EXPLORE = 13
     HUNT = 14
+    # Phase 4 — Émergence civilisationnelle.
+    PLANT = 15       # sow a known seed clade onto the current chunk
+    HARVEST = 16     # gather standing biomass from a cultivated chunk
 
 
 @dataclass

@@ -1,5 +1,60 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 21 — P10 long-run 100k ticks complété, 2 anomalies P-NEW.22 + .24).
+**Dernière mise à jour :** 14 mai 2026 (session 22 — P-NEW.22/.24 fixés + Phase 4 agriculture).
+
+---
+
+## ✅ Livré session 22 (2026-05-14) — P-NEW.22 + .24 fixés + Phase 4 agriculture
+
+### Fix P-NEW.22 (commit 044578a)
+**Bug** : DRINK réinfectait les agents même avec immunité totale.
+Cholera chronique 30% sur 100k ticks, civilisation à 4 agents.
+**Fix scientifique** : ingestion gated par `immune_cholera + 0.5 × innate`.
+Avec mem=1.0 → protection=1.0 → infect_prob=0. Mémoire IgA réaliste.
+**Validation 30k ticks** : `cholera_mean = 0.000` (vs 0.30 avant).
+
+### Fix P-NEW.24 (commit 044578a)
+`PhotosynthesisState.chunk_caches` LRU bornée à 4096 entrées. Earth-scale safe.
+
+### Phase 4 — Agriculture (NEW)
+
+**`engine/agriculture.py` (~330 LOC)** + `ActionKind.PLANT` + `ActionKind.HARVEST` :
+- Per-culture **seed library** (set de clades cultivables)
+- Per-chunk **fields cultivés** (clade, owner_culture, sown_tick, stats)
+- `plant_seed(sim, state, row, clade)` injecte 40 kg dans `plant_evolution.ChunkVegetation`
+- `harvest(sim, state, row)` tire 50% biomasse + crédit `inv_food` (cap 10 kg)
+- `maybe_record_forage_discovery` : agents découvrent par FORAGE les clades édibles présents
+- `tick_agriculture` boost croissance ×1.5 sur fields cultivés (pression de sélection)
+
+**Smoke `p30_agriculture_smoke` 10/10 PASS** :
+- install idempotent
+- discover_seed adds new, idempotent on known
+- plant_seed injects (50 → 90 kg)
+- harvest pulls 148K kcal + fills inv_food + draws biomass (740 → 695 kg)
+- forage discovery ramasse 10 clades
+- tick_agriculture grows cultivated
+- ADR-0005 OK
+- persistence round-trip preserves seed libraries
+
+**Endpoint** `/api/agriculture_state` : plant_events, harvest_events,
+total_kcal_harvested, discoveries, n_cultivated_chunks,
+culture_seed_libraries, top_cultivated_clades.
+
+**ADR-0005 → 12 modules requis taggés**. Non-régression Wave 1-8 confirmée.
+
+Voir `docs/sprints/2026-05-14_PHASE19-AGRICULTURE.md`.
+
+### Phase 4 — Reste à faire
+- **Écriture** : `engine/writing.py` — système de transmission des
+  recettes/lois entre cultures via supports persistants (tablette,
+  papyrus). Compatible avec material_synthesis (recipe transmission).
+- **État** : `engine/polity.py` — émergence de proto-gouvernements
+  quand >N agents partagent une territoire et un set de règles
+  (taxation, distribution de food, autorité).
+- **Cognition hookup** : router les actions PLANT/HARVEST dans
+  cognition.decide quand un champ cultivé est en perception et drives
+  permettent.
+
+---
 
 ---
 
