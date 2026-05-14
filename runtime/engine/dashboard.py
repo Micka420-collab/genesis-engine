@@ -13,6 +13,7 @@ GET  /api/world_model_capabilities → taxonomy table per ADR-0005 (Genesis L1-L
 GET  /api/physiology_state   → Wave 3 physiology: excretion, hygiene, skin, disease loads
 GET  /api/photosynthesis_state → Wave 4 GPP: global + per-biome kcal/tick, Ca, PAR, T
 GET  /api/material_aging_state → Wave 4 material aging: alive/destroyed counts, integrity
+GET  /api/marine_state       → Wave 5 marine: tides, currents, plankton/fish/predator totals
 GET  /api/demography         → lineage tree size, generations, cultures, top progenitors
 GET  /api/agent?row=N        → one-agent detail
 GET  /api/world?cx=&cy=      → one-chunk PNG (legacy)
@@ -60,6 +61,10 @@ try:
     from engine.material_aging import material_aging_state
 except Exception:  # pragma: no cover
     material_aging_state = None  # type: ignore[assignment]
+try:
+    from engine.marine import marine_state
+except Exception:  # pragma: no cover
+    marine_state = None  # type: ignore[assignment]
 from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 
 
@@ -174,6 +179,15 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
     photo_state = getattr(sim, "_photo_state", None)
     photo_caches = (photo_state.chunk_caches
                     if photo_state is not None else {})
+    marine_state_obj = getattr(sim, "_marine_state", None)
+    marine_currents = (marine_state_obj.currents
+                       if marine_state_obj is not None else {})
+
+    # Marine-overlay scratch fields, only populated when the overlay is
+    # requested. Allocated unconditionally so the indexing below stays
+    # straightforward (cheap : two float arrays the size of the image).
+    current_speed_out = np.zeros((out_h, out_w), dtype=np.float32)
+    ocean_mask_out = np.zeros((out_h, out_w), dtype=bool)
 
     # Determine unique chunks
     pairs = np.stack([cx_arr.ravel(), cy_arr.ravel()], axis=1)
@@ -201,6 +215,12 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
         gpp_cache = photo_caches.get(coord)
         if gpp_cache is not None and gpp_cache.last_gpp_umol is not None:
             gpp_out[mask] = gpp_cache.last_gpp_umol[iy, ix]
+        # Marine overlay : per-cell current speed magnitude on OCEAN cells.
+        cf = marine_currents.get(coord)
+        if cf is not None:
+            speed = np.sqrt(cf.u * cf.u + cf.v * cf.v).astype(np.float32)
+            current_speed_out[mask] = speed[iy, ix]
+            ocean_mask_out[mask] = cf.ocean_mask[iy, ix]
 
     palette = np.array([BIOME_COLORS.get(i, (128, 128, 128)) for i in range(12)],
                        dtype=np.float32)
@@ -240,6 +260,22 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
         food_norm = np.clip(food_out / 200.0, 0.0, 1.0)[..., None]
         warm = np.array([255, 180, 80], np.float32)
         cols = cols * (1.0 - food_norm * 0.7) + warm * (food_norm * 0.7)
+
+    if "marine" in overlay_set:
+        # Wave 5 marine overlay : colour OCEAN cells by current speed.
+        # Deep blue at 0 m/s, bright cyan at the CURRENT_MAX_MS cap. We
+        # import locally to avoid a hard module dependency on import.
+        try:
+            from engine.marine import CURRENT_MAX_MS as _CMAX
+        except Exception:
+            _CMAX = 1.5
+        speed_norm = np.clip(current_speed_out / max(_CMAX, 1e-3),
+                             0.0, 1.0)[..., None]
+        deep_blue = np.array([10, 35, 110], np.float32)
+        bright_cyan = np.array([40, 220, 240], np.float32)
+        marine_col = deep_blue * (1.0 - speed_norm) + bright_cyan * speed_norm
+        m3 = ocean_mask_out[..., None]
+        cols = np.where(m3, marine_col, cols)
 
     if "elev" in overlay_set:
         # Greyscale elevation, sharp contrast.
@@ -392,6 +428,10 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/material_aging_state":
             payload = (material_aging_state(self.sim_ref)
                        if material_aging_state is not None else {})
+            self._json(200, payload); return
+        if path == "/api/marine_state":
+            payload = (marine_state(self.sim_ref)
+                       if marine_state is not None else {})
             self._json(200, payload); return
         if path == "/api/demography":
             self._json(200, self._demography()); return

@@ -39,6 +39,7 @@ _PERSISTENT_MODULES: Tuple[Tuple[str, str, str], ...] = (
     ("engine.physiology",     "save_physio_state",   "load_physio_state"),
     ("engine.photosynthesis", "save_photo_state",    "load_photo_state"),
     ("engine.material_aging", "save_aging_state",    "load_aging_state"),
+    ("engine.marine",         "save_marine_state",   "load_marine_state"),
 )
 
 
@@ -229,7 +230,8 @@ def save_world(world: World, name: Optional[str] = None,
         "manifest.json": _file_sha256(os.path.join(target, "manifest.json")),
     }
     for f in ("physiology.npz", "photosynthesis.json",
-              "material_aging.json", "material_registry.json"):
+              "material_aging.json", "material_registry.json",
+              "marine.json", "marine.npz"):
         p = os.path.join(target, f)
         if os.path.isfile(p):
             integrity[f] = _file_sha256(p)

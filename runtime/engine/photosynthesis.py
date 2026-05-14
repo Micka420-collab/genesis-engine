@@ -85,7 +85,7 @@ class Pathway(IntEnum):
 # Tables are intentionally coarse but anchored on global vegetation
 # surveys; sum to ~1.0 per biome (deserts are partially non-vegetated).
 BIOME_PATHWAY_MIX: Dict[int, Tuple[float, float, float]] = {
-    int(Biome.OCEAN):              (0.00, 0.00, 0.00),  # algae handled separately
+    int(Biome.OCEAN):              (1.00, 0.00, 0.00),  # phytoplankton (C3-like) — Wave 5 marine
     int(Biome.ICE):                (0.00, 0.00, 0.00),
     int(Biome.TUNDRA):             (0.98, 0.02, 0.00),
     int(Biome.BOREAL_FOREST):      (1.00, 0.00, 0.00),
