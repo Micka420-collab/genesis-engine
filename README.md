@@ -30,6 +30,14 @@
 
 Hypothèse falsifiable et reproductible inspirée de Conway (Game of Life), Ray (Tierra), Generative Agents (Park 2023), Project Sid (PIANO 2024), et des world models 2025-2026 (Genie 3, Cosmos, V-JEPA-2, Marble).
 
+### 🔭 Vision long-terme — Counterfactual humanity
+
+> **L'objectif ultime** : donner aux agents IA toutes les bases du monde réel (physique, chimie, matériaux, biologie, géographie), puis les laisser explorer **d'autres styles de construction, d'autres styles de société**, pour voir **ce que l'humanité aurait pu faire**. Les IA peuvent **inventer de nouveaux matériaux** — mais tout en **respectant les lois de la nature** (conservation masse-énergie, énergies de liaison, thermodynamique).
+
+L'histoire humaine est un seul tirage parmi des milliards de possibles. Genesis Engine veut servir de **laboratoire de contrefactuelle** : si on rejoue l'histoire de la Terre 1000 fois avec les mêmes lois physiques, combien de civilisations ressemblent à la nôtre ?
+
+📖 **Lire la vision complète** : [`FUTURE-VISION.md`](FUTURE-VISION.md) — 4 piliers, roadmap 4 vagues, critères de succès, références scientifiques.
+
 ---
 
 ## ✨ Ce qui marche aujourd'hui
