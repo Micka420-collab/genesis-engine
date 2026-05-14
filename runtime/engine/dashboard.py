@@ -16,6 +16,7 @@ GET  /api/material_aging_state → Wave 4 material aging: alive/destroyed counts
 GET  /api/marine_state       → Wave 5 marine: tides, currents, plankton/fish/predator totals
 GET  /api/global_world_state → Phase 15 inter-region: attached sims, shared atmosphere, clock, migration count
 GET  /api/plant_evolution_state → Wave 6 plant evolution: 40-clade phylogeny, biomass, speciation, O2
+GET  /api/meteorology_state  → Wave 7 weather: clouds, rain, wind, UV, storms, solar zenith
 GET  /api/demography         → lineage tree size, generations, cultures, top progenitors
 GET  /api/agent?row=N        → one-agent detail
 GET  /api/world?cx=&cy=      → one-chunk PNG (legacy)
@@ -75,6 +76,10 @@ try:
     from engine.plant_evolution import plant_evolution_state
 except Exception:  # pragma: no cover
     plant_evolution_state = None  # type: ignore[assignment]
+try:
+    from engine.meteorology import meteorology_state
+except Exception:  # pragma: no cover
+    meteorology_state = None  # type: ignore[assignment]
 from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 
 
@@ -199,6 +204,17 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
     current_speed_out = np.zeros((out_h, out_w), dtype=np.float32)
     ocean_mask_out = np.zeros((out_h, out_w), dtype=bool)
 
+    # Wave 7 meteorology overlays — per-chunk single values broadcast over
+    # the chunk's pixels.
+    meteo_state_obj = getattr(sim, "_meteo_state", None)
+    meteo_chunks = (meteo_state_obj.chunk_meteo
+                    if meteo_state_obj is not None else {})
+    cloud_out = np.zeros((out_h, out_w), dtype=np.float32)
+    precip_out = np.zeros((out_h, out_w), dtype=np.float32)
+    uv_out = np.zeros((out_h, out_w), dtype=np.float32)
+    wind_speed_out = np.zeros((out_h, out_w), dtype=np.float32)
+    temp_out = np.zeros((out_h, out_w), dtype=np.float32)
+
     # Determine unique chunks
     pairs = np.stack([cx_arr.ravel(), cy_arr.ravel()], axis=1)
     uniq = np.unique(pairs, axis=0)
@@ -231,6 +247,14 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
             speed = np.sqrt(cf.u * cf.u + cf.v * cf.v).astype(np.float32)
             current_speed_out[mask] = speed[iy, ix]
             ocean_mask_out[mask] = cf.ocean_mask[iy, ix]
+        # Wave 7 meteorology — single value per chunk broadcast.
+        mc = meteo_chunks.get(coord)
+        if mc is not None:
+            cloud_out[mask] = mc.cloud_cover
+            precip_out[mask] = mc.precip_mm_h
+            uv_out[mask] = mc.uv_index
+            wind_speed_out[mask] = mc.wind_speed_ms
+            temp_out[mask] = mc.temp_c
 
     palette = np.array([BIOME_COLORS.get(i, (128, 128, 128)) for i in range(12)],
                        dtype=np.float32)
@@ -293,6 +317,40 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
         grey = np.array([240, 240, 240], np.float32)
         dark = np.array([40, 40, 40], np.float32)
         cols = cols * 0.30 + (grey * elev + dark * (1.0 - elev)) * 0.70
+
+    if "clouds" in overlay_set:
+        # Wave 7 — white veil for cloud cover, darker where dense.
+        cc = np.clip(cloud_out, 0.0, 1.0)[..., None]
+        white = np.array([240, 240, 240], np.float32)
+        cols = cols * (1.0 - 0.55 * cc) + white * (0.55 * cc)
+
+    if "precip" in overlay_set:
+        # Wave 7 — blue stripes for rain/snow intensity.
+        p = np.clip(precip_out / 20.0, 0.0, 1.0)[..., None]
+        blue = np.array([80, 130, 240], np.float32)
+        cols = cols * (1.0 - 0.6 * p) + blue * (0.6 * p)
+
+    if "uv" in overlay_set:
+        # Wave 7 — purple intensity for UV index 0..11+.
+        uv = np.clip(uv_out / 11.0, 0.0, 1.0)[..., None]
+        purple = np.array([200, 60, 220], np.float32)
+        cols = cols * (1.0 - 0.5 * uv) + purple * (0.5 * uv)
+
+    if "wind" in overlay_set:
+        # Wave 7 — green to red gradient by wind speed (m/s).
+        ws = np.clip(wind_speed_out / 25.0, 0.0, 1.0)[..., None]
+        calm = np.array([60, 140, 80], np.float32)
+        gust = np.array([220, 50, 30], np.float32)
+        wind_col = calm * (1.0 - ws) + gust * ws
+        cols = cols * 0.45 + wind_col * 0.55
+
+    if "temperature" in overlay_set or "temp" in overlay_set:
+        # Wave 7 — blue (cold) → red (hot) gradient. Centred ~15 °C.
+        t = np.clip((temp_out - (-10.0)) / 50.0, 0.0, 1.0)[..., None]
+        cold = np.array([60, 100, 220], np.float32)
+        hot = np.array([240, 60, 40], np.float32)
+        temp_col = cold * (1.0 - t) + hot * t
+        cols = cols * 0.40 + temp_col * 0.60
 
     img[..., 0] = np.clip(cols[..., 0], 0, 255).astype(np.uint8)
     img[..., 1] = np.clip(cols[..., 1], 0, 255).astype(np.uint8)
@@ -453,6 +511,10 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/plant_evolution_state":
             payload = (plant_evolution_state(self.sim_ref)
                        if plant_evolution_state is not None else {})
+            self._json(200, payload); return
+        if path == "/api/meteorology_state":
+            payload = (meteorology_state(self.sim_ref)
+                       if meteorology_state is not None else {})
             self._json(200, payload); return
         if path == "/api/demography":
             self._json(200, self._demography()); return

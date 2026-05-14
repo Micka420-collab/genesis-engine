@@ -153,6 +153,9 @@ class PhysioFields:
     melanin: np.ndarray = field(default=None)        # 0=fair, 1=very dark
     body_fat: np.ndarray = field(default=None)       # 0..1 normalised
     immune_baseline: np.ndarray = field(default=None)  # innate strength
+    # Wave 7 — epidermal melanin response to UV (tanning, days-scale).
+    tan_level: np.ndarray = field(default=None)        # [0,1] epidermal
+    uv_dose_lifetime: np.ndarray = field(default=None)  # cumulative UV-day units
     # Cumulative counters (diagnostic, no semantic effect).
     relief_events: np.ndarray = field(default=None)
     bathe_events: np.ndarray = field(default=None)
@@ -175,6 +178,9 @@ class PhysioFields:
         self.melanin = np.full(N, 0.50, dtype=np.float32)
         self.body_fat = np.full(N, 0.20, dtype=np.float32)
         self.immune_baseline = np.full(N, 0.50, dtype=np.float32)
+        # Wave 7 — epidermal tan (acquired) + cumulative UV dose.
+        self.tan_level = z()
+        self.uv_dose_lifetime = z()
         self.relief_events = np.zeros(N, dtype=np.int32)
         self.bathe_events = np.zeros(N, dtype=np.int32)
         self.diseases_caught = np.zeros(N, dtype=np.int32)
@@ -293,12 +299,53 @@ def _tick_skin(sim, fields: PhysioFields) -> None:
     except Exception:
         pass
 
-    # --- Sunburn — only the hot half of thermal stress (proxy for sun
-    # exposure outdoors). Sub-linear in thermal so a sunny afternoon
-    # adds 1-2 % per tick, not 100 %.
-    hot_factor = np.clip(thermal, 0.0, 1.0) * (0.0 if is_freezing else 1.0)
-    susceptibility = (1.0 - fields.melanin[:n]) * SUNBURN_PER_S * accel * 0.10
-    delta = susceptibility * hot_factor
+    # --- Sample per-agent UV index from meteorology (Wave 7). If absent,
+    # fall back to thermal-proxy logic. UV is read from the agent's
+    # current chunk's CellMeteorology.
+    from engine.world import world_to_chunk
+    meteo_state = getattr(sim, "_meteo_state", None)
+    uv_per_agent = np.zeros(n, dtype=np.float32)
+    if meteo_state is not None:
+        meteo_chunks = meteo_state.chunk_meteo
+        for r in np.flatnonzero(m_alive):
+            px = float(sim.agents.pos[r, 0])
+            py = float(sim.agents.pos[r, 1])
+            ccoord = world_to_chunk(px, py)
+            cell = meteo_chunks.get(ccoord)
+            if cell is not None:
+                uv_per_agent[r] = cell.uv_index
+
+    # --- Tanning (Wave 7) : epidermal melanin response to UV exposure.
+    # Real biology : melanocyte stimulation at UVI > ~3 produces visible
+    # tan over days. Decays with weeks of low exposure. Tan reduces
+    # sunburn susceptibility (effective melanin = melanin + 0.4 * tan).
+    if meteo_state is not None:
+        # Growth where UV > 3.
+        uv_gain = np.where(uv_per_agent > 3.0,
+                           (uv_per_agent - 3.0) / 8.0, 0.0).astype(np.float32)
+        tan_grow_rate = 1.0 / (5.0 * 86400.0) * accel  # 5-day tan-up
+        tan_decay_rate = 1.0 / (30.0 * 86400.0) * accel  # 30-day fade
+        delta_tan = uv_gain * tan_grow_rate - tan_decay_rate
+        fields.tan_level[:n][m_alive] = np.clip(
+            fields.tan_level[:n][m_alive] + delta_tan[m_alive], 0.0, 1.0)
+        # Cumulative dose tracking (UVI-day units).
+        fields.uv_dose_lifetime[:n][m_alive] += (
+            uv_per_agent[m_alive] * accel * TICK_DT_S / 86400.0)
+        effective_melanin = fields.melanin[:n] + 0.4 * fields.tan_level[:n]
+    else:
+        effective_melanin = fields.melanin[:n]
+
+    # --- Sunburn — driven by UV when meteo installed, otherwise thermal proxy.
+    if meteo_state is not None:
+        # UV > 6 burns fair skin within an hour outdoor.
+        susceptibility = (1.0 - effective_melanin) * SUNBURN_PER_S * accel * 0.10
+        # 0 below UVI 1, linear ramp to 1 above UVI 8.
+        uv_factor = np.clip((uv_per_agent - 1.0) / 7.0, 0.0, 1.5)
+        delta = susceptibility * uv_factor
+    else:
+        hot_factor = np.clip(thermal, 0.0, 1.0) * (0.0 if is_freezing else 1.0)
+        susceptibility = (1.0 - effective_melanin) * SUNBURN_PER_S * accel * 0.10
+        delta = susceptibility * hot_factor
     fields.sunburn[:n][m_alive] = np.clip(
         fields.sunburn[:n][m_alive] + delta[m_alive], 0.0, 1.0)
     fields.sunburn[:n][m_alive] = np.maximum(
@@ -640,6 +687,10 @@ def physiology_state(sim) -> Dict[str, object]:
     def _max(arr):
         return float(arr[:n][alive].max()) if n_alive else 0.0
 
+    # Effective melanin = genetic baseline + 0.4 * tan_level. Visual skin
+    # tone of agents = effective_melanin in [0..1].
+    eff_melanin_arr = fields.melanin[:n] + 0.4 * fields.tan_level[:n]
+    eff_mean = float(eff_melanin_arr[alive].mean()) if n_alive else 0.0
     return {
         "n_active": int(n),
         "alive": int(n_alive),
@@ -652,6 +703,9 @@ def physiology_state(sim) -> Dict[str, object]:
             "parasites": _mean(fields.parasites),
             "dermatitis": _mean(fields.dermatitis),
             "melanin":   _mean(fields.melanin),
+            "tan_level": _mean(fields.tan_level),
+            "effective_melanin": round(eff_mean, 4),
+            "uv_dose_lifetime": _mean(fields.uv_dose_lifetime),
             "body_fat":  _mean(fields.body_fat),
         },
         "disease": {
@@ -722,6 +776,7 @@ _PHYSIO_ARRAY_FIELDS = (
     "cholera_load", "flu_load", "wound_load",
     "immune_cholera", "immune_flu", "immune_wound",
     "melanin", "body_fat", "immune_baseline",
+    "tan_level", "uv_dose_lifetime",          # Wave 7 — epidermal + cumulative UV
     "relief_events", "bathe_events", "diseases_caught",
 )
 

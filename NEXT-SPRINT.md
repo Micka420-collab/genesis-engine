@@ -1,5 +1,50 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 18 — Wave 6 plant evolution : 39 clades + divergence IA).
+**Dernière mise à jour :** 14 mai 2026 (session 19 — Wave 7 météorologie ultra-réaliste + bronzage UV).
+
+---
+
+## ✅ Livré session 19 (2026-05-14) — Wave 7 météo + skin UV adaptation
+
+### `engine/meteorology.py` (~770 LOC)
+
+Modèle météo scientifique :
+- **Géométrie solaire Spencer 1971** : déclinaison ±23.45°, zenith exact
+- **Irradiance Beer-Lambert** : 1293 W/m² midi mi-latitude été (réaliste)
+- **UV index WHO** : UVI 10.80 tropical noon (records WMO observés)
+- **5 types de nuages** (cirrus, cumulus, stratus, nimbus, cumulonimbus)
+- **7 types de précipitation** (drizzle, rain, shower, snow, sleet, hail)
+- **Coriolis exact** : f = 2Ω sin(φ) — 0 équateur, 1.46e-4 pôle
+- **3 tempêtes trackées** (thunderstorm, extratropical low,
+  tropical cyclone). Cyclones nécessitent SST > 26.5°C + lat > 5°.
+- Champ vent géostrophique + advection des tempêtes
+- 16 champs par chunk dans `CellMeteorology`
+
+### Extension `physiology.py` — bronzage UV (vraie biologie)
+
+- `tan_level` épidermique : croît 5j sous UV>3, fade 30j
+- `uv_dose_lifetime` cumul UV-jour sur la vie
+- `effective_melanin = melanin + 0.4 × tan_level` utilisé pour sunburn
+- Sunburn maintenant piloté par UV per-chunk (pas thermal proxy)
+- Reporter expose `effective_melanin` pour visualisation
+
+### 5 nouveaux overlays visuels
+`?overlay=clouds,precip,uv,wind,temperature` — empilables.
+
+### Tests
+- `p28_meteorology_smoke` **12/12 PASS** (astronomie, irradiance, UV
+  WHO bounds, Coriolis, sim integration, déterminisme)
+- Non-régression p18 (10/10), p20, p23, p27 PASS
+
+### ADR-0005 → 10 modules requis taggés
+`engine.meteorology` ajouté.
+
+Voir `docs/sprints/2026-05-14_PHASE17-METEOROLOGY.md`.
+
+### Wave 8 (futur)
+Skin color rendering per-agent, cycle hydrologique fermé, saisons
+compressibles, jet stream multi-région.
+
+---
 
 ---
 
