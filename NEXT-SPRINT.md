@@ -1,5 +1,56 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 13 — FUTURE-VISION Wave 2 livrée).
+**Dernière mise à jour :** 14 mai 2026 (session 14 — Wave 3 physiologie ultra-réaliste).
+
+---
+
+## ✅ Livré session 14 (2026-05-14) — Wave 3 physiologie ultra-réaliste
+
+Nouveau module `engine/physiology.py` (~520 LOC) qui empile sur les
+drives Phase-4 une physiologie humaine fidèle :
+
+- **Excrétion** : `bladder` (4 h fill), `bowel` (14 h fill). Relief
+  autonome dès urge ; **contamination de l'eau** (cholera shedding)
+  si relief près d'un point d'eau.
+- **Hygiène** : `hygiene` scalar, décay 5 jours, restauré par bain
+  sur cellule water > 50 L. Sweat + parasites accélèrent le décay.
+- **Maladies de peau** : `sunburn`, `frostbite`, `parasites` (lice),
+  `dermatitis`. Pilotées par melanin × thermal × body_fat × hygiene.
+- **Pathogènes contagieux** :
+  - `cholera` (water-borne, ingéré via DRINK sur eau contaminée)
+  - `flu` (airborne, transmission via spatial grid rayon 2 m)
+  - `wound_infection` (entrée par injuries × dirty environment)
+  - Croissance **logistique** `r·load·(1-load)`, clearance par
+    immunité. Mémoire immunitaire post-infection.
+- **Génome → traits** : melanin (loci 120-127), body_fat (128-135),
+  immune_baseline (136-143) lus à l'install.
+
+**Émergence observée** sur smoke 800 ticks Léman : **10/12 agents
+survivants attrapent le choléra** par auto-contamination de leur eau
+de boisson — le mécanisme historique du XIXe siècle reproduit sans
+le programmer.
+
+**Hookage** : `engine.cognition.apply_decision` wrappé **une fois par
+processus** avec dispatch `id(agents)→(sim, fields)` (permet plusieurs
+sims simultanés).
+
+**Déterminisme** : SHA hash physio bit-identique entre 2 sims même seed
+même processus (`27dff46e878183dc1aad3f92`). Tous les RNG via `prf_rng`.
+
+**ADR-0005** : `engine.physiology` ajouté à `_REQUIRED_MODULES`, linter
+CI passe 4/4.
+
+**Endpoint** : `GET /api/physiology_state` + 2 lignes HUD dans
+`#observatory-panel` (💧bld 💩bwl 🧼hyg ☀️sun ❄️frz 🐛par 🩹der + 🦠
+cho/flu/wnd).
+
+Voir `docs/sprints/2026-05-14_PHASE10-PHYSIOLOGY.md`.
+
+### Wave 4 (R&D future)
+Wounds localisées (jambe/bras), grossesse+lactation, remèdes culturels
+(invention.py × MaterialRegistry = pharmacopée), mémoire trauma
+adaptative (éviter chunks contaminés).
+
+---
 
 ---
 

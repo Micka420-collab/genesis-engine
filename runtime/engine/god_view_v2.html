@@ -1139,6 +1139,9 @@ refresh();
   <div class="obs-prog" id="obs-prog">…</div>
   <div class="obs-lbl" title="ADR-0005 — Genesis pipeline × paper capability">WORLD-MODEL CAPABILITIES</div>
   <div class="obs-cap" id="obs-cap">…</div>
+  <div class="obs-lbl" title="Wave 3 — excretion, hygiene, skin, disease">PHYSIOLOGY</div>
+  <div class="obs-row" id="obs-physio">…</div>
+  <div class="obs-row" id="obs-disease">…</div>
 </div>
 <script>
 (function(){
@@ -1154,12 +1157,13 @@ refresh();
     return {forest:f, garrigue:g};
   }
   async function refreshObservatory(){
-    const [state, realism, lift, demo, caps] = await Promise.all([
+    const [state, realism, lift, demo, caps, physio] = await Promise.all([
       safeFetch('/api/state'),
       safeFetch('/api/realism_state'),
       safeFetch('/api/lift_state'),
       safeFetch('/api/demography'),
       safeFetch('/api/world_model_capabilities'),
+      safeFetch('/api/physiology_state'),
     ]);
     // Header
     try{
@@ -1256,6 +1260,34 @@ refresh();
         `<div style="color:#888;margin-top:3px">${tag} · ADR-0005</div>`;
     }catch(e){ document.getElementById('obs-cap').innerHTML =
       '<span class="obs-err">caps err</span>'; }
+    // Wave 3 physiology — excretion, hygiene, skin, disease.
+    try{
+      const m = (physio && physio.means) || {};
+      const d = (physio && physio.disease) || {};
+      const e = (physio && physio.events) || {};
+      const ali = (physio && physio.alive) || 0;
+      const fmt = x => pctFmt(x);
+      const bar = (label, v, em) => `${em} ${label} ${fmt(v||0)}`;
+      document.getElementById('obs-physio').innerHTML =
+        `${bar('bld', m.bladder, '💧')} · ${bar('bwl', m.bowel, '💩')}<br>`+
+        `${bar('hyg', m.hygiene, '🧼')} · ${bar('sun', m.sunburn, '☀️')} · `+
+        `${bar('frz', m.frostbite, '❄️')}<br>`+
+        `${bar('par', m.parasites, '🐛')} · ${bar('der', m.dermatitis, '🩹')}`;
+      const cMax = (d.cholera_max||0).toFixed(2);
+      const fMax = (d.flu_max||0).toFixed(2);
+      const wMax = (d.wound_max||0).toFixed(2);
+      const cInf = d.infected_cholera||0;
+      const fInf = d.infected_flu||0;
+      const wInf = d.infected_wound||0;
+      document.getElementById('obs-disease').innerHTML =
+        `🦠 cho ${cInf}/${cMax} · flu ${fInf}/${fMax} · wnd ${wInf}/${wMax}<br>`+
+        `relief ${e.relief_total||0} · bath ${e.bathe_total||0} · `+
+        `caught ${e.diseases_caught_total||0}`;
+    }catch(e){
+      document.getElementById('obs-physio').innerHTML =
+        '<span class="obs-err">physio err</span>';
+      document.getElementById('obs-disease').innerHTML = '';
+    }
   }
   refreshObservatory();
   setInterval(refreshObservatory, 3000);
