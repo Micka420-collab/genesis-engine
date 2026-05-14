@@ -306,6 +306,78 @@ def material_aging_state(sim) -> Dict[str, object]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Persistence — P1 save / load round-trip support
+# ---------------------------------------------------------------------------
+
+def save_aging_state(sim, target_dir: str) -> bool:
+    """Persist :class:`MaterialAgingRegistry` to ``target_dir/material_aging.json``."""
+    import json, os
+    reg: Optional[MaterialAgingRegistry] = getattr(sim, "_aging_registry", None)
+    if reg is None:
+        return False
+    payload = {
+        "instances": [
+            {
+                "instance_id": inst.instance_id,
+                "material_id": inst.material_id,
+                "material_name": inst.material_name,
+                "spawned_tick": inst.spawned_tick,
+                "owner_culture": inst.owner_culture,
+                "exposure_mode": inst.exposure_mode,
+                "integrity": inst.integrity,
+                "ticks_exposed": inst.ticks_exposed,
+                "last_aged_tick": inst.last_aged_tick,
+                "destroyed": inst.destroyed,
+            }
+            for inst in reg._by_id.values()
+        ],
+        "next_id": reg._next_id,
+        "culture_practices": {
+            str(k): sorted(v) for k, v in reg._culture_practices.items()
+        },
+        "cumulative_decay_units": reg.cumulative_decay_units,
+        "destroyed_instances": reg.destroyed_instances,
+    }
+    with open(os.path.join(target_dir, "material_aging.json"),
+              "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+    return True
+
+
+def load_aging_state(sim, target_dir: str) -> bool:
+    """Reinstate :class:`MaterialAgingRegistry` from disk. Installs if missing."""
+    import json, os
+    path = os.path.join(target_dir, "material_aging.json")
+    if not os.path.isfile(path):
+        return False
+    reg = install_material_aging(sim)
+    with open(path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+    reg._by_id.clear()
+    for d in payload.get("instances", []):
+        inst = MaterialInstance(
+            instance_id=int(d["instance_id"]),
+            material_id=int(d["material_id"]),
+            material_name=str(d["material_name"]),
+            spawned_tick=int(d["spawned_tick"]),
+            owner_culture=int(d["owner_culture"]),
+            exposure_mode=str(d.get("exposure_mode", "humid_air")),
+            integrity=float(d.get("integrity", 1.0)),
+            ticks_exposed=int(d.get("ticks_exposed", 0)),
+            last_aged_tick=int(d.get("last_aged_tick", 0)),
+            destroyed=bool(d.get("destroyed", False)),
+        )
+        reg._by_id[inst.instance_id] = inst
+    reg._next_id = int(payload.get("next_id", 1))
+    reg._culture_practices = {
+        int(k): set(v) for k, v in payload.get("culture_practices", {}).items()
+    }
+    reg.cumulative_decay_units = float(payload.get("cumulative_decay_units", 0.0))
+    reg.destroyed_instances = int(payload.get("destroyed_instances", 0))
+    return True
+
+
 __all__ = [
     "PIPELINE_LAYER",
     "WORLD_MODEL_CAPABILITY",
@@ -313,6 +385,8 @@ __all__ = [
     "MaterialAgingRegistry",
     "install_material_aging",
     "material_aging_state",
+    "save_aging_state",
+    "load_aging_state",
     "ANNUAL_LOSS_FRACTION",
     "EXPOSURE_FACTORS",
     "MAINTENANCE_FACTORS",

@@ -706,12 +706,84 @@ class MaterialRegistry:
         return [self._by_id[mid] for mid in ids if mid in self._by_id]
 
 
+# ----------------------------------------------------------------------------
+# --- Persistence (P1) — save / load MaterialRegistry to disk ----------------
+# ----------------------------------------------------------------------------
+
+def save_material_registry(reg: "MaterialRegistry", target_dir: str) -> bool:
+    """Persist a :class:`MaterialRegistry` to ``target_dir/material_registry.json``.
+
+    Returns True if anything was written. The registry isn't attached to
+    ``sim`` automatically — callers (e.g. ``world_library.save_world``)
+    pass it explicitly when they have one.
+    """
+    import json, os
+    payload = {
+        "schema_version": 1,
+        "next_id": reg._next_id,
+        "materials": [
+            {
+                "material_id": m.material_id,
+                "name": m.name,
+                "composition": m.composition,
+                "discovered_tick": m.discovered_tick,
+                "discovered_by_culture": m.discovered_by_culture,
+                "conditions": m.conditions,
+                "properties": m.properties,
+                "parent_materials": list(m.parent_materials),
+            }
+            for m in reg._by_id.values()
+        ],
+        "culture_known": {
+            str(k): sorted(int(x) for x in v)
+            for k, v in reg._culture_known.items()
+        },
+    }
+    with open(os.path.join(target_dir, "material_registry.json"),
+              "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+    return True
+
+
+def load_material_registry(target_dir: str) -> Optional["MaterialRegistry"]:
+    """Read back a :class:`MaterialRegistry` written by
+    :func:`save_material_registry`. Returns ``None`` if no file."""
+    import json, os
+    path = os.path.join(target_dir, "material_registry.json")
+    if not os.path.isfile(path):
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+    reg = MaterialRegistry()
+    reg._next_id = int(payload.get("next_id", 1))
+    for d in payload.get("materials", []):
+        mat = SynthesizedMaterial(
+            material_id=int(d["material_id"]),
+            name=str(d["name"]),
+            composition={str(k): float(v) for k, v in d["composition"].items()},
+            discovered_tick=int(d.get("discovered_tick", 0)),
+            discovered_by_culture=int(d.get("discovered_by_culture", 0)),
+            conditions={str(k): float(v)
+                        for k, v in d.get("conditions", {}).items()},
+            properties={str(k): float(v)
+                        for k, v in d.get("properties", {}).items()},
+            parent_materials=tuple(int(x) for x in d.get("parent_materials", [])),
+        )
+        reg._by_id[mat.material_id] = mat
+        reg._by_name[mat.name] = mat.material_id
+    for k, vs in payload.get("culture_known", {}).items():
+        reg._culture_known[int(k)] = set(int(x) for x in vs)
+    return reg
+
+
 __all__ = [
     "SynthesisConditions",
     "SynthesizedMaterial",
     "MaterialRegistry",
     "check_physical_validity",
     "synthesize",
+    "save_material_registry",
+    "load_material_registry",
     "TOOL_MAX_TEMPERATURE_K",
     "PERIODIC_TABLE",
     "BOND_ENERGY",

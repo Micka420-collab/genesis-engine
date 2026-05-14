@@ -712,11 +712,89 @@ def install_physiology(sim) -> PhysioFields:
     return fields
 
 
+# ---------------------------------------------------------------------------
+# Persistence — P1 save / load round-trip support
+# ---------------------------------------------------------------------------
+
+_PHYSIO_ARRAY_FIELDS = (
+    "bladder", "bowel", "hygiene",
+    "sunburn", "frostbite", "parasites", "dermatitis",
+    "cholera_load", "flu_load", "wound_load",
+    "immune_cholera", "immune_flu", "immune_wound",
+    "melanin", "body_fat", "immune_baseline",
+    "relief_events", "bathe_events", "diseases_caught",
+)
+
+
+def save_physio_state(sim, target_dir: str) -> bool:
+    """Persist :class:`PhysioFields` to ``target_dir/physiology.npz``.
+
+    Returns ``True`` if state was written. Stays silent when no physiology
+    has been installed on the sim (just returns False).
+    """
+    import os
+    fields = getattr(sim, "_physio_fields", None)
+    if fields is None:
+        return False
+    n = sim.agents.n_active
+    payload = {"n_active": np.array([n], dtype=np.int64),
+               "capacity": np.array([fields.capacity], dtype=np.int64)}
+    for f in _PHYSIO_ARRAY_FIELDS:
+        arr = getattr(fields, f, None)
+        if arr is not None:
+            payload[f] = np.asarray(arr)
+    # water_contamination is a Dict[(int,int,int) → float]. Flatten to two
+    # parallel arrays for safe serialisation.
+    if fields.water_contamination:
+        keys = list(fields.water_contamination.keys())
+        coords = np.array(keys, dtype=np.int32)
+        vals = np.array(
+            [fields.water_contamination[k] for k in keys], dtype=np.float32)
+        payload["contam_coords"] = coords
+        payload["contam_values"] = vals
+    np.savez_compressed(os.path.join(target_dir, "physiology.npz"), **payload)
+    return True
+
+
+def load_physio_state(sim, target_dir: str) -> bool:
+    """Reinstate :class:`PhysioFields` from ``target_dir/physiology.npz``.
+
+    Calls ``install_physiology(sim)`` if not already done, then restores
+    every per-agent array. ``True`` on success, ``False`` if no file.
+    """
+    import os
+    path = os.path.join(target_dir, "physiology.npz")
+    if not os.path.isfile(path):
+        return False
+    fields = install_physiology(sim)
+    data = np.load(path, allow_pickle=False)
+    for f in _PHYSIO_ARRAY_FIELDS:
+        if f in data.files:
+            arr = getattr(fields, f, None)
+            if arr is None:
+                continue
+            src = data[f]
+            try:
+                arr[:src.shape[0]] = src
+            except Exception:
+                pass
+    if "contam_coords" in data.files and "contam_values" in data.files:
+        coords = data["contam_coords"]
+        vals = data["contam_values"]
+        fields.water_contamination = {
+            tuple(int(c) for c in coords[i]): float(vals[i])
+            for i in range(len(vals))
+        }
+    return True
+
+
 __all__ = [
     "PIPELINE_LAYER",
     "WORLD_MODEL_CAPABILITY",
     "PhysioFields",
     "install_physiology",
     "physiology_state",
+    "save_physio_state",
+    "load_physio_state",
     "PATHOGEN_NAMES",
 ]

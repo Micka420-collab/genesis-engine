@@ -18,15 +18,39 @@ then evolve identically going forward.
 """
 from __future__ import annotations
 
+import hashlib
+import importlib
 import json
 import os
 import shutil
 from dataclasses import asdict
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Tuple
 
 import numpy as np
 
 from engine.world_builder import WorldBuilder, World, _BuilderState
+
+
+# Modules that can persist their own state outside the basic save_world
+# loop. Each entry is (dotted_module, save_fn_name, load_fn_name). Modules
+# absent at import time are skipped silently — keeps the persistence
+# system loosely coupled.
+_PERSISTENT_MODULES: Tuple[Tuple[str, str, str], ...] = (
+    ("engine.physiology",     "save_physio_state",   "load_physio_state"),
+    ("engine.photosynthesis", "save_photo_state",    "load_photo_state"),
+    ("engine.material_aging", "save_aging_state",    "load_aging_state"),
+)
+
+
+def _file_sha256(path: str) -> str:
+    """Return the lowercase hex SHA-256 of a file. ``""`` if absent."""
+    if not os.path.isfile(path):
+        return ""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(64 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 _LIBRARY_ROOT_ENV = "GENESIS_LIBRARY_ROOT"
@@ -65,15 +89,30 @@ def list_worlds() -> List[str]:
 # ---------------------------------------------------------------------------
 
 _AGENT_FIELDS_TO_SAVE = (
-    "uuid", "pos", "vel", "heading",
-    "alive", "born_tick", "generation",
+    # Identity / lineage
+    "uuid", "generation", "born_tick",
+    # Kinematics
+    "pos", "vel", "heading", "mass_kg", "walk_max_ms", "run_max_ms",
+    "lifespan_ticks",
+    # Drives
     "hunger", "thirst", "sleep", "fatigue", "thermal",
-    "pain", "stress", "loneliness", "vitality",
+    "pain", "stress", "loneliness",
+    # Health
+    "vitality", "injuries", "pathogen_load",
+    # Personality / traits
     "openness", "conscientiousness", "extraversion", "agreeableness",
     "neuroticism", "ambition", "risk_tolerance",
     "aggression", "curiosity", "empathy", "intelligence",
+    # Inventory
     "inv_water", "inv_food", "inv_wood", "inv_stone", "inv_metal",
-    "lifespan_ticks", "last_mating_tick", "offspring_count", "action",
+    "inv_tools", "inv_capacity_kg",
+    # Action state
+    "last_mating_tick", "offspring_count", "action",
+    "target_x", "target_y", "intent_expires",
+    # Death
+    "alive", "death_cause", "death_tick",
+    # Language (Phase 4)
+    "lexicon",
 )
 
 
@@ -152,6 +191,54 @@ def save_world(world: World, name: Optional[str] = None,
             chunk_index.append(f"{cx}_{cy}_{cz}")
         with open(os.path.join(target, "chunks", "_index.json"), "w") as f:
             json.dump(chunk_index, f)
+
+    # 4. Optional side-tables (Wave 3 physiology, Wave 4 photo / aging).
+    saved_modules: List[str] = []
+    for dotted, save_name, _ in _PERSISTENT_MODULES:
+        try:
+            mod = importlib.import_module(dotted)
+        except Exception:
+            continue
+        save_fn = getattr(mod, save_name, None)
+        if save_fn is None:
+            continue
+        try:
+            ok = bool(save_fn(world.sim, target))
+            if ok:
+                saved_modules.append(dotted)
+        except Exception:
+            pass
+
+    # 5. Optional material registry — caller may have attached one.
+    reg = getattr(world.sim, "_material_registry", None)
+    if reg is None:
+        # Builder may store it on the world.
+        reg = getattr(world, "material_registry", None)
+    if reg is not None:
+        try:
+            from engine.material_synthesis import save_material_registry
+            save_material_registry(reg, target)
+            saved_modules.append("engine.material_synthesis")
+        except Exception:
+            pass
+
+    # 6. Integrity manifest — SHA-256 of the artefacts the loader will
+    # read. Detects silent corruption (disk errors, partial writes).
+    integrity = {
+        "agents.npz": _file_sha256(os.path.join(target, "agents.npz")),
+        "manifest.json": _file_sha256(os.path.join(target, "manifest.json")),
+    }
+    for f in ("physiology.npz", "photosynthesis.json",
+              "material_aging.json", "material_registry.json"):
+        p = os.path.join(target, f)
+        if os.path.isfile(p):
+            integrity[f] = _file_sha256(p)
+    # Index chunks but don't hash each (would explode for big worlds).
+    integrity["chunks_count"] = str(len(chunk_index))
+    integrity["modules_saved"] = ",".join(saved_modules)
+    with open(os.path.join(target, "integrity.json"),
+              "w", encoding="utf-8") as f:
+        json.dump(integrity, f, indent=2)
 
     return target
 
@@ -253,7 +340,68 @@ def load_world(name: str) -> World:
         except Exception:
             pass
 
+    # 4. Optional side-tables (Wave 3 physiology, Wave 4 photo / aging).
+    # Loaders install the module on the sim if it wasn't installed yet, so
+    # a restored world is *immediately* equivalent to a freshly-installed
+    # one from a caller's POV.
+    for dotted, _, load_name in _PERSISTENT_MODULES:
+        try:
+            mod = importlib.import_module(dotted)
+        except Exception:
+            continue
+        load_fn = getattr(mod, load_name, None)
+        if load_fn is None:
+            continue
+        try:
+            load_fn(world.sim, target)
+        except Exception:
+            pass
+
+    # 5. Optional material registry. Attach onto sim AND world for both
+    # access patterns to work.
+    try:
+        from engine.material_synthesis import load_material_registry
+        reg = load_material_registry(target)
+        if reg is not None:
+            world.sim._material_registry = reg
+            try:
+                world.material_registry = reg
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     return world
+
+
+def verify_world_integrity(name: str) -> Tuple[bool, List[str]]:
+    """Compare the on-disk artefacts of a saved world against the SHA
+    digests recorded in ``integrity.json``.
+
+    Returns ``(ok, problems)``. ``ok`` is ``True`` if every file the
+    manifest expected to find is present and hash-matches. ``problems``
+    lists human-readable issues (missing file, hash mismatch).
+    """
+    target = world_path(name)
+    integ_path = os.path.join(target, "integrity.json")
+    problems: List[str] = []
+    if not os.path.isfile(integ_path):
+        return False, [f"integrity.json missing under {target}"]
+    with open(integ_path, "r", encoding="utf-8") as f:
+        integrity = json.load(f)
+    for fname, expected in integrity.items():
+        if fname in ("chunks_count", "modules_saved"):
+            continue
+        if not expected:
+            continue
+        actual = _file_sha256(os.path.join(target, fname))
+        if not actual:
+            problems.append(f"missing file {fname}")
+        elif actual != expected:
+            problems.append(
+                f"hash mismatch on {fname}: expected {expected[:8]}…"
+                f" got {actual[:8]}…")
+    return (not problems), problems
 
 
 # ---------------------------------------------------------------------------
@@ -291,5 +439,5 @@ def delete_world(name: str) -> bool:
 
 __all__ = [
     "save_world", "load_world", "branch_world", "delete_world",
-    "list_worlds", "world_path",
+    "list_worlds", "world_path", "verify_world_integrity",
 ]

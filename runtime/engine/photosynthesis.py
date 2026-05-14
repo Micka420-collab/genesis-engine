@@ -470,6 +470,59 @@ def photosynthesis_state(sim) -> Dict[str, object]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Persistence — P1 save / load round-trip support
+# ---------------------------------------------------------------------------
+
+def save_photo_state(sim, target_dir: str) -> bool:
+    """Persist :class:`PhotosynthesisState` to ``target_dir/photosynthesis.json``.
+
+    Only the scalar summary + counters are written. The per-chunk
+    ``last_gpp_umol`` rasters are *not* serialised — they regenerate
+    deterministically from the first ``tick_photosynthesis`` call after
+    load (weather + atmosphere + chunk biome are all restored already).
+    """
+    import json, os
+    state: Optional[PhotosynthesisState] = getattr(sim, "_photo_state", None)
+    if state is None:
+        return False
+    payload = {
+        "last_global_gpp_kcal_per_tick":
+            float(state.last_global_gpp_kcal_per_tick),
+        "last_per_biome_gpp": {int(k): float(v)
+                               for k, v in state.last_per_biome_gpp.items()},
+        "last_par": float(state.last_par),
+        "last_temp_c": float(state.last_temp_c),
+        "last_ca_ppm": float(state.last_ca_ppm),
+        "ticks_run": int(state.ticks_run),
+    }
+    with open(os.path.join(target_dir, "photosynthesis.json"),
+              "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+    return True
+
+
+def load_photo_state(sim, target_dir: str) -> bool:
+    """Reinstate :class:`PhotosynthesisState` scalars. Installs if missing."""
+    import json, os
+    path = os.path.join(target_dir, "photosynthesis.json")
+    if not os.path.isfile(path):
+        return False
+    state = install_photosynthesis(sim)
+    with open(path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+    state.last_global_gpp_kcal_per_tick = float(
+        payload.get("last_global_gpp_kcal_per_tick", 0.0))
+    state.last_per_biome_gpp = {int(k): float(v)
+                                for k, v in payload.get(
+                                    "last_per_biome_gpp", {}).items()}
+    state.last_par = float(payload.get("last_par", 0.0))
+    state.last_temp_c = float(payload.get("last_temp_c", 15.0))
+    state.last_ca_ppm = float(payload.get("last_ca_ppm", 280.0))
+    state.ticks_run = int(payload.get("ticks_run", 0))
+    return True
+
+
 __all__ = [
     "PIPELINE_LAYER",
     "WORLD_MODEL_CAPABILITY",
@@ -482,5 +535,7 @@ __all__ = [
     "install_photosynthesis",
     "tick_photosynthesis",
     "photosynthesis_state",
+    "save_photo_state",
+    "load_photo_state",
     "PhotosynthesisState",
 ]

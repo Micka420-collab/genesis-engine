@@ -1,5 +1,33 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 15 — Wave 4 photosynthèse + vieillissement matériaux + overlays).
+**Dernière mise à jour :** 14 mai 2026 (session 16 — P1 persistence + sous-agents P5/P3/P10 délégués).
+
+---
+
+## ✅ Livré session 16 (2026-05-14) — P1 persistence
+
+Le `world_library.py` existant ne sauvait qu'une fraction (agents +
+chunks). Tout Wave 3/4 état (physio, photo, aging, material_registry)
+était silencieusement perdu sur save→load. Maintenant **bit-identique**
+round-trip.
+
+**Architecture** : chaque module Wave 3/4 publie `save_<name>_state` /
+`load_<name>_state`. `world_library._PERSISTENT_MODULES` itère sur la
+table (un seul point d'extension). SHA-256 par fichier dans
+`integrity.json` + `verify_world_integrity(name)` API.
+
+**Tests** : `p23_persistence_roundtrip` 7/7 PASS. Régression
+Wave 3/4 conservée.
+
+**Limite scope** : continuation determinism *post-load* pas livré
+(content_root régénéré). C'est P1.b.
+
+Voir `docs/sprints/2026-05-14_PHASE12-PERSISTENCE.md`.
+
+### 🚀 Sous-agents délégués en parallèle (P3, P5, P10)
+Travail en arrière-plan pendant que les sprints principaux continuent.
+Voir les commits suivants pour les rapports.
+
+---
 
 ---
 
