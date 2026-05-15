@@ -113,6 +113,10 @@ try:
     from engine.realistic_construction import realistic_construction_state
 except Exception:  # pragma: no cover
     realistic_construction_state = None  # type: ignore[assignment]
+try:
+    from engine.building_discovery import building_discovery_state
+except Exception:  # pragma: no cover
+    building_discovery_state = None  # type: ignore[assignment]
 from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 
 
@@ -576,6 +580,10 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/realistic_construction_state":
             payload = (realistic_construction_state(self.sim_ref)
                        if realistic_construction_state is not None else {})
+            self._json(200, payload); return
+        if path == "/api/building_discovery_state":
+            payload = (building_discovery_state(self.sim_ref)
+                       if building_discovery_state is not None else {})
             self._json(200, payload); return
         if path == "/api/demography":
             self._json(200, self._demography()); return

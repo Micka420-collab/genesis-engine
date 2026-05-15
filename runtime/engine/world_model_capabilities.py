@@ -50,6 +50,7 @@ _REQUIRED_MODULES: Tuple[str, ...] = (
     "engine.geology",
     "engine.metallurgy",
     "engine.realistic_construction",
+    "engine.building_discovery",
 )
 
 # Modules that ADR-0005 references but which are still R&D. They are queried

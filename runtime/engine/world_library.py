@@ -51,6 +51,9 @@ _PERSISTENT_MODULES: Tuple[Tuple[str, str, str], ...] = (
     ("engine.realistic_construction",
                                  "save_realistic_construction_state",
                                  "load_realistic_construction_state"),
+    ("engine.building_discovery",
+                                 "save_building_discovery_state",
+                                 "load_building_discovery_state"),
 )
 
 

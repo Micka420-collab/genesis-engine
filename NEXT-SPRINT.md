@@ -38,6 +38,38 @@ Voir `docs/sprints/2026-05-15_WAVE11-ELITE-METRICS.md`.
 
 ---
 
+## ✅ Livré session 29b (2026-05-15) — Wave 10e discovery-driven building
+
+**Règle invariante respectée** : rien n'est scripté. Les recettes
+hardcodées de Wave 10d violaient ; Wave 10e corrige avec un système
+de découverte émergente.
+
+### `engine/building_discovery.py` (~440 LOC)
+
+- `place_block(sim, row, pos, material)` — buffer pending
+- `complete_structure(sim, row)` — engine valide :
+  - **Function** : ≥8 blocs, footprint ≥4 voxels, ≥2 layers, roof
+  - **Statics** : compressive stress, support, overhang (Wave 1 réelle)
+- Si valide → **archetype émerge** :
+  - Fingerprint = (dominant_material × footprint_xy × height × roof)
+  - Auto-naming déterministe via `prf_rng(seed, culture, fingerprint)`
+  - Cultures différentes pour la même forme = noms différents
+
+### Smoke `p38_building_discovery_smoke` **8/8 PASS**
+
+Cas-clé : deux cultures isolées découvrent la **même architecture
+3×3×2 stone** mais culture 0 l'appelle `stone_3x3x2_vap` et culture 99
+l'appelle `stone_3x3x2_nuv` — comme deux langues humaines pour
+case / hutte / igloo.
+
+### ADR-0005 → 18 modules requis taggés
+
+`engine.building_discovery` : Genesis-L4 Feedback / paper-L2 Simulator.
+
+Voir `docs/sprints/2026-05-15_PHASE25-BUILDING-DISCOVERY.md`.
+
+---
+
 ## ✅ Livré session 28 (2026-05-15) — Wave 10d realistic construction
 
 **`engine/realistic_construction.py` (~390 LOC)** — agents construisent
