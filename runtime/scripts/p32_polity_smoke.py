@@ -83,11 +83,16 @@ def main() -> int:
         failures += 1
 
     # Pre-set agent inventories so tax + redistribute has something to do.
+    # Wave 11 — pin personality to neutral=1.0 so this test still exercises
+    # the *nominal* TAX_RATE / linear-need redistribution. Wave 11 trait
+    # effects are validated in p39_personality_polity_smoke.
     for r in [0, 1, 2, 3, 4]:
         sim.agents.inv_food[r] = 2.0           # 2 kg = 5000 kcal each
         sim.agents.hunger[r] = 0.2             # not hungry yet
         sim.agents.inv_capacity_kg[r] = 10.0
         sim.agents.alive[r] = True
+        sim.agents.agreeableness[r] = 1.0      # full tax compliance
+        sim.agents.conscientiousness[r] = 1.0  # full redistribution
 
     # Step 3 — Tax tick
     treasury_before = polity.treasury_kcal

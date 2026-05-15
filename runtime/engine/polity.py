@@ -143,7 +143,9 @@ def _agent_culture(sim, row: int) -> int:
 def _prestige_score(sim, row: int, writing_state=None) -> float:
     """Sum of demographic + cultural achievements for leader election.
 
-    offspring_count + 0.5 × authored_inscriptions + age_factor.
+    offspring_count + 0.5 × authored_inscriptions + age_factor
+    + personality bonus (Wave 11: ambition × 5 + extraversion × 2).
+    Ambition drives candidacy ; extraversion gives social visibility.
     """
     score = 0.0
     try:
@@ -162,6 +164,13 @@ def _prestige_score(sim, row: int, writing_state=None) -> float:
         age_ticks = max(0, sim.tick - born)
         age_yr = age_ticks * accel / (365.0 * 86400.0)
         score += min(20.0, age_yr * 0.1)  # cap age bonus
+    except Exception:
+        pass
+    # Wave 11 — personality drives politics.
+    try:
+        ambition = float(sim.agents.ambition[row])
+        extraversion = float(sim.agents.extraversion[row])
+        score += 5.0 * ambition + 2.0 * extraversion
     except Exception:
         pass
     return score
@@ -267,18 +276,29 @@ def _re_elect_leader(sim, polity: Polity, writing_state) -> None:
 
 
 def _tax(sim, polity: Polity) -> float:
-    """Collect tax from each alive member's inv_food. Returns kcal collected."""
+    """Collect tax from each alive member's inv_food. Returns kcal collected.
+
+    Wave 11 — per-agent compliance scales with agreeableness :
+    ``compliance = 0.3 + 0.7 × agreeableness`` (range [0.3, 1.0]).
+    A fully agreeable agent pays the nominal TAX_RATE ; a low-A agent
+    only pays ~30 % of nominal (evasion / hoarding).
+    """
     total = 0.0
     inv_food = getattr(sim.agents, "inv_food", None)
     if inv_food is None:
         return 0.0
+    agreeableness = getattr(sim.agents, "agreeableness", None)
     for r in polity.member_rows:
         if not _alive(sim, r):
             continue
         food_kg = float(inv_food[r])
         if food_kg <= 0:
             continue
-        levy_kg = food_kg * TAX_RATE
+        if agreeableness is not None:
+            compliance = 0.3 + 0.7 * float(agreeableness[r])
+        else:
+            compliance = 1.0
+        levy_kg = food_kg * TAX_RATE * compliance
         inv_food[r] = food_kg - levy_kg
         total += levy_kg * KCAL_PER_KG_FOOD
     polity.treasury_kcal += total
@@ -288,7 +308,19 @@ def _tax(sim, polity: Polity) -> float:
 
 def _redistribute(sim, polity: Polity) -> float:
     """Pour treasury food to hungry members proportional to hunger.
-    Returns kcal distributed."""
+    Returns kcal distributed.
+
+    Wave 11 — leader's ``conscientiousness`` shapes BOTH :
+
+    * **share_fraction** of the treasury actually redistributed :
+      ``0.30 + 0.70 × consc``. A leader low in conscientiousness
+      hoards (~30 % out) ; a high-C leader empties the granaries
+      (~100 % out) to feed the hungry.
+    * **fairness exponent** for need weighting : ``weight = need ** (1/fairness)``
+      with ``fairness = max(0.20, consc)``. consc=1 → linear (equal
+      proportional share) ; consc→0 → power curve favouring the
+      hungriest (winner-take-all).
+    """
     if polity.treasury_kcal <= 0:
         return 0.0
     inv_food = getattr(sim.agents, "inv_food", None)
@@ -296,21 +328,33 @@ def _redistribute(sim, polity: Polity) -> float:
     capacity = getattr(sim.agents, "inv_capacity_kg", None)
     if inv_food is None or hunger is None:
         return 0.0
+    # Leader conscientiousness — shapes the redistribution curve.
+    consc_attr = getattr(sim.agents, "conscientiousness", None)
+    if consc_attr is not None and _alive(sim, polity.leader_row):
+        consc = float(consc_attr[polity.leader_row])
+    else:
+        consc = 0.5
+    share_fraction = 0.30 + 0.70 * consc
+    fairness = max(0.20, consc)
     needy: List[Tuple[int, float]] = []
-    total_need = 0.0
+    weighted: List[Tuple[int, float, float]] = []
+    total_weight = 0.0
     for r in polity.member_rows:
         if not _alive(sim, r):
             continue
         h = float(hunger[r])
         if h >= REDISTRIBUTE_HUNGER_THRESHOLD:
             need = h - REDISTRIBUTE_HUNGER_THRESHOLD
+            w = need ** (1.0 / fairness) if need > 0 else 0.0
             needy.append((r, need))
-            total_need += need
-    if not needy or total_need <= 0:
+            weighted.append((r, need, w))
+            total_weight += w
+    if not weighted or total_weight <= 0:
         return 0.0
+    pool_kcal = polity.treasury_kcal * share_fraction
     distributed = 0.0
-    for r, need in needy:
-        share_kcal = polity.treasury_kcal * (need / total_need)
+    for r, need, w in weighted:
+        share_kcal = pool_kcal * (w / total_weight)
         share_kg = share_kcal / KCAL_PER_KG_FOOD
         # Capped by inventory headroom.
         if capacity is not None:
