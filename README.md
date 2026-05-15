@@ -14,7 +14,8 @@
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/release/python-3140/)
-[![Status: Phase 5g](https://img.shields.io/badge/status-Phase_5g_alpha-orange.svg)](#-roadmap)
+[![Status: Phase 4 complete](https://img.shields.io/badge/status-Phase_4_complete-green.svg)](#-roadmap)
+[![Modules: 18/18](https://img.shields.io/badge/ADR--0005_modules-18%2F18-brightgreen.svg)](#-architecture-stratifi%C3%A9e)
 [![Earth-anchored](https://img.shields.io/badge/Earth-anchored-green.svg)](#-earth-anchored-anywhere-on-earth)
 [![Deterministic](https://img.shields.io/badge/deterministic-✓-purple.svg)](#-d%C3%A9terminisme)
 
@@ -49,25 +50,57 @@ L'histoire humaine est un seul tirage parmi des milliards de possibles. Genesis 
 
 ## ✨ Ce qui marche aujourd'hui
 
-| Capacité | Statut | Démo |
+**18 modules ADR-0005 taggés** orchestrés en pipeline cohérent
+(Earth → minerals → metallurgy → buildings → cultural transmission).
+
+### 🌍 Substrat physique
+
+| Capacité | Statut | Détail |
 |---|---|---|
-| 🌍 **Terrain Earth-anchored** (Copernicus DEM + ESA WorldCover) | ✅ | 100% hit ratio depuis AWS Open Data, n'importe où sur Terre |
-| 🌲 **Succession végétale** (Markov 5 états, 100+ ans sim-time) | ✅ | Prairie → garrigue → bois jeune → forêt mature → forêt vieille |
-| 🌊 **Hydrologie** (D8 flow accumulation + L1 water union) | ✅ | Lacs/rivières détectés, 8% Léman = OCEAN |
-| 🦌 **Faune Lotka-Volterra** (deer/wolf/fish dynamics) | ✅ | Équilibre prédateur-proie stable |
-| 🏹 **Chasse** (ActionKind.HUNT, 800 kcal/deer) | ✅ | Agents foragent ET chassent |
-| 🐾 **Sentiers émergents** (foot-prints boost walkability) | ✅ | +0.3 walkability sur paths fréquentés |
-| 📅 **Calendrier réel** (Earth seasons + day/night) | ✅ | Année/jour/heure synced |
+| 🛰️ **Earth-anchored** (Copernicus DEM + ESA WorldCover) | ✅ | 100% hit ratio AWS Open Data, n'importe où sur Terre |
+| 🪨 **Géologie / strates** (36 minéraux réels, 4-5 couches/chunk) | ✅ | hématite, cassitérite, native_gold, granite, marble, … |
+| 🏔️ **Slope/lake/walkability** (L2 sim-lift) | ✅ | 0-100m, falaises 84°, lacs 12.9% Léman |
+| 🌲 **Succession végétale** (Markov 5 états) | ✅ | Prairie → forêt vieille, 100+ sim-yr |
+| 🌊 **Hydrologie D8** (flow accumulation + rivers) | ✅ | Rivières émergentes |
+| ☁️ **Météorologie Spencer 1971** (zenith exact + UV WHO) | ✅ | 5 types nuages, 7 précip, 3 tempêtes, UVI 10.8 tropical noon |
+
+### 🌱 Biologie
+
+| Capacité | Statut | Détail |
+|---|---|---|
+| 🌿 **Photosynthèse Farquhar-von Caemmerer-Berry** | ✅ | C3/C4/CAM, V_cmax 60, K_c 404 ppm, calibrée Sharkey 2007 |
+| 🪴 **39 clades végétaux** (Sage 2004 / Magallón 2015) | ✅ | Cyanobactéries → angiospermes, divergence par CO2/O2/biome |
+| 🐺 **47 espèces animales** (Lotka-Volterra + plant-animal coevolution) | ✅ | Arthropodes, fish, oiseaux, mammifères (lions, baleines, …) |
+| 🦠 **Pathogènes contagieux** (cholera, flu, wound infection) | ✅ | Immune memory + transmission via DRINK/proximity |
+| 🧴 **Bronzage UV épidermique** (réponse mélaninique réelle) | ✅ | Tan grows 5j sous UV>3, fade 30j ; effective_melanin |
+| 💩 **Excrétion + hygiène** (bladder, bowel, contamination eau) | ✅ | Cholera émergent par auto-contamination (Snow 1854) |
+
+### 🛠️ Civilisation
+
+| Capacité | Statut | Détail |
+|---|---|---|
 | 🧬 **Génome 256-gènes** + 8 stades de vie | ✅ | Crossover + mutation 1e-4 + cognitive efficiency |
-| 👥 **Démographie multi-générations** | ✅ | **23 générations** observées en 5K ticks |
-| 🗣️ **Proto-langage émergent** (lexical signatures par culture) | ✅ | 95k vocalisations / 5K ticks |
-| 🛠️ **Invention organique** (artefacts composites) | ✅ | `clay_stone_contain`, `flint_stone_grind`, etc. |
-| 🏘️ **Construction** (HEARTH, BUILD, multi-cultures) | ✅ | 1 HEARTH complété en 5K ticks |
-| ⚡ **Time-warp x10/x100/x1000** | ✅ | **38× / 84× speedup** mesuré, déterminisme préservé |
-| 🦠 **Épidémies SIR** | ✅ | Infectious_until + transmission radius |
-| 👁️ **God Mode dashboard** | ✅ | HTTP `/api/state`, `/api/realism_state`, `/api/demography`, `/api/lift_state` |
-| 💾 **Save / Load / Branch** | ✅ | World library, format ouvert |
-| 📤 **Export GIS** | ✅ | GeoTIFF (12 layers), PNG cartographique, OBJ heightfield, JSON |
+| 👥 **Démographie multi-générations** | ✅ | 23 générations observées en 5K ticks |
+| 🗣️ **Proto-langage émergent** | ✅ | 95k vocalisations / 5K ticks |
+| ⚗️ **Material synthesis Wave 1+2** (39 clades + dopage non-linéaire) | ✅ | Cu+Sn→bronze, Fe+1.5%C→acier 6.17 Mohs |
+| ⛏️ **Mining** (ActionKind.MINE depth-driven) | ✅ | Extrait ore via stratigraphy, alimente synthesis |
+| 🔥 **Métallurgie réelle** (smelt: ore+fuel+furnace+practices) | ✅ | bloomery, charcoal, bellows ×1.15, blast_furnace ×0.85 |
+| 🌾 **Agriculture** (PLANT/HARVEST + per-culture seed library) | ✅ | Cultures découvrent seeds via FORAGE |
+| 📜 **Writing** (inscriptions sur material_aging instances) | ✅ | Argile 6000 ans, granite immortel, transmission inter-gen |
+| 🏛️ **Polity émergent** (taxation 5% + redistribution + lois) | ✅ | Leader élu par offspring + age + inscriptions authored |
+| 🏚️ **Discovery-driven buildings** (statics + auto-naming per culture) | ✅ | **Zéro recette scriptée** — archetypes émergent par expérimentation |
+| 🌐 **GlobalWorld** (atmosphère + horloge partagées + migration agents) | ✅ | N régions cohérentes, agents traversent frontières |
+
+### 🛡️ Infrastructure
+
+| Capacité | Statut | Détail |
+|---|---|---|
+| 🪙 **Material aging** (corrosion/rot/wear per-instance) | ✅ | Fer 3%/an, granite 0.005%/an ; maintenance practices |
+| ⏱️ **Time-warp x10/x100/x1000** | ✅ | 38×/84× speedup mesuré, déterminisme préservé |
+| 💾 **Persistence bit-identique** (P1 round-trip + SHA-256) | ✅ | 18 modules sauvegardés ; integrity manifest |
+| 🔬 **Long-run stability** (100K ticks validés) | ✅ | Mémoire stable, déterminisme `143ba17ef510a024` |
+| 👁️ **Live dashboard** (`/api/*` ~20 endpoints + overlays) | ✅ | clouds, uv, wind, gpp, ndvi, marine, precip, … |
+| 📤 **Export GIS** | ✅ | GeoTIFF, PNG carto, OBJ heightfield, JSON |
 
 ---
 
@@ -86,13 +119,54 @@ Genesis Engine charge **directement les données Copernicus DEM + ESA WorldCover
 
 ## 🏗️ Architecture stratifiée
 
+**18 modules orthogonaux** validés par [ADR-0005](adr/0005-world-model-taxonomy.md) selon deux axes :
+
+| Module | Pipeline (origine de l'état) | Capability (arxiv 2604.22748) |
+|---|---|---|
+| `earth_loader` | Genesis-L1 Earth-Seed | paper-L1 Predictor |
+| `geology` | Genesis-L1 Earth-Seed | paper-L1 Predictor |
+| `sim_lift` | Genesis-L2 Sim-Lift | paper-L2 Simulator |
+| `realism` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `physiology` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `photosynthesis` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `material_aging` | Genesis-L4 Feedback | paper-L1 Predictor |
+| `marine` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `global_world` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `plant_evolution` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `meteorology` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `animal_evolution` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `agriculture` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `writing` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `polity` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `metallurgy` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `realistic_construction` | Genesis-L4 Feedback | paper-L2 Simulator |
+| `building_discovery` | Genesis-L4 Feedback | paper-L2 Simulator |
+
 ```
-┌─ Phase 5cd      : agents PIANO, construction, invention, atmosphère, langage
-├─ Reality Engine : hydrologie + faune + sentiers + saisons + maladies          ⭐
-├─ L2 Sim-Lift    : succession végétale + érosion + slope + walkability + lake
-├─ L1 Earth-Seed  : Copernicus DEM GLO-30 + ESA WorldCover 10m (via /vsis3 AWS)
-└─ Procedural     : Whittaker biomes (fallback déterministe)
+┌─ Phase 4 émergence : agriculture, writing, polity, building discovery
+├─ Wave 10 métallurgie : geology strata + mining + smelt + construction
+├─ Wave 6-8 biologie  : plant evolution + animal evolution + meteorology
+├─ Wave 3-5 vie       : physiology + photosynthesis + material_aging + marine
+├─ Wave 1-2 chimie    : 50 elements + material_synthesis (Farquhar/doping)
+├─ Phase 5cd          : agents PIANO, invention, atmosphère, langage
+├─ Reality Engine     : hydrologie + faune + sentiers + saisons + maladies
+├─ L2 Sim-Lift        : succession végétale + érosion + slope + walkability
+├─ L1 Earth-Seed      : Copernicus DEM + ESA WorldCover + geology strata
+└─ Procedural         : Whittaker biomes (fallback déterministe)
 ```
+
+### 🔬 Règle invariante du projet
+
+> **Rien n'est scripté. Les agents découvrent par eux-mêmes.**
+
+Aucune table de recettes pour les alliages, les semences, les bâtiments,
+les pathogènes, les espèces. Tout émerge des lois physiques + des
+décisions agents :
+- `material_synthesis.synthesize(elements, conditions)` — chimie réelle
+- `building_discovery.complete_structure(blocks)` — statics + naming auto
+- `agriculture.discover_seed(culture, clade)` — via FORAGE
+- `plant_evolution` émerge des conditions CO2/O2/biome
+- `writing` propage les découvertes inter-générations
 
 Pour la vue d'ensemble complète des 7 couches logiques, voir [`Genesis_Engine_Architecture_v1.0.docx`](Genesis_Engine_Architecture_v1.0.docx).
 
@@ -203,24 +277,51 @@ Genesis Engine est **le seul** outil 2026 qui combine **vraie géographie plané
 
 Le projet suit la roadmap phasée de [`Genesis_Engine_Architecture_v1.0.docx`](Genesis_Engine_Architecture_v1.0.docx) §44-49.
 
-- **Phase 0** — Foundations (substrat ECS, monorepo, observability) — ✅ structure
+- **Phase 0** — Foundations (substrat ECS, monorepo, observability) — ✅
 - **Phase 1** — MVP Vie (boucle cognitive, mort biologique) — ✅
 - **Phase 2** — MVP Société (reproduction, mémoire, lexique) — ✅
 - **Phase 3** — MVP Civilisation (construction, troc, métiers, conflits) — 🟡 partiel
-- **Phase 4** — Émergence Civilisationnelle (agriculture, écriture, État) — ⏳
-- **Phase 5** — Genesis-α Public (2 fondateurs, 10 ans réels = 10000 ans sim) — ⏳
+- **Phase 4** — Émergence Civilisationnelle (agriculture ✅ + écriture ✅ + État ✅) — ✅ **COMPLÈTE**
+- **Phase 5** — Genesis-α Public (2 fondateurs, 10 ans réels = 10000 ans sim) — ⏳ **8/10 pré-requis livrés**
 
-### Prochaines priorités queueées
+### 🎯 Pré-requis Phase 5
 
-Voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md) pour la file de travail vivante.
+| # | Pré-req | État |
+|---|---|---|
+| 1 | 18 modules ADR-0005 taggés (earth_loader → building_discovery) | ✅ |
+| 2 | P-NEW.22 cholera bloquant corrigé | ✅ |
+| 3 | P-NEW.24 photo cache LRU 4096 | ✅ |
+| 4 | Wave 9d cognition wiring (PLANT/HARVEST/FORAGE) | ✅ |
+| 5 | Wave 10b MINE wiring | ✅ |
+| 6 | Wave 10c SMELT chain | ✅ |
+| 7 | Wave 10d realistic construction | ✅ |
+| 8 | Wave 10e discovery-driven buildings | ✅ |
+| 9 | Wave 11 personality drives politics | ⏳ |
+| 10 | Wave 12 long-run 10K sim-yr stable | ⏳ |
 
-1. **§15 Émergence monnaie référence** — sel/coquillages → unité de compte
-2. **§17 Spécialisation métiers** — chasseur/paysan/artisan stables
-3. **§18 Compositionnalité linguistique** — combiner phonèmes pour concepts
-4. **§19 Chefferie émergente** — leader élu/héréditaire avec autorité
-5. **§22 Religion / animisme** — esprits → panthéon → cosmogonie
-6. **§10 LLM cognition tier-2** — Llama 4 / Mistral / Qwen 3 via vLLM pour agents saillants
-7. **§37-43 PQC crypto** — ML-KEM-768 + ML-DSA-65 hybride
+### Pipeline complet vérifié end-to-end
+
+```
+Earth (Wave L1)
+  ↓ MINE depth=50m → ore in inv_metal
+🪨 Geology strata (36 minerals)
+  ↓ SMELT hematite + charcoal in bloomery
+🔥 Metallurgy (yield 65 % × fuel × skill × practices)
+  ↓ pure Fe, Cu, Sn, Au, …
+⚗️ Material synthesis (Cu70Sn30 → bronze ; Fe+1.5%C → steel 6.17 Mohs)
+  ↓ SynthesizedMaterial
+🪙 Material aging (Fe 3 %/yr, granite 0.005 %/yr, bronze 0.35 %/yr)
+  ↓ place_block × N
+🏚️ Building discovery (statics validation + auto-naming per culture)
+  ↓ Inscribe RECIPE/SEED/LAW on clay tablet
+📜 Writing (clay 6000 yr lifespan)
+  ↓ future generation READ inscription
+🌾 Agriculture seed_library + 🏛️ Polity treasury
+```
+
+23/23 smokes p15→p38 PASS. Bit-perfect determinism confirmé.
+
+Voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md) pour la file de travail vivante et [`docs/sprints/`](docs/sprints/) pour les ~25 logs de sessions.
 
 ---
 
@@ -239,24 +340,51 @@ Validé par SHA-256 sur (alive + pos + drives) après N ticks : 2 runs identique
 ```
 genesis-engine/
 ├── runtime/
-│   ├── engine/                  # core engine (~25 modules)
-│   │   ├── sim.py               # Phase 4 simulation loop
-│   │   ├── agent.py             # AgentRegistry + ActionKind
-│   │   ├── cognition.py         # perceive / decide / apply_decision
-│   │   ├── world.py             # procedural worldgen (Whittaker biomes)
-│   │   ├── earth_loader.py      # L1 Copernicus DEM + ESA WorldCover
-│   │   ├── earth_streamer.py    # bridge L1 → ChunkStreamer
-│   │   ├── sim_lift.py          # L2 vegetation + erosion + slope + lake
-│   │   ├── realism.py           # Reality Engine (5 subsystems)
-│   │   ├── timewarp.py          # x10/x100/x1000/milestone modes
-│   │   ├── genome.py            # 256-gene + 8 LifeStages
-│   │   ├── sim_5cd_integration.py  # Phase 5cd wiring
-│   │   ├── world_builder.py     # fluent builder API
-│   │   ├── world_export.py      # GeoTIFF / PNG / JSON / OBJ
-│   │   ├── world_library.py     # save / load / branch
-│   │   ├── dashboard.py         # HTTP god view server
-│   │   └── god_view_v2.html     # multi-panel observatory UI
-│   ├── scripts/                 # smoke tests + demos (p0..p12 + multi_region)
+│   ├── engine/                          # 35+ modules
+│   │   # ─ Core boucle sim ─
+│   │   ├── sim.py                       # Simulation step loop
+│   │   ├── agent.py                     # AgentRegistry + ActionKind (18 actions)
+│   │   ├── cognition.py                 # perceive / decide / apply_decision
+│   │   ├── world.py                     # procedural worldgen (Whittaker biomes)
+│   │   # ─ Wave L1 — substrat Earth ─
+│   │   ├── earth_loader.py              # Copernicus DEM + ESA WorldCover
+│   │   ├── earth_streamer.py            # bridge L1 → ChunkStreamer
+│   │   ├── geology.py                   # strates + extraction (36 minerals)
+│   │   ├── mineral_catalog.py           # 36 minéraux réels + yields
+│   │   # ─ Wave L2 — terrain dynamics ─
+│   │   ├── sim_lift.py                  # vegetation + erosion + slope
+│   │   # ─ Wave L4 — Reality Engine + bio ─
+│   │   ├── realism.py                   # hydrology + wildlife + trails + seasons
+│   │   ├── physiology.py                # Wave 3 excretion / disease / UV tan
+│   │   ├── photosynthesis.py            # Wave 4 Farquhar C3/C4/CAM
+│   │   ├── material_aging.py            # corrosion / rot / wear
+│   │   ├── marine.py                    # Wave 5 currents / tides / fish
+│   │   ├── global_world.py              # Phase 15 multi-region shared atm
+│   │   ├── plant_evolution.py           # Wave 6 — 39 clades emergent
+│   │   ├── plant_catalog.py             # 39 plant clades (Sage / Magallón)
+│   │   ├── meteorology.py               # Wave 7 — Spencer 1971 + UV WHO
+│   │   ├── animal_evolution.py          # Wave 8 — 47 species + LV
+│   │   ├── animal_catalog.py            # 47 animal species (NCBI / IUCN)
+│   │   ├── elite_metrics.py             # Wave 11 — Gini / Hill alpha
+│   │   # ─ Phase 4 émergence civilisationnelle ─
+│   │   ├── agriculture.py               # PLANT/HARVEST + seed_library
+│   │   ├── writing.py                   # Inscriptions on aging materials
+│   │   ├── polity.py                    # Proto-government + taxation
+│   │   ├── metallurgy.py                # Wave 10c — smelt ore + fuel
+│   │   ├── realistic_construction.py    # Wave 10d — real materials
+│   │   ├── building_discovery.py        # Wave 10e — emergent via statics
+│   │   # ─ Wave 1-2 — chimie / matériaux ─
+│   │   ├── physics.py / chemistry.py / material_synthesis.py / statics.py
+│   │   # ─ Infrastructure ─
+│   │   ├── timewarp.py                  # x10/x100/x1000/milestone
+│   │   ├── genome.py                    # 256-gene + 8 LifeStages
+│   │   ├── world_builder.py             # fluent builder API
+│   │   ├── world_export.py              # GeoTIFF / PNG / JSON / OBJ
+│   │   ├── world_library.py             # save / load / branch + SHA-256
+│   │   ├── world_model_capabilities.py  # ADR-0005 agregator + lint
+│   │   ├── dashboard.py                 # HTTP god view + ~20 endpoints
+│   │   └── god_view_v2.html             # multi-panel observatory UI
+│   ├── scripts/                         # smoke tests (p0 → p38, 23 PASS)
 │   └── tests/
 ├── architecture/                # ADRs + tech specs
 ├── *.md                         # SPRINT logs + phase progress
