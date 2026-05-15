@@ -48,6 +48,9 @@ _PERSISTENT_MODULES: Tuple[Tuple[str, str, str], ...] = (
     ("engine.polity",           "save_polity_state",   "load_polity_state"),
     ("engine.geology",          "save_geology_state",  "load_geology_state"),
     ("engine.metallurgy",       "save_metallurgy_state", "load_metallurgy_state"),
+    ("engine.realistic_construction",
+                                 "save_realistic_construction_state",
+                                 "load_realistic_construction_state"),
 )
 
 

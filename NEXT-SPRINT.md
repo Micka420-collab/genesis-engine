@@ -1,5 +1,67 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 14 mai 2026 (session 27 — Wave 10b+c : MINE wiring + métallurgie complète).
+**Dernière mise à jour :** 15 mai 2026 (session 28 — Wave 10d realistic construction).
+
+---
+
+## ✅ Livré session 28 (2026-05-15) — Wave 10d realistic construction
+
+**`engine/realistic_construction.py` (~390 LOC)** — agents construisent
+des bâtiments en utilisant les vrais minéraux extraits par geology +
+les vrais éléments smeltés par metallurgy.
+
+### 6 recipes calibrées historiquement
+
+| Recipe | Matériaux requis | Aging tracker |
+|---|---|---|
+| 🏚️ **stone_hut** | 60 limestone + 25 granite + 12 wood | limestone (humid_air) |
+| 🏠 **stone_house** | 250 limestone + 60 granite + 35 wood + 4 Fe | limestone |
+| 🔥 **brick_kiln** | 30 shale + 6 granite + 4 wood | ceramic |
+| ⛏️ **mineshaft** | 100 granite + 12 wood + 6 Fe | granite (wet_soil) |
+| ⚒️ **forge** | 50 granite + 15 shale + 6 wood + 8 Fe + 2 Cu | granite (open_fire) |
+| 🏛️ **marble_temple** | 500 marble + 100 limestone + 80 granite + 25 wood + 0.5 Au | marble |
+
+### Resolver de matériaux à 3 niveaux
+
+```python
+_resolve_balance(sim, row, material_name):
+  1. metallurgy.agent_pure_elements[row][element]  # Fe, Cu, Sn, Au…
+  2. geology.cumulative_extracted[mineral]         # limestone, granite…
+  3. fallback: inv_wood / inv_stone / inv_metal     # abstrait
+```
+
+`_consume_balance` drains chacun dans l'ordre. **C'est le pont qui
+permet à un agent qui a miné de la pierre + smelté de l'acier + ramassé
+du bois de construire littéralement une maison de pierre**.
+
+### Couplage material_aging
+
+Chaque structure construite **spawn un MaterialInstance** dans
+`material_aging` avec le nom du matériau dominant
+(`stone_limestone`, `marble`, `ceramic`, etc.) et son mode d'exposition.
+La structure vieillit ensuite à son taux annuel calibré (Wave 4).
+
+**Validation 200 sim-yr humid** : stone_hut limestone integrity 1.000 →
+**0.8400** (0.08 %/yr × 200 yr = 16 % loss, exactement).
+
+### Smoke `p36_realistic_construction_smoke` **9/9 PASS** :
+- install idempotent, 6 recipes loaded
+- empty inv → can_build False + deficits listés
+- build stone_hut consomme inv (wood 50→38, stone 200→115)
+- material_aging instance bound (stone_limestone, integrity 1.0)
+- après 200 yr → integrity 0.84 (calibration réelle) ✓
+- temple échoue sans marble/gold (deficits {marble: 500, Au: 0.5})
+- persistence round-trip
+- ADR-0005 17/17 OK
+
+Non-régression p18 (17/17), p23, p35 PASS.
+
+### Endpoint
+`/api/realistic_construction_state` : structures totales, alive/ruined,
+build_events, failed_builds, cumulative_materials_kg.
+
+Voir `docs/sprints/2026-05-15_PHASE24-REALISTIC-CONSTRUCTION.md`.
+
+---
 
 ---
 

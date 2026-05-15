@@ -109,6 +109,10 @@ try:
     from engine.metallurgy import metallurgy_state
 except Exception:  # pragma: no cover
     metallurgy_state = None  # type: ignore[assignment]
+try:
+    from engine.realistic_construction import realistic_construction_state
+except Exception:  # pragma: no cover
+    realistic_construction_state = None  # type: ignore[assignment]
 from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 
 
@@ -568,6 +572,10 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/metallurgy_state":
             payload = (metallurgy_state(self.sim_ref)
                        if metallurgy_state is not None else {})
+            self._json(200, payload); return
+        if path == "/api/realistic_construction_state":
+            payload = (realistic_construction_state(self.sim_ref)
+                       if realistic_construction_state is not None else {})
             self._json(200, payload); return
         if path == "/api/demography":
             self._json(200, self._demography()); return
