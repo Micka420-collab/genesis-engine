@@ -1,5 +1,40 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 15 mai 2026 (session 28 — Wave 10d realistic construction).
+**Dernière mise à jour :** 15 mai 2026 (session 29 — Wave 11 elite cognitive metrics).
+
+---
+
+## ✅ Livré session 29 (2026-05-15) — Wave 11 elite cognitive metrics
+
+**Veille du jour :** combo retenu = paper arXiv avril 2026 *"Do Agent
+Societies Develop Intellectual Elites? The Hidden Power Laws of
+Collective Cognition in LLM Multi-Agent Systems"* × cognition Genesis.
+
+**Livré :**
+
+- `engine/elite_metrics.py` (~160 LOC) — observateur **pur-lecture** :
+  Gini, top10/médiane, **Hill α** (tail index Pareto) par culture.
+- `scripts/p37_elite_metrics_smoke.py` — **8/8 PASS** (déterminisme +
+  pure-read observer confirmés).
+- `docs/sprints/2026-05-15_WAVE11-ELITE-METRICS.md`.
+
+API :
+
+```python
+from engine.elite_metrics import (
+    compute_elite_metrics,    # dict[culture_id] -> stats
+    log_elite_metrics,        # append JSONL
+    detect_power_law,         # heuristique α∈[1.2,4] & Gini>0.05
+)
+```
+
+**Observation initiale (Léman, 250 ticks, 16 founders, 2 cultures) :**
+α ≈ 3.98 / 4.50 — queues courtes attendues car cognition Phase 4 est
+*génétique-statique*. Premier candidat W12 : plasticité d'apprentissage
+sur `intelligence_effective`.
+
+**Non-régression :** `p23_persistence_roundtrip` PASS.
+
+Voir `docs/sprints/2026-05-15_WAVE11-ELITE-METRICS.md`.
 
 ---
 
