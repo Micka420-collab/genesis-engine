@@ -1,5 +1,78 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 15 mai 2026 (session 29 — Wave 11 elite cognitive metrics).
+**Dernière mise à jour :** 15 mai 2026 (session 31 — Wave 13 audit invariance + art discovery).
+
+---
+
+## ✅ Livré session 31 (2026-05-15) — Wave 13 audit invariance + art discovery
+
+**Règle invariante revisitée** : *"rien n'est scripté — ils doivent
+découvrir par eux-mêmes : les outils, les matériaux, le langage, les
+dessins, tout."*
+
+**Audit codebase 5 piliers** :
+
+| Pilier | Verdict | Module |
+|---|---|---|
+| Outils | ✅ émergent | `engine/invention.py` (try_invent par curiosité × matériau) |
+| Matériaux | ✅ émergent | geology + metallurgy |
+| Bâtiments | ✅ émergent | Wave 10e `building_discovery.py` |
+| Langage | ✅ émergent | lexicon 16-D drift + heritage |
+| Dessins | ❌ → ✅ | **nouveau** `art_discovery.py` |
+
+**Violation résiduelle corrigée** : `sim_5cd_integration._seed_initial_project`
+plantait un HEARTH scripté par culture au démarrage. Gated derrière
+`SimConfig.scripted_hearth_seed: bool = False` (default OFF). Seul
+`p0_smoke` (legacy regression P-NEW.7) opt-in explicitement.
+
+**Livré** :
+
+- `engine/art_discovery.py` (~330 LOC) — emergent drawings :
+  6 pigments réels (hematite, ochre, manganese, kaolin, graphite,
+  limonite) × 6 surfaces (bedrock_calcite, granite, sandstone,
+  ceramic, leather, wood). Fingerprint = (pigment, surface,
+  n_strokes_class, dominant_orientation, closed?). Auto-naming
+  CVCV via prf_rng — culture 0 dit `hematite_ring_W_kune`, culture 1
+  dit `hematite_ring_W_peki` (Lascaux vs Altamira pattern).
+- `scripts/p40_art_discovery_smoke.py` — **8/8 PASS**.
+- `engine/sim.py` (+5) : `cfg.scripted_hearth_seed`.
+- `engine/sim_5cd_integration.py` (+6) : gate `_seed_initial_project`.
+- `engine/world_library.py` (+1) : persistent module art.
+- `engine/world_model_capabilities.py` (+1) : 19e module requis.
+- `scripts/p0_smoke.py` (+7) : opt-in legacy flag.
+- `docs/sprints/2026-05-15_WAVE13-DISCOVERY-AUDIT-AND-ART.md`.
+
+**Non-régression** : 17 smokes (p23–p40) verts ; p0 vert après opt-in.
+
+Voir `docs/sprints/2026-05-15_WAVE13-DISCOVERY-AUDIT-AND-ART.md`.
+
+---
+
+## ✅ Livré session 30 (2026-05-15) — Wave 11 personality drives politics
+
+**Règle invariante respectée** : aucun script "si chef alors X" — la
+gouvernance émerge des **Big-Five réels** stockés sur chaque agent.
+
+**Livré :**
+
+- `engine/polity.py` (~40 LOC modifiées) — 3 mécaniques wired :
+  * leader election : `+5·ambition + 2·extraversion` sur prestige.
+  * tax compliance : `compliance = 0.3 + 0.7 × agreeableness` per-agent.
+  * redistribute : leader's `conscientiousness` contrôle
+    `share_fraction = 0.3 + 0.7·C` ET `weight = need^(1/max(0.2,C))`.
+- `scripts/p39_personality_polity_smoke.py` (~220 LOC) — **8/8 PASS** :
+  * hi-A pays 2.88× tax d'un évadeur.
+  * low-consc leader thésaurise (33 %) vs hi-consc vide (96 %).
+  * courbe brutale (25218×) vs douce (3.7×).
+- `scripts/p32_polity_smoke.py` (+5 LOC) — traits pinés à 1.0 pour
+  exercer le nominal sans casser l'API.
+- `docs/sprints/2026-05-15_WAVE11-PERSONALITY-POLITY.md`.
+
+**Pré-requis Phase 5 : 9/10** — il ne reste que la validation long-run
+(Wave 12, 10K sim-années).
+
+**Non-régression :** p23, p25-p38 tous PASS.
+
+Voir `docs/sprints/2026-05-15_WAVE11-PERSONALITY-POLITY.md`.
 
 ---
 

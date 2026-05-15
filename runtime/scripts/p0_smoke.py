@@ -41,6 +41,13 @@ def main() -> int:
         spawn_radius_m=20.0,
         cultures=1,
         drive_accel=1500.0,
+        # Legacy regression : this smoke validates the P-NEW.7 scripted
+        # hearth seeding fix. Discovery-rule audit (2026-05-15) made
+        # that seeding opt-in ; we opt back in here to keep the smoke
+        # exercising the legacy behaviour. New tests should NOT set
+        # this flag — they should drive BUILD via emergence
+        # (engine.invention + engine.building_discovery).
+        scripted_hearth_seed=True,
     )
 
     t_setup = time.monotonic()

@@ -797,10 +797,15 @@ def install(sim, *, world_seed: Optional[int] = None) -> None:
     except Exception:
         pass
 
-    # ALSO seed multiple HEARTH projects (P-NEW.7) — one per culture cluster
-    # — so labor accumulates fast enough to produce a completed structure
-    # in a 5k-10k tick run.
-    _seed_initial_project(sim)
+    # Discovery rule (2026-05-15 audit): the legacy convenience that
+    # auto-seeded a HEARTH project per founder culture violates the
+    # invariant "rien n'est scripté — ils doivent découvrir par eux-mêmes".
+    # We keep the helper available but gate it behind an explicit
+    # opt-in flag (`sim.cfg.scripted_hearth_seed = True`) used only by
+    # the P-NEW.7 legacy regression test. Default = False = pure
+    # discovery via engine.invention + engine.building_discovery.
+    if bool(getattr(sim.cfg, "scripted_hearth_seed", False)):
+        _seed_initial_project(sim)
 
 
 def _install_fertility_patch(sim) -> None:

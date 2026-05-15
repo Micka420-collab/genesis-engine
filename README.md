@@ -282,13 +282,13 @@ Le projet suit la roadmap phasée de [`Genesis_Engine_Architecture_v1.0.docx`](G
 - **Phase 2** — MVP Société (reproduction, mémoire, lexique) — ✅
 - **Phase 3** — MVP Civilisation (construction, troc, métiers, conflits) — 🟡 partiel
 - **Phase 4** — Émergence Civilisationnelle (agriculture ✅ + écriture ✅ + État ✅) — ✅ **COMPLÈTE**
-- **Phase 5** — Genesis-α Public (2 fondateurs, 10 ans réels = 10000 ans sim) — ⏳ **8/10 pré-requis livrés**
+- **Phase 5** — Genesis-α Public (2 fondateurs, 10 ans réels = 10000 ans sim) — ⏳ **9/10 pré-requis livrés**
 
 ### 🎯 Pré-requis Phase 5
 
 | # | Pré-req | État |
 |---|---|---|
-| 1 | 18 modules ADR-0005 taggés (earth_loader → building_discovery) | ✅ |
+| 1 | 19 modules ADR-0005 taggés (earth_loader → art_discovery) | ✅ |
 | 2 | P-NEW.22 cholera bloquant corrigé | ✅ |
 | 3 | P-NEW.24 photo cache LRU 4096 | ✅ |
 | 4 | Wave 9d cognition wiring (PLANT/HARVEST/FORAGE) | ✅ |
@@ -296,7 +296,7 @@ Le projet suit la roadmap phasée de [`Genesis_Engine_Architecture_v1.0.docx`](G
 | 6 | Wave 10c SMELT chain | ✅ |
 | 7 | Wave 10d realistic construction | ✅ |
 | 8 | Wave 10e discovery-driven buildings | ✅ |
-| 9 | Wave 11 personality drives politics | ⏳ |
+| 9 | Wave 11 personality drives politics | ✅ |
 | 10 | Wave 12 long-run 10K sim-yr stable | ⏳ |
 
 ### Pipeline complet vérifié end-to-end
@@ -369,10 +369,11 @@ genesis-engine/
 │   │   # ─ Phase 4 émergence civilisationnelle ─
 │   │   ├── agriculture.py               # PLANT/HARVEST + seed_library
 │   │   ├── writing.py                   # Inscriptions on aging materials
-│   │   ├── polity.py                    # Proto-government + taxation
+│   │   ├── polity.py                    # Proto-government + Wave 11 Big-Five wiring
 │   │   ├── metallurgy.py                # Wave 10c — smelt ore + fuel
 │   │   ├── realistic_construction.py    # Wave 10d — real materials
 │   │   ├── building_discovery.py        # Wave 10e — emergent via statics
+│   │   ├── art_discovery.py             # Wave 13 — emergent drawings (Lascaux/Altamira pattern)
 │   │   # ─ Wave 1-2 — chimie / matériaux ─
 │   │   ├── physics.py / chemistry.py / material_synthesis.py / statics.py
 │   │   # ─ Infrastructure ─

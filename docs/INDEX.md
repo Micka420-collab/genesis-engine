@@ -16,7 +16,13 @@ genesis-engine/
 │   ├── 04-world-engine.md                Génération procédurale, climat, biomes
 │   ├── 05-emergent-systems.md            Économie, politique, culture, conflits
 │   ├── 06-observation-and-tooling.md     Mode GOD, dashboards, replay
-│   └── 07-glossary-and-conventions.md    Glossaire + conventions
+│   ├── 07-glossary-and-conventions.md    Glossaire + conventions
+│   ├── research/                          Publications scientifiques
+│   │   └── 2026-05-15_OSF-preregistration.md   Pre-reg OSF Wave 11/12 (Registered Report)
+│   ├── security/                          Sécurité opérationnelle
+│   │   └── 2026-05-15_threat-model.md     STRIDE + LINDDUN + risk register
+│   └── compliance/                        Conformité RGPD
+│       └── 2026-05-15_AIPD.md             AIPD/DPIA v1.1 (post Wave 11)
 │
 ├── architecture/                     Architecture technique
 │   ├── system-architecture.md            Diagramme global + plans logiques
@@ -107,6 +113,14 @@ genesis-engine/
   sur `_scan_chunk`. Sparse `np.nonzero` au lieu de bool-mask
   4096-cells. Déterminisme bit-perfect préservé (SHA-256 A==B).
   À re-mesurer en pop saturée (P-NEW.17). Voir `SPRINT-2026-05-16.md`.
+- **2026-05-15** : **Wave 11 — personality → polity** livré.
+  Trois publications scientifiques officielles déposées :
+  `docs/research/2026-05-15_OSF-preregistration.md` (Registered
+  Report H1–H5 + analyse confirmatoire des 21 smokes Wave 1–11),
+  `docs/security/2026-05-15_threat-model.md` (STRIDE/LINDDUN +
+  registre risques quantifié L×I, 19 entrées, top-5 mitigations),
+  `docs/compliance/2026-05-15_AIPD.md` (DPIA v1.1, conformité
+  RGPD art. 35, plan d'action 6 mesures).
 
 ## Ordre de lecture suggéré (1re session)
 

@@ -44,6 +44,10 @@ class SimConfig:
     catastrophe_at_tick: int = -1
     catastrophe_radius_m: float = 200.0
     catastrophe_damage: float = 0.6
+    # Discovery-rule opt-outs (default False = pure emergence).
+    # Set True only in legacy regression tests that depend on
+    # pre-Wave-12 scripted seeding (P-NEW.7 hearth, etc.).
+    scripted_hearth_seed: bool = False
 
 
 @dataclass
