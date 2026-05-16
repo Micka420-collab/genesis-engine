@@ -1,5 +1,48 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 15 mai 2026 (session 31 — Wave 13 audit invariance + art discovery).
+**Dernière mise à jour :** 16 mai 2026 (session 32 — Wave 12 cognitive plasticity).
+
+---
+
+## ✅ Livré session 32 (2026-05-16) — Wave 12 cognitive plasticity
+
+**Veille du jour combo :** arxiv *Project Sid — Many-agent simulations
+toward AI civilization* (2411.00114, PIANO cognitive architecture) ×
+observation Wave 11 (`Hill α ≈ 4.0`, queues plates car cognition figée).
+
+**Règle invariante respectée** : aucun script "si action complexe alors
++intelligence" — un module additif accumule un `learned_skill[N]`
+hebbien gated par `curiosity`, l'`agents.intelligence` génétique reste
+bit-identique (testé via hash SHA-256).
+
+**Livré :**
+
+- `engine/cognitive_plasticity.py` (~340 LOC) — module PIANO-inspired :
+  * `install_plasticity(sim)` idempotent + buffer zero
+  * `record_experience(sim, row, action_kind)` Hebbien × curiosité × intensité
+  * `intelligence_effective(sim, row) = clip(intel_base + learned_skill, 0, 1)`
+  * `decay_step` (oubli multiplicatif, ½-vie ~1385 ticks)
+  * `save_plasticity_state` / `load_plasticity_state` (npz round-trip)
+  * `compute_plasticity_metrics(sim)` (stats dashboard)
+- `engine/elite_metrics.py` (+62 LOC append-only, signature originale
+  intacte) — `compute_elite_metrics_effective(sim)` qui lit le buffer
+  plasticity si présent.
+- `engine/world_library.py` (+4 LOC) — 17e module persistent listé.
+- `scripts/p41_cognitive_plasticity_smoke.py` (~296 LOC) — **9/9 PASS** :
+  * install idempotent + zero buffer
+  * non-cognitive actions sont no-ops
+  * curiosity gating : ratio hi/lo = **3.00** (déterministe)
+  * `intelligence_effective` clippée à 1.0 sous spam
+  * `decay_step` divise par 0.5 exactement
+  * power-law signature : top10 lift **1.473 → 1.658**, mean lift
+    **0.490 → 0.624** sur 32 founders / 2 cultures / boost 1/4 SMELT + 1/4 BUILD
+  * déterminisme : deux replays → SHA-256 buffer identique
+  * persistence npz round-trip (80 events restaurés)
+  * `agents.intelligence` jamais mutée (invariant génétique)
+
+**Non-régression** : p18 lint OK, p23 persistence OK, p37 elite_metrics OK,
+p40 art_discovery OK.
+
+Voir `docs/sprints/2026-05-16_WAVE12-COGNITIVE-PLASTICITY.md`.
 
 ---
 

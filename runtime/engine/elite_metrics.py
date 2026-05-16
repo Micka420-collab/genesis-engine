@@ -167,4 +167,63 @@ __all__ = [
     "compute_elite_metrics",
     "log_elite_metrics",
     "detect_power_law",
+    "compute_elite_metrics_effective",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Wave 12 — effective skill (intelligence_base + learned_skill).
+# Pure additive helper : the original `compute_elite_metrics` keeps its
+# bit-identical signature & semantics. This new function reads the
+# plasticity buffer if installed, else falls back to the base proxy.
+# ---------------------------------------------------------------------------
+
+def _skill_proxy_effective(agents, alive_idx: np.ndarray, sim) -> np.ndarray:
+    intel_base = agents.intelligence[alive_idx].astype(np.float64)
+    state = getattr(sim, "plasticity", None)
+    if state is None:
+        bonus = np.zeros_like(intel_base)
+    else:
+        # learned_skill is per-capacity ; index by alive_idx directly.
+        bonus = state.learned_skill[alive_idx].astype(np.float64)
+    intel_eff = np.clip(intel_base + bonus, 0.0, 1.0)
+    cons = agents.conscientiousness[alive_idx].astype(np.float64)
+    return _SKILL_W_INTELLIGENCE * intel_eff + _SKILL_W_CONSCIENTIOUSNESS * cons
+
+
+def compute_elite_metrics_effective(sim) -> Dict[int, Dict]:
+    """Same shape as :func:`compute_elite_metrics`, but uses
+    :func:`engine.cognitive_plasticity.intelligence_effective` per agent.
+
+    Drop-in replacement for dashboards / sprint reports that want to
+    track elite emergence *post-learning* rather than purely genetic.
+    """
+    agents = sim.agents
+    n = agents.n_active
+    if n <= 0:
+        return {}
+    alive_mask = agents.alive[:n]
+    alive_idx = np.flatnonzero(alive_mask)
+    if alive_idx.size == 0:
+        return {}
+
+    skills = _skill_proxy_effective(agents, alive_idx, sim)
+    cult_ids = np.array(
+        [agents.relations[int(i)].culture_id for i in alive_idx],
+        dtype=np.int32,
+    )
+    result: Dict[int, Dict] = {}
+    for cid in np.unique(cult_ids):
+        mask = cult_ids == cid
+        s = skills[mask]
+        if s.size == 0:
+            continue
+        result[int(cid)] = {
+            "n_alive": int(s.size),
+            "mean": float(s.mean()),
+            "std": float(s.std()),
+            "gini": _gini(s),
+            "top10_median_ratio": _top10_ratio(s),
+            "hill_alpha": _hill_alpha(s),
+        }
+    return result
