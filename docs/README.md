@@ -15,6 +15,7 @@ Index of all canonical user-facing documentation.
 | [`../FUTURE-VISION.md`](../FUTURE-VISION.md) | Long-term goal: counterfactual humanity laboratory |
 | [`../ROADMAP.md`](../ROADMAP.md) | Phased roadmap (Phase 0 → Phase 5) |
 | [`../NEXT-SPRINT.md`](../NEXT-SPRINT.md) | Live priority queue |
+| [`PROJECT-VIABILITY.md`](PROJECT-VIABILITY.md) | Installability, supported entry points, viability gates |
 | [`EXECUTIVE-SUMMARY.md`](EXECUTIVE-SUMMARY.md) | 1-page summary for stakeholders |
 | [`INDEX.md`](INDEX.md) | Cross-cutting reference index |
 

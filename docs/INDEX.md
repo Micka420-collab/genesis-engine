@@ -17,6 +17,7 @@ genesis-engine/
 │   ├── 05-emergent-systems.md            Économie, politique, culture, conflits
 │   ├── 06-observation-and-tooling.md     Mode GOD, dashboards, replay
 │   ├── 07-glossary-and-conventions.md    Glossaire + conventions
+│   ├── PROJECT-VIABILITY.md              Contrat d'installation + portes de viabilité
 │   ├── research/                          Publications scientifiques
 │   │   └── 2026-05-15_OSF-preregistration.md   Pre-reg OSF Wave 11/12 (Registered Report)
 │   ├── security/                          Sécurité opérationnelle

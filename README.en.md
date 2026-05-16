@@ -13,8 +13,8 @@
 [🇸🇦 العربية](README.ar.md)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/release/python-3140/)
-[![Status: Phase 5g](https://img.shields.io/badge/status-Phase_5g_alpha-orange.svg)](#️-roadmap)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+[![Status: Phase 4 complete](https://img.shields.io/badge/status-Phase_4_complete-green.svg)](#️-roadmap)
 [![Earth-anchored](https://img.shields.io/badge/Earth-anchored-green.svg)](#-earth-anchored-anywhere-on-earth)
 [![Deterministic](https://img.shields.io/badge/deterministic-✓-purple.svg)](#-determinism)
 
@@ -103,14 +103,23 @@ For the complete overview of the 7 logical layers, see [`Genesis_Engine_Architec
 
 ### Requirements
 
-- **Python 3.13+** (tested on 3.14 Windows)
+- **Python 3.12+** (CI 3.12, tested on 3.14 Windows)
 - **rasterio + pyproj** for Earth-anchored mode (otherwise procedural fallback)
 - **Internet connection** (only for Copernicus DEM + ESA WorldCover; otherwise offline mode)
 
 ```bash
 git clone https://github.com/Micka420-collab/genesis-engine.git
 cd genesis-engine
-pip install numpy rasterio pyproj
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+
+# Earth-anchored option (Copernicus DEM + ESA WorldCover)
+python -m pip install -e ".[earth,dev]"
+
+make doctor
+make test-python
 ```
 
 ### Hello, World — 30 seconds
@@ -208,7 +217,7 @@ The project follows the phased roadmap in [`Genesis_Engine_Architecture_v1.0.doc
 - **Phase 1** — MVP Life (cognitive loop, biological death) — ✅
 - **Phase 2** — MVP Society (reproduction, memory, lexicon) — ✅
 - **Phase 3** — MVP Civilization (construction, barter, trades, conflicts) — 🟡 partial
-- **Phase 4** — Civilizational Emergence (agriculture, writing, State) — ⏳
+- **Phase 4** — Civilizational Emergence (agriculture, writing, State) — ✅ complete
 - **Phase 5** — Genesis-α Public (2 founders, 10 real years = 10000 sim years) — ⏳
 
 See [`NEXT-SPRINT.md`](NEXT-SPRINT.md) for the live priority queue.

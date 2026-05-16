@@ -29,13 +29,23 @@ Tu peux contribuer **à toutes les échelles** :
 git clone https://github.com/<ton-handle>/genesis-engine.git
 cd genesis-engine
 
-# 3. Installe les dépendances
-pip install numpy rasterio pyproj
+# 3. Crée un environnement isolé, puis installe le runtime Python
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+
+# Optionnel : données Earth-anchored (Copernicus DEM + ESA WorldCover)
+python -m pip install -e ".[earth,dev]"
 
 # 4. Vérifie que tout marche
-cd runtime
-python scripts/p0_smoke.py
-# → attendu : "✅ P0 SMOKE PASSED" en fin de sortie
+make doctor
+make compile-python
+make test-python
+
+# Smoke plus long
+make smoke
+# attendu : "P0 SMOKE PASSED" en fin de sortie
 
 # 5. Optionnel : run le multi-régions demo (~5 min)
 python scripts/multi_region_demo.py

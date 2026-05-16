@@ -13,7 +13,7 @@
 [🇸🇦 العربية](README.ar.md)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/release/python-3140/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 [![Status: Phase 4 complete](https://img.shields.io/badge/status-Phase_4_complete-green.svg)](#-roadmap)
 [![Modules: 18/18](https://img.shields.io/badge/ADR--0005_modules-18%2F18-brightgreen.svg)](#-architecture-stratifi%C3%A9e)
 [![Earth-anchored](https://img.shields.io/badge/Earth-anchored-green.svg)](#-earth-anchored-anywhere-on-earth)
@@ -176,14 +176,23 @@ Pour la vue d'ensemble complète des 7 couches logiques, voir [`Genesis_Engine_A
 
 ### Prérequis
 
-- **Python 3.13+** (testé sur 3.14 Windows)
+- **Python 3.12+** (CI 3.12, testé sur 3.14 Windows)
 - **rasterio + pyproj** pour l'Earth-anchored (sinon fallback procédural)
 - **Connexion internet** (uniquement pour Copernicus DEM + ESA WorldCover, sinon mode offline)
 
 ```bash
 git clone https://github.com/Micka420-collab/genesis-engine.git
 cd genesis-engine
-pip install numpy rasterio pyproj
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+
+# Option Earth-anchored (Copernicus DEM + ESA WorldCover)
+python -m pip install -e ".[earth,dev]"
+
+make doctor
+make test-python
 ```
 
 ### Hello, World — 30 secondes
