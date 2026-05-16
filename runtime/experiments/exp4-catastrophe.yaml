@@ -1,0 +1,13 @@
+name: exp4-catastrophe
+seed: 0xBADCAFE0004
+founder_count: 30
+journal_path: data/exp4-catastrophe.jsonl
+cultures:
+  - name: default
+    color: "#74c0fc"
+    spawn_center: [0, 0]
+initial_ambient_c: 14.0
+catastrophe_at_tick: 1500
+catastrophe_weather: coldsnap
+catastrophe_duration_ticks: 4000
+# Observation goal: adaptation vs. extinction vs. innovation under shock.

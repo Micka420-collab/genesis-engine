@@ -1,0 +1,14 @@
+name: exp2-famine
+seed: 0xFA111E0002
+founder_count: 50
+journal_path: data/exp2-famine.jsonl
+cultures:
+  - name: default
+    color: "#74c0fc"
+    spawn_center: [0, 0]
+scarcity_factor: 0.15
+initial_ambient_c: 16.0
+catastrophe_at_tick: 2000
+catastrophe_weather: drought
+catastrophe_duration_ticks: 6000
+# Observation goal: conflicts, alliances, migration patterns.

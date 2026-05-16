@@ -1,0 +1,8 @@
+name: petri
+seed: 0xC0FFEE
+founder_count: 8
+journal_path: data/petri.jsonl
+cultures:
+  - name: default
+    color: "#74c0fc"
+    spawn_center: [0, 0]

@@ -1,0 +1,17 @@
+name: exp3-cultures
+seed: 0xCAFE0003
+founder_count: 24
+journal_path: data/exp3-cultures.jsonl
+cultures:
+  - name: north
+    color: "#74c0fc"
+    spawn_center: [-120, 0]
+    aggression_bias: -0.1
+    cooperative_bias: 0.2
+  - name: south
+    color: "#ff8a4c"
+    spawn_center: [+120, 0]
+    aggression_bias: 0.15
+    cooperative_bias: -0.05
+initial_ambient_c: 18.0
+# Observation goal: contact dynamics — trade, war, fusion.

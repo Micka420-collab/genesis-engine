@@ -1,0 +1,17 @@
+name: stress
+seed: 0x57E550001
+founder_count: 120
+journal_path: data/stress.jsonl
+cultures:
+  - name: north
+    color: "#74c0fc"
+    spawn_center: [-200, 0]
+  - name: south
+    color: "#ff8a4c"
+    spawn_center: [+200, 0]
+  - name: east
+    color: "#ff9bd1"
+    spawn_center: [0, +200]
+  - name: west
+    color: "#c0f06d"
+    spawn_center: [0, -200]
