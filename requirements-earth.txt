@@ -1,0 +1,4 @@
+-r requirements.txt
+pyproj>=3.6
+rasterio>=1.3
+
