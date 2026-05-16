@@ -35,6 +35,13 @@ class Sim5CDSmokeTests(unittest.TestCase):
             spawn_radius_m=20.0,
             cultures=1,
             drive_accel=1500.0,
+            # Wave 13 (2026-05-15) made the HEARTH seeding opt-in per the
+            # discovery-rule audit (`cfg.scripted_hearth_seed: bool = False`).
+            # This is a legacy regression for P-NEW.7 — keep it opting in.
+            # New tests must NOT set this flag; emergent BUILD via
+            # engine.invention + engine.building_discovery is the supported
+            # path, see NEXT-SPRINT.md P-NEW.7 / WAVE13 sprint note.
+            scripted_hearth_seed=True,
         )
         sim = Simulation(cfg)
         install(sim)

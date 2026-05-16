@@ -38,10 +38,12 @@ engine = ["*.html", "*.js"]
 
 [tool.pytest.ini_options]
 pythonpath = ["runtime"]
-testpaths = [
-  "runtime/tests",
-  "runtime-phase5/tests",
-]
+# `runtime-phase5/tests` was here but `runtime-phase5/` is the deprecated
+# parallel prototype tree (see docs/PROJECT-VIABILITY.md). Its tests are an
+# exact copy of `runtime/tests/` against a stale fork of the engine and they
+# duplicate failures. The Makefile already runs `pytest runtime/tests`
+# explicitly; this config now matches that.
+testpaths = ["runtime/tests"]
 addopts = "-q"
 
 [tool.ruff]
