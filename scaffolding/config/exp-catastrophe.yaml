@@ -1,0 +1,53 @@
+# Genesis Engine — expérience 4 : catastrophe environnementale.
+#
+# 50 agents en spirale autour de l'origine. À t=15 000 ticks, un séisme
+# (label="earthquake") affecte tous les agents dans un rayon de 60 m
+# autour de l'origine : -0.6 de vitalité + +0.6 d'injuries.
+#
+# Observations attendues :
+#  * pic de mortalité immédiat
+#  * dispersion des survivants
+#  * reconstitution éventuelle d'une population à partir des survivants
+#  * adaptation génétique (sélection des traits favorables à la survie)
+#
+# À utiliser avec : --scenario catastrophe
+simulation:
+  name: "exp-catastrophe"
+  seed: 0xDEAD_BEEF_DEAD_BEEF_FEED_FACE_FEED_FACE
+  tier: petri
+  time_scale: standard
+  max_agents: 200
+
+world:
+  size: bounded
+  bounds_km: [2, 2]
+  voxel_size_m: 0.5
+  chunk_size: [64, 64, 128]
+
+biology:
+  metabolic_rate: 1.0
+  reproduction_cooldown_days: 30
+  child_dependency_years: 10
+  base_lifespan_years: 80
+
+cognition:
+  policy_model: "policy-r0-reflex"
+
+evolution:
+  mutation_rate: 0.01
+
+snapshots:
+  interval_ticks: 100000
+  retention_count: 5
+  storage: "minio://genesis-snapshots/exp-catastrophe/"
+
+events:
+  catastrophe_tick: 15000
+  catastrophe_radius_m: 60
+  catastrophe_severity: 0.6
+
+founders:
+  count: 50
+  spawn_strategy: "near-water-and-food"
+  initial_genome: "balanced-baseline"
+  knowledge: ["survive", "reproduce", "interact"]

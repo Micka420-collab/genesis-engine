@@ -37,6 +37,14 @@ struct Args {
     /// Override le nombre de fondateurs (0 = utiliser la config YAML).
     #[arg(long, env = "GE_FOUNDERS", default_value_t = 0)]
     founders: u32,
+    /// Scénario expérimental.
+    ///
+    /// Valeurs : `default`, `scarcity`, `two_cultures`, `catastrophe`.
+    /// Chaque scénario surcharge la stratégie de spawn et configure les
+    /// événements globaux (catastrophe). La config YAML reste prioritaire
+    /// pour les paramètres non concernés par le scénario.
+    #[arg(long, env = "GE_SCENARIO", default_value = "default")]
+    scenario: String,
 }
 
 #[tokio::main]
@@ -59,6 +67,11 @@ async fn main() -> Result<()> {
         bootstrap.founder_count = args.founders;
         info!(founders = args.founders, "founder count overridden by CLI");
     }
+    // Applique le scénario expérimental — affecte la stratégie de spawn et
+    // les événements globaux (catastrophe). N'affecte pas le seed ni les
+    // constantes biologiques, ce qui garde le déterminisme stable.
+    state::apply_scenario(&mut bootstrap, &args.scenario);
+    info!(scenario = %bootstrap.scenario, founders = bootstrap.founder_count, max_agents = bootstrap.max_agents, "scenario applied");
     let app_state = Arc::new(RwLock::new(bootstrap));
 
     // Spawn de la boucle de sim en background.

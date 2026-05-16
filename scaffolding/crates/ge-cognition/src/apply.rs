@@ -6,6 +6,16 @@
 //!
 //! Phase 1 implémente : Idle, WalkTo, Drink, Eat, Sleep, Forage, SeekShelter.
 //! Mate est un no-op (réservé Phase 2 — reproduction).
+//!
+//! ## Note Phase 3 — récolte mondiale
+//!
+//! Les actions `Drink`, `Eat`, `Forage` ne créent pas de ressources ex nihilo :
+//! elles posent une *intention de récolte* (vélocité à zéro, position figée),
+//! et le système `run_world_harvest` de `ge-api` consomme effectivement les
+//! ressources du chunk sous-jacent + applique le soulagement du drive en
+//! fonction de la disponibilité réelle. Cela rend les scénarios de rareté
+//! exploitables : si la cellule est vide ou non-comestible, l'agent ne tire
+//! aucun bénéfice de l'action.
 
 use crate::action::{ActionArgs, ActionId, Decision};
 use ge_agents::{Drives, Inventory, ItemKind, Metabolism, Position, Velocity};
@@ -95,21 +105,22 @@ fn walk_to(agent: &mut AgentMut<'_>, args: &ActionArgs) -> bool {
 }
 
 fn drink(agent: &mut AgentMut<'_>) -> bool {
+    // Phase 3 : c'est `run_world_harvest` (côté ge-api) qui consomme l'eau
+    // du chunk et applique le soulagement effectif du drive. Ici on se
+    // contente de fixer la vélocité à zéro pour figer l'agent sur place
+    // pendant qu'il boit.
     agent.velocity.0 = Vec3::ZERO;
-    let before = agent.drives.thirst.0;
-    agent.drives.thirst = agent.drives.thirst.add(-DRINK_RELIEF);
-    // Crédite un peu d'eau en inventaire (consommable plus tard).
-    agent.inventory.add(ItemKind::Water, 0.5);
-    before > agent.drives.thirst.0
+    false
 }
 
 fn eat(agent: &mut AgentMut<'_>) -> bool {
     agent.velocity.0 = Vec3::ZERO;
-    // Si on a de la nourriture en inventaire, on la consomme.
+    // Si l'agent a déjà de la food en inventaire (récoltée précédemment),
+    // il peut la consommer immédiatement — pas besoin de chunk. Sinon le
+    // système de récolte traitera l'intention au même tick.
     let food = agent.inventory.take(ItemKind::Food, 0.5);
     if food <= 0.0 {
-        // Pas de food dans le sac — on tente une cueillette opportuniste.
-        return forage(agent);
+        return false;
     }
     let before = agent.drives.hunger.0;
     agent.drives.hunger = agent.drives.hunger.add(-EAT_RELIEF * food.max(0.1));
@@ -126,17 +137,11 @@ fn sleep(agent: &mut AgentMut<'_>) -> bool {
 }
 
 fn forage(agent: &mut AgentMut<'_>) -> bool {
+    // Phase 3 : le système `run_world_harvest` côté ge-api consulte le chunk
+    // sous l'agent et crédite l'inventaire en fonction de la NPP et du wood
+    // disponible. Ici on se contente d'immobiliser l'agent.
     agent.velocity.0 = Vec3::ZERO;
-    // Phase 1 : forage produit un peu de food et un peu de wood/stone.
-    // Le système Phase 2 consultera la biome locale via une ressource.
-    let added_food = agent.inventory.add(ItemKind::Food, 1.0);
-    agent.inventory.add(ItemKind::Wood, 0.5);
-    // Si on récupère un peu de food, on réduit aussi la faim immédiatement
-    // (manger pendant qu'on cueille).
-    if added_food > 0.0 {
-        agent.drives.hunger = agent.drives.hunger.add(-FORAGE_RATE_KCAL * 1e-4);
-    }
-    added_food > 0.0
+    false
 }
 
 #[cfg(test)]
@@ -155,13 +160,18 @@ mod tests {
     }
 
     #[test]
-    fn drink_reduces_thirst() {
+    fn drink_is_velocity_zero_intent_only() {
+        // Phase 3 : `Drink` est désormais une *intention* — l'effet hydrique
+        // est appliqué par `run_world_harvest` côté ge-api en fonction du
+        // chunk sous l'agent. La cognition se contente d'immobiliser.
         let (mut p, mut v, mut d, mut inv, m) = fresh_agent();
+        v.0 = Vec3::new(2.0, 0.0, 0.0);
         d.thirst = Drive(0.5);
         let mut a = AgentMut { position: &mut p, velocity: &mut v, drives: &mut d, inventory: &mut inv, metabolism: &m };
-        let ok = apply_decision(&mut a, &Decision { action: ActionId::Drink, args: ActionArgs::None, confidence: 1.0 });
-        assert!(ok);
-        assert!(d.thirst.0 < 0.5);
+        let _ = apply_decision(&mut a, &Decision { action: ActionId::Drink, args: ActionArgs::None, confidence: 1.0 });
+        assert_eq!(v.0, Vec3::ZERO);
+        // Le drive n'a pas changé à ce niveau.
+        assert!((d.thirst.0 - 0.5).abs() < 1e-6);
     }
 
     #[test]

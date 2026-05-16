@@ -1,0 +1,43 @@
+# Genesis Engine — expérience 1 : 10 agents en cluster serré, ressources locales rares.
+#
+# Hypothèse scientifique : observer l'émergence de partage vs compétition
+# quand un petit groupe doit récolter sur un seul chunk de 32×32 m. La NPP
+# du biome local fixe la cadence de régénération. Le `tight cluster` met
+# tout le monde à <2 m de l'origine — la rareté est purement géographique.
+#
+# À utiliser avec : --scenario scarcity
+simulation:
+  name: "exp-scarcity"
+  seed: 0xC0FFEE_DEADBEEF_FEEDFACE_BAADC0DE
+  tier: petri
+  time_scale: standard
+  max_agents: 16
+
+world:
+  size: bounded
+  bounds_km: [1, 1]
+  voxel_size_m: 0.5
+  chunk_size: [64, 64, 128]
+
+biology:
+  metabolic_rate: 1.0
+  reproduction_cooldown_days: 30
+  child_dependency_years: 10
+  base_lifespan_years: 80
+
+cognition:
+  policy_model: "policy-r0-reflex"
+
+evolution:
+  mutation_rate: 0.05
+
+snapshots:
+  interval_ticks: 100000
+  retention_count: 5
+  storage: "minio://genesis-snapshots/exp-scarcity/"
+
+founders:
+  count: 10
+  spawn_strategy: "tight-cluster"
+  initial_genome: "balanced-baseline"
+  knowledge: ["survive", "reproduce", "interact"]

@@ -5,6 +5,32 @@ use bevy_ecs::world::World as BevyWorld;
 use ge_agents::{spawn_founders, Aging, Deceased, Drives, Fertility, Health, Identity, Personality, Position};
 use ge_ann::{Event, EventKind, JsonlSink, LineageMap, Sink};
 
+/// Plan d'une catastrophe environnementale ponctuelle.
+#[derive(Clone, Debug)]
+pub struct CatastrophePlan {
+    /// Label lisible (`"earthquake"`, `"plague"`, ...).
+    pub label: String,
+    /// Tick auquel déclencher l'événement.
+    pub tick: u64,
+    /// Centre d'impact (XY, Z ignoré pour la distance horizontale).
+    pub center: glam::Vec3,
+    /// Rayon d'impact (m).
+    pub radius_m: f32,
+    /// Sévérité [0..1] — perte de vitalité directe + injuries.
+    pub severity: f32,
+}
+
+/// Stratégie de spawn des fondateurs.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum SpawnStrategy {
+    /// Spirale d'or autour de l'origine (défaut).
+    Spiral,
+    /// Deux clusters culturels diamétralement opposés (expérience 3).
+    TwoCultures,
+    /// Cluster serré (expérience 1 — rareté).
+    TightCluster,
+}
+
 /// Taille max du buffer d'événements récents exposé via /sim/events.
 pub const RECENT_EVENTS_CAPACITY: usize = 1_024;
 use ge_core::{AgentId, SimulationId, Tick, WorldSeed};
@@ -38,6 +64,10 @@ pub struct SimSnapshot {
     pub events_emitted: u64,
     /// Chunks en mémoire.
     pub chunks_in_memory: usize,
+    /// Nom du scénario actif (`default`, `scarcity`, `two_cultures`, `catastrophe`).
+    pub scenario: String,
+    /// Capacité d'agents vivants (population cap).
+    pub max_agents: u32,
 }
 
 /// Vue résumée d'un agent — utilisé par `/sim/agents`.
@@ -101,8 +131,16 @@ pub struct AppState {
     pub ready: bool,
     /// Nombre de fondateurs configuré.
     pub founder_count: u32,
+    /// Capacité d'agents vivants — au-dessus, la reproduction est bloquée.
+    pub max_agents: u32,
     /// Fondateurs déjà spawnés ?
     pub bootstrapped: bool,
+    /// Stratégie de spawn — varie selon le scénario sélectionné.
+    pub spawn_strategy: SpawnStrategy,
+    /// Plan de catastrophe (optionnel).
+    pub catastrophe: Option<CatastrophePlan>,
+    /// Nom du scénario actif (pour observabilité).
+    pub scenario: String,
 }
 
 impl AppState {
@@ -113,6 +151,10 @@ impl AppState {
 
         let seed: WorldSeed = parsed.get_hex_u128("simulation.seed").unwrap_or(0xC0FFEE);
         let founder_count = parsed.get_u32("founders.count").unwrap_or(2);
+        let max_agents = parsed
+            .get_u32("simulation.max_agents")
+            .unwrap_or(1_000)
+            .max(founder_count.saturating_add(1));
         let sim_id = SimulationId(Uuid::new_v4());
 
         let journal = match journal_path {
@@ -146,7 +188,11 @@ impl AppState {
             journal,
             ready: false,
             founder_count,
+            max_agents,
             bootstrapped: false,
+            spawn_strategy: SpawnStrategy::Spiral,
+            catastrophe: None,
+            scenario: "default".to_string(),
         })
     }
 
@@ -163,22 +209,52 @@ impl AppState {
 
     /// Spawn initial des fondateurs. Idempotent.
     ///
-    /// Positions disposées en cercle de 5 m autour de l'origine. Z fixé à 1 m
-    /// pour rester au-dessus du « niveau de la mer » par défaut.
+    /// La disposition dépend de `spawn_strategy` :
+    /// - `Spiral` : spirale logarithmique en angle d'or autour de l'origine
+    ///   (compatibilité descendante avec les tests Phase 1/2/3).
+    /// - `TightCluster` : tous serrés dans un disque de 1.5 m (expérience
+    ///   "rareté", garantit le contact reproductif).
+    /// - `TwoCultures` : deux clusters opposés à ±50 m sur X (expérience
+    ///   "fusion culturelle"). La personnalité reste fonction du PRF du
+    ///   monde — ce qui rend ces clusters culturellement distincts si on
+    ///   pousse en Phase 4 un trait "culture" séparé.
     pub fn spawn_initial(&mut self) -> Vec<AgentId> {
         if self.bootstrapped {
             return Vec::new();
         }
         let n = self.founder_count as usize;
         let mut positions = Vec::with_capacity(n);
-        // Disposition en spirale logarithmique compacte — couvre une zone
-        // suffisamment dense pour que des paires soient à distance de
-        // reproduction sans forcer la même position (cf. Phase 2).
-        // Rayon ≈ 1.5 m × sqrt(i) — assure une densité raisonnable jusqu'à n=200.
-        for i in 0..n {
-            let phi = (i as f32) * 2.399_963_2; // angle d'or (rad) — distribution dense
-            let r = 1.5 * (i as f32).sqrt();
-            positions.push(Vec3::new(phi.cos() * r, phi.sin() * r, 1.0));
+        match self.spawn_strategy {
+            SpawnStrategy::Spiral => {
+                for i in 0..n {
+                    let phi = (i as f32) * 2.399_963_2;
+                    let r = 1.5 * (i as f32).sqrt();
+                    positions.push(Vec3::new(phi.cos() * r, phi.sin() * r, 1.0));
+                }
+            }
+            SpawnStrategy::TightCluster => {
+                for i in 0..n {
+                    let phi = (i as f32) * 2.399_963_2;
+                    let r = 0.4 * (i as f32).sqrt();
+                    positions.push(Vec3::new(phi.cos() * r, phi.sin() * r, 1.0));
+                }
+            }
+            SpawnStrategy::TwoCultures => {
+                let half = n / 2;
+                let cx_a = -50.0;
+                let cx_b = 50.0;
+                for i in 0..half {
+                    let phi = (i as f32) * 2.399_963_2;
+                    let r = 1.5 * (i as f32).sqrt();
+                    positions.push(Vec3::new(cx_a + phi.cos() * r, phi.sin() * r, 1.0));
+                }
+                for i in half..n {
+                    let j = i - half;
+                    let phi = (j as f32) * 2.399_963_2 + std::f32::consts::PI;
+                    let r = 1.5 * (j as f32).sqrt();
+                    positions.push(Vec3::new(cx_b + phi.cos() * r, phi.sin() * r, 1.0));
+                }
+            }
         }
         let tick = self.tick.get();
         let ids = spawn_founders(&mut self.world, self.seed, &positions, tick);
@@ -229,6 +305,8 @@ impl AppState {
             max_generation: self.max_generation,
             events_emitted: self.events_emitted,
             chunks_in_memory: self.streamer.cache.len(),
+            scenario: self.scenario.clone(),
+            max_agents: self.max_agents,
         }
     }
 
@@ -336,6 +414,62 @@ impl AppState {
         // Inclut le tick pour distinguer 2 ticks identiques sur le même état.
         hasher.update(&self.tick.get().to_le_bytes());
         *hasher.finalize().as_bytes()
+    }
+}
+
+/// Applique un scénario expérimental sur l'état initial. Réversible :
+/// chaque scénario écrit explicitement les champs qu'il change.
+///
+/// Scénarios pris en charge :
+/// - `default` — laisse la config YAML telle quelle.
+/// - `scarcity` — 10 agents serrés, max_agents=12, déclenche déjà la
+///   compétition sur les ressources d'un seul chunk.
+/// - `two_cultures` — N fondateurs scindés en deux clusters opposés (±50 m
+///   sur X). Permet d'observer commerce / guerre / fusion.
+/// - `catastrophe` — 50 agents en spirale, puis catastrophe à t=15 000.
+pub fn apply_scenario(state: &mut AppState, name: &str) {
+    let raw = name.trim().to_ascii_lowercase();
+    let s = if raw.is_empty() { "default".to_string() } else { raw };
+    state.scenario = s.clone();
+    match s.as_str() {
+        "scarcity" => {
+            state.founder_count = state.founder_count.clamp(8, 12);
+            if state.founder_count < 10 {
+                state.founder_count = 10;
+            }
+            state.max_agents = state.max_agents.max(state.founder_count + 4);
+            state.spawn_strategy = SpawnStrategy::TightCluster;
+            state.catastrophe = None;
+        }
+        "two_cultures" | "two-cultures" => {
+            // 50 agents par défaut si la config est plus petite.
+            if state.founder_count < 50 {
+                state.founder_count = 50;
+            }
+            state.max_agents = state.max_agents.max(state.founder_count + 50);
+            state.spawn_strategy = SpawnStrategy::TwoCultures;
+            state.catastrophe = None;
+        }
+        "catastrophe" => {
+            if state.founder_count < 50 {
+                state.founder_count = 50;
+            }
+            state.max_agents = state.max_agents.max(state.founder_count + 100);
+            state.spawn_strategy = SpawnStrategy::Spiral;
+            state.catastrophe = Some(CatastrophePlan {
+                label: "earthquake".to_string(),
+                tick: 15_000,
+                center: glam::Vec3::ZERO,
+                radius_m: 60.0,
+                severity: 0.6,
+            });
+        }
+        "default" | "" => {
+            // No-op.
+        }
+        other => {
+            tracing::warn!(scenario = %other, "unknown scenario — falling back to default");
+        }
     }
 }
 

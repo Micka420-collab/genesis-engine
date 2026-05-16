@@ -38,8 +38,12 @@ impl Inventory {
 
     /// Ajoute (clamp par capacité).
     pub fn add(&mut self, kind: ItemKind, qty: f32) -> f32 {
+        let qty = qty.max(0.0);
+        let added = qty.min(self.remaining());
+        if added <= 0.0 {
+            return 0.0;
+        }
         let e = self.items.entry(kind).or_insert(0.0);
-        let added = qty.min(self.remaining(qty));
         *e += added;
         added
     }
@@ -57,7 +61,7 @@ impl Inventory {
         self.items.values().sum()
     }
 
-    fn remaining(&self, _wanted: f32) -> f32 {
+    fn remaining(&self) -> f32 {
         (self.capacity_kg - self.total_mass()).max(0.0)
     }
 }

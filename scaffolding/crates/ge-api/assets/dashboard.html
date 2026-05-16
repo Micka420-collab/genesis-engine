@@ -396,6 +396,7 @@ function renderEvents(events) {
     const detail =
       cls === "birth" ? `gen=${meta.generation ?? 0}` :
       cls === "death" ? `cause=${meta.cause ?? "?"}` :
+      k === "catastrophe" ? `${meta.label ?? "?"} sev=${meta.severity ?? "?"} r=${meta.radius_m ?? "?"}m` :
       JSON.stringify(meta);
     // Tick is serialized as a plain number (newtype struct in Rust).
     const tick = (typeof ev.tick === "object" && ev.tick !== null && "0" in ev.tick)
@@ -460,7 +461,9 @@ async function tick() {
       fetchJSON("/api/v1/sim/agents?limit=10000"),
       fetchJSON("/api/v1/sim/events?limit=200"),
     ]);
-    $("meta").textContent = `sim: ${state.sim_id.slice(0,8)}  seed: ${state.seed_hex}  tick: ${state.tick}`;
+    $("meta").textContent =
+      `sim: ${state.sim_id.slice(0,8)}  seed: ${state.seed_hex}  tick: ${state.tick}` +
+      `  scénario: ${state.scenario ?? "default"}  cap: ${state.max_agents ?? "?"}`;
     $("kpi-alive").textContent = fmt(state.agents_alive);
     $("kpi-alive-sub").textContent = `chunks chargés : ${state.chunks_in_memory}`;
     $("kpi-births").textContent = fmt(state.births_total);

@@ -1,0 +1,45 @@
+# Genesis Engine — expérience 3 : 2 groupes culturels distincts.
+#
+# 50 fondateurs scindés en deux clusters à ±50 m sur X. La frontière est
+# franchissable (rayon de perception = 50 m), donc les agents finissent par
+# se croiser. On observe :
+#  * la dynamique d'union/conflit aux frontières
+#  * la convergence ou la persistance des traits de personnalité distincts
+#  * l'éventuelle fusion en une population unique
+#
+# À utiliser avec : --scenario two_cultures
+simulation:
+  name: "exp-two-cultures"
+  seed: 0xCAFE_FACE_BABE_DEAD_BEEF_F00D_FACE_F00D
+  tier: petri
+  time_scale: standard
+  max_agents: 200
+
+world:
+  size: bounded
+  bounds_km: [2, 2]
+  voxel_size_m: 0.5
+  chunk_size: [64, 64, 128]
+
+biology:
+  metabolic_rate: 1.0
+  reproduction_cooldown_days: 30
+  child_dependency_years: 10
+  base_lifespan_years: 80
+
+cognition:
+  policy_model: "policy-r0-reflex"
+
+evolution:
+  mutation_rate: 0.01
+
+snapshots:
+  interval_ticks: 100000
+  retention_count: 5
+  storage: "minio://genesis-snapshots/exp-two-cultures/"
+
+founders:
+  count: 50
+  spawn_strategy: "two-clusters"
+  initial_genome: "two-cultures-baseline"
+  knowledge: ["survive", "reproduce", "interact"]

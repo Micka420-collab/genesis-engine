@@ -15,13 +15,18 @@ use crate::state::AppState;
 use bevy_ecs::prelude::*;
 use ge_agents::{
     spawn_offspring, Aging, Deceased, Drives, Episode, EpisodeKind, Fertility, Health, Identity,
-    Inventory, Memory, Metabolism, Personality, Position, Velocity, MATING_RADIUS_M,
-    DRIVE_BLOCK_THRESHOLD,
+    Inventory, ItemKind, Memory, Metabolism, Personality, Position, Velocity,
+    DRIVE_BLOCK_THRESHOLD, MATING_RADIUS_M,
 };
 use ge_ann::{Event, EventKind, Sink};
-use ge_cognition::{apply_decision, decide, perceive_for, AgentMut, Decision, PERCEPTION_RADIUS_M};
+use ge_cognition::{
+    apply_decision, decide, perceive_for, ActionId, AgentMut, Decision, PERCEPTION_RADIUS_M,
+};
 use ge_core::{AgentId, ChunkCoord};
-use ge_world::{area_around, Chunk};
+use ge_world::{
+    area_around, sample as sample_terrain, weather_at, Biome, Chunk, TerrainSample, CHUNK_SIZE,
+    VOXEL_SIZE_M,
+};
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -83,17 +88,38 @@ pub fn step_once(state: &mut AppState) {
     // 2) Tick drives — système simple (Bevy SystemState n'est pas nécessaire).
     run_tick_drives(&mut state.world);
 
+    // 2b) Thermal comfort — wire la météo et le biome local au drive `thermal`.
+    //     Sans ça, le drive `thermal` ne bouge jamais et `detect_mortality`
+    //     ne peut jamais conclure à un décès par froid/chaud. C'est nécessaire
+    //     pour les expériences de type "catastrophe environnementale".
+    run_thermal_comfort(state);
+
     // 3) Perception → Décision (lecture seule sur l'ECS + streamer).
     let decisions = perceive_and_decide(state);
 
     // 4) Apply decisions (mutation).
     apply_decisions(&mut state.world, &decisions);
 
+    // 4b) Récolte mondiale — consomme réellement les ressources des chunks
+    //     pour les agents qui ont mangé/bu/fouragé ce tick. Sans cela, les
+    //     ressources sont infinies et l'expérience "rareté" est impossible.
+    run_world_harvest(state, &decisions);
+
     // 5) Intégration vélocité.
     run_apply_velocity(&mut state.world);
 
+    // 6a-pre) Catastrophe environnementale (Phase 3, expérience 4).
+    //         Si configurée et que le tick courant correspond, applique un
+    //         choc de santé/thermal sur les agents dans la zone d'impact.
+    let catastrophe_events = run_catastrophe(state);
+
     // 6a) Reproduction (Phase 2) — pairs proches & fertiles → naissances.
-    let birth_events = run_reproduction(state);
+    //     Population cap : si on a déjà atteint `max_agents`, on saute.
+    let birth_events = if state.agents_alive >= state.max_agents {
+        Vec::new()
+    } else {
+        run_reproduction(state)
+    };
 
     // 6b) Mémoire : enregistre la souffrance courante (drive >= 0.85).
     record_suffering(state);
@@ -121,9 +147,9 @@ pub fn step_once(state: &mut AppState) {
     }
     update_counters(state);
 
-    // Persiste les events (naissances puis décès) si journal actif. Pousse
-    // également dans le buffer borné `recent_events` pour /sim/events.
-    if !birth_events.is_empty() || !death_events.is_empty() {
+    // Persiste les events (naissances, décès, catastrophes) si journal actif.
+    // Pousse également dans le buffer borné `recent_events` pour /sim/events.
+    if !birth_events.is_empty() || !death_events.is_empty() || !catastrophe_events.is_empty() {
         if let Some(j) = state.journal.as_mut() {
             if !birth_events.is_empty() {
                 if let Err(e) = j.append(&birth_events) {
@@ -139,10 +165,18 @@ pub fn step_once(state: &mut AppState) {
                     state.events_emitted += death_events.len() as u64;
                 }
             }
+            if !catastrophe_events.is_empty() {
+                if let Err(e) = j.append(&catastrophe_events) {
+                    warn!(error = %e, "failed to append catastrophe events");
+                } else {
+                    state.events_emitted += catastrophe_events.len() as u64;
+                }
+            }
             let _ = j.flush();
         }
         state.push_recent(&birth_events);
         state.push_recent(&death_events);
+        state.push_recent(&catastrophe_events);
     }
 
     // 8) GC chunks périodique.
@@ -495,6 +529,260 @@ fn drives_block_reproduction(d: &Drives) -> bool {
         || d.thermal.0 > DRIVE_BLOCK_THRESHOLD
 }
 
+// ---------------------------------------------------------------------------
+// Thermal comfort
+// ---------------------------------------------------------------------------
+
+/// Zone de confort thermique d'un humain (°C).
+pub const THERMAL_COMFORT_LO_C: f32 = 18.0;
+/// Zone de confort thermique d'un humain (°C).
+pub const THERMAL_COMFORT_HI_C: f32 = 26.0;
+/// Pas d'incrément du drive thermal par tick (per °C d'écart hors zone).
+///
+/// Calibration Phase 3 : avec une déviation de 30 °C il faut ~20 000 ticks
+/// (~5 heures simulation à 1 tick/s) pour atteindre le seuil critique 1.0.
+/// Cela laisse les tests Phase 1/2/3 (≤ 1100 ticks) totalement saufs tout
+/// en permettant qu'une catastrophe environnementale de longue durée tue
+/// un agent par hypothermie/hyperthermie.
+pub const THERMAL_RATE_PER_C: f32 = 1.0 / 600_000.0;
+/// Décroissance passive quand l'agent est en zone de confort.
+pub const THERMAL_DECAY_PER_TICK: f32 = 1.0 / 200_000.0;
+
+/// Met à jour le drive `thermal` en fonction du climat local. Réduit aussi le
+/// drive `loneliness` si des congénères sont à proximité (Phase 3 light).
+///
+/// Déterminisme : `sample_terrain` et `weather_at` sont des fonctions pures
+/// déterministes (PRF). L'itération Bevy par-position-vivante donne le même
+/// résultat pour un même seed quel que soit l'ordre interne.
+fn run_thermal_comfort(state: &mut AppState) {
+    let tick = state.tick;
+    let seed = state.streamer.seed;
+    let params = state.streamer.params.clone();
+    // 1) Snapshot lecture seule des positions des agents vivants.
+    let positions: Vec<(Entity, glam::Vec3)> = {
+        let mut q = state
+            .world
+            .query_filtered::<(Entity, &Position), Without<Deceased>>();
+        q.iter(&state.world).map(|(e, p)| (e, p.0)).collect()
+    };
+    // 2) Pour chaque agent, calcul du thermique local + mise à jour du drive.
+    for (entity, pos) in positions {
+        let base: TerrainSample = sample_terrain(seed, &params, pos.x, pos.y);
+        // Hémisphère nord pour Y >= 0, sud sinon.
+        let north = pos.y >= 0.0;
+        let w = weather_at(tick, &base, north);
+        // Cible biome — abri/forêt amortit ±3°C.
+        let chunk_coord = Chunk::from_world_pos(pos.x, pos.y, pos.z);
+        let buffer = state
+            .streamer
+            .cache
+            .get(&chunk_coord)
+            .and_then(|c| {
+                let (ox, oy) = Chunk::origin_m(chunk_coord);
+                let cx = ((pos.x - ox) / VOXEL_SIZE_M).floor() as i32;
+                let cy = ((pos.y - oy) / VOXEL_SIZE_M).floor() as i32;
+                if cx < 0 || cy < 0 || cx >= CHUNK_SIZE as i32 || cy >= CHUNK_SIZE as i32 {
+                    None
+                } else {
+                    let i = Chunk::idx(cx as usize, cy as usize);
+                    Some(match c.biome[i] {
+                        Biome::TemperateForest
+                        | Biome::TemperateRainforest
+                        | Biome::TropicalRainforest
+                        | Biome::BorealForest => 3.0,
+                        Biome::TropicalDryForest => 1.5,
+                        _ => 0.0,
+                    })
+                }
+            })
+            .unwrap_or(0.0);
+
+        let mut t_felt = w.temp_c;
+        // L'abri rapproche t_felt de la zone de confort.
+        let mid = (THERMAL_COMFORT_LO_C + THERMAL_COMFORT_HI_C) * 0.5;
+        if t_felt < THERMAL_COMFORT_LO_C {
+            t_felt = (t_felt + buffer.min(mid - t_felt)).min(mid);
+        } else if t_felt > THERMAL_COMFORT_HI_C {
+            t_felt = (t_felt - buffer.min(t_felt - mid)).max(mid);
+        }
+
+        let delta = if t_felt < THERMAL_COMFORT_LO_C {
+            (THERMAL_COMFORT_LO_C - t_felt) * THERMAL_RATE_PER_C
+        } else if t_felt > THERMAL_COMFORT_HI_C {
+            (t_felt - THERMAL_COMFORT_HI_C) * THERMAL_RATE_PER_C
+        } else {
+            -THERMAL_DECAY_PER_TICK
+        };
+        if let Ok(mut em) = state.world.get_entity_mut(entity) {
+            if let Some(mut d) = em.get_mut::<Drives>() {
+                d.thermal = d.thermal.add(delta);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// World harvest — consomme les ressources des chunks lorsque les agents
+// boivent / mangent / cueillent. Sans ça, les ressources sont infinies et les
+// scénarios de rareté ne fonctionnent pas.
+// ---------------------------------------------------------------------------
+
+/// Quantité d'eau (L) qu'un agent retire localement par tick `Drink`.
+pub const HARVEST_WATER_PER_TICK: f32 = 0.5;
+/// Quantité de food (kcal-équivalent) qu'un agent retire par tick `Eat`/`Forage`.
+pub const HARVEST_FOOD_PER_TICK: f32 = 1.0;
+/// Quantité de bois (kg) qu'un agent retire par tick `Forage`.
+pub const HARVEST_WOOD_PER_TICK: f32 = 0.3;
+
+fn cell_index_for(pos: glam::Vec3) -> Option<(ChunkCoord, usize)> {
+    let coord = Chunk::from_world_pos(pos.x, pos.y, pos.z);
+    let (ox, oy) = Chunk::origin_m(coord);
+    let cx = ((pos.x - ox) / VOXEL_SIZE_M).floor() as i32;
+    let cy = ((pos.y - oy) / VOXEL_SIZE_M).floor() as i32;
+    if cx < 0 || cy < 0 || cx >= CHUNK_SIZE as i32 || cy >= CHUNK_SIZE as i32 {
+        return None;
+    }
+    Some((coord, Chunk::idx(cx as usize, cy as usize)))
+}
+
+/// Soulagement du drive `thirst` quand l'agent boit effectivement.
+pub const DRINK_RELIEF: f32 = 0.05;
+/// Soulagement du drive `hunger` par unité de food consommée pendant Forage.
+pub const FORAGE_HUNGER_PER_FOOD: f32 = 0.04;
+
+fn run_world_harvest(state: &mut AppState, decisions: &HashMap<Entity, Decision>) {
+    // Tri canonique : on traite les agents par AgentId pour que l'ordre de
+    // ponction sur les chunks soit reproductible quelle que soit l'ordre
+    // d'itération Bevy/HashMap.
+    let mut tasks: Vec<(AgentId, Entity, glam::Vec3, ActionId)> = {
+        let mut q = state
+            .world
+            .query_filtered::<(Entity, &Identity, &Position), Without<Deceased>>();
+        q.iter(&state.world)
+            .filter_map(|(e, id, p)| {
+                decisions
+                    .get(&e)
+                    .map(|d| (id.id, e, p.0, d.action))
+                    .filter(|(_, _, _, a)| {
+                        matches!(a, ActionId::Drink | ActionId::Forage)
+                    })
+            })
+            .collect()
+    };
+    tasks.sort_by_key(|(id, _, _, _)| *id);
+
+    for (_aid, entity, pos, action) in tasks {
+        let Some((coord, idx)) = cell_index_for(pos) else { continue };
+        let Some(chunk) = state.streamer.cache.get_mut(&coord) else { continue };
+        match action {
+            ActionId::Drink => {
+                // Eau libre = cellule océan ou cellule à niveau bas (cours d'eau).
+                let is_water = matches!(chunk.biome[idx], Biome::Ocean) || chunk.height[idx] < 0.5;
+                if !is_water {
+                    continue; // pas d'eau ici → l'action est sans effet
+                }
+                if let Ok(mut em) = state.world.get_entity_mut(entity) {
+                    if let Some(mut inv) = em.get_mut::<Inventory>() {
+                        inv.add(ItemKind::Water, HARVEST_WATER_PER_TICK);
+                    }
+                    if let Some(mut d) = em.get_mut::<Drives>() {
+                        d.thirst = d.thirst.add(-DRINK_RELIEF);
+                    }
+                }
+            }
+            ActionId::Forage => {
+                let npp = chunk.biome[idx].npp();
+                let available_wood = chunk.resources.wood[idx];
+                // Le "food" est calculé depuis la NPP du biome (régénère) +
+                // une fraction du stock wood courant (qui se déplète).
+                let available_food = (npp * 200.0 + available_wood * 0.5).max(0.0);
+
+                let food_take = HARVEST_FOOD_PER_TICK.min(available_food);
+                let wood_take = HARVEST_WOOD_PER_TICK.min(available_wood);
+
+                // Décrémente le chunk (clamp >= 0). La moitié du food vient du wood.
+                let wood_consumed_for_food = food_take * 0.5;
+                let total_wood_consumed = (wood_take + wood_consumed_for_food).min(available_wood);
+                chunk.resources.wood[idx] = (available_wood - total_wood_consumed).max(0.0);
+
+                if food_take <= 0.0 && wood_take <= 0.0 {
+                    continue; // cellule stérile, aucun effet
+                }
+                if let Ok(mut em) = state.world.get_entity_mut(entity) {
+                    if let Some(mut inv) = em.get_mut::<Inventory>() {
+                        inv.add(ItemKind::Food, food_take);
+                        inv.add(ItemKind::Wood, wood_take);
+                    }
+                    if let Some(mut d) = em.get_mut::<Drives>() {
+                        d.hunger = d.hunger.add(-FORAGE_HUNGER_PER_FOOD * food_take.max(0.1));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Catastrophe — choc déterministe sur les agents dans une zone à un tick donné.
+// ---------------------------------------------------------------------------
+
+fn run_catastrophe(state: &mut AppState) -> Vec<Event> {
+    let Some(plan) = state.catastrophe.clone() else { return Vec::new() };
+    if state.tick.get() != plan.tick {
+        return Vec::new();
+    }
+    let mut events = Vec::new();
+    let center = plan.center;
+    let r2 = plan.radius_m * plan.radius_m;
+    let mut q = state
+        .world
+        .query_filtered::<(Entity, &Identity, &Position), Without<Deceased>>();
+    let victims: Vec<(Entity, AgentId, glam::Vec3)> = q
+        .iter(&state.world)
+        .filter_map(|(e, id, p)| {
+            let dx = p.0.x - center.x;
+            let dy = p.0.y - center.y;
+            if dx * dx + dy * dy <= r2 {
+                Some((e, id.id, p.0))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for (entity, aid, pos) in &victims {
+        if let Ok(mut em) = state.world.get_entity_mut(*entity) {
+            if let Some(mut h) = em.get_mut::<Health>() {
+                h.vitality = (h.vitality - plan.severity).max(0.0);
+                h.injuries = (h.injuries + plan.severity).min(1.0);
+            }
+        }
+        events.push(Event {
+            event_id: Uuid::now_v7(),
+            sim_id: state.sim_id,
+            tick: state.tick,
+            kind: EventKind::Catastrophe,
+            participants: vec![*aid],
+            location: *pos,
+            metadata: json!({
+                "label": plan.label,
+                "severity": plan.severity,
+                "radius_m": plan.radius_m,
+            }),
+        });
+    }
+    if !victims.is_empty() {
+        info!(
+            tick = state.tick.get(),
+            count = victims.len(),
+            label = %plan.label,
+            "catastrophe applied"
+        );
+    }
+    events
+}
+
 /// Enregistre un épisode `Suffered` pour les agents en privation aiguë.
 ///
 /// Critère : au moins un drive ≥ 0.85 (le seuil critique de la policy R0).
@@ -683,6 +971,103 @@ mod tests {
         assert!(s1.births_total >= 2, "test sanity: at least one offspring per sim");
         assert_eq!(s1.agents_root_hash(), s2.agents_root_hash());
         assert_eq!(s1.births_total, s2.births_total);
+    }
+
+    /// Phase 3 : scénario "scarcity" — vérifie que `apply_scenario` configure
+    /// correctement l'état et que `spawn_initial` produit un cluster dense.
+    #[test]
+    fn scenario_scarcity_spawns_tight_cluster() {
+        use crate::state::{apply_scenario, SpawnStrategy};
+        let mut s = make_state(0x5CA12C17);
+        apply_scenario(&mut s, "scarcity");
+        assert_eq!(s.spawn_strategy, SpawnStrategy::TightCluster);
+        assert_eq!(s.founder_count, 10);
+        assert!(s.max_agents >= 14);
+        s.spawn_initial();
+        // 10 fondateurs avec rayon max 0.4 * sqrt(9) = 1.2 m → diamètre ≤ 2.4 m.
+        let mut q = s.world.query::<&Position>();
+        let positions: Vec<glam::Vec3> = q.iter(&s.world).map(|p| p.0).collect();
+        assert_eq!(positions.len(), 10);
+        for p in &positions {
+            let xy = (p.x * p.x + p.y * p.y).sqrt();
+            assert!(xy <= 1.5, "founder too far from origin (XY): {p:?}");
+        }
+    }
+
+    /// Phase 3 : scénario "two_cultures" — deux clusters distincts à ±50 m.
+    #[test]
+    fn scenario_two_cultures_spawns_two_clusters() {
+        use crate::state::{apply_scenario, SpawnStrategy};
+        let mut s = make_state(0xC2C0CABE);
+        apply_scenario(&mut s, "two_cultures");
+        assert_eq!(s.spawn_strategy, SpawnStrategy::TwoCultures);
+        assert_eq!(s.founder_count, 50);
+        s.spawn_initial();
+        let mut q = s.world.query::<&Position>();
+        let positions: Vec<glam::Vec3> = q.iter(&s.world).map(|p| p.0).collect();
+        // 25 à gauche (x < 0), 25 à droite (x > 0).
+        let left = positions.iter().filter(|p| p.x < 0.0).count();
+        let right = positions.iter().filter(|p| p.x > 0.0).count();
+        assert_eq!(left, 25);
+        assert_eq!(right, 25);
+    }
+
+    /// Phase 3 : scénario "catastrophe" — déclenche le choc au tick prévu et
+    /// affecte la vitalité des agents dans le rayon d'impact.
+    #[test]
+    fn scenario_catastrophe_triggers_damage() {
+        use crate::state::{apply_scenario, CatastrophePlan};
+        let mut s = make_state(0xCA7A5FE);
+        // Petit setup contrôlé : 4 agents, catastrophe immédiate.
+        s.founder_count = 4;
+        apply_scenario(&mut s, "default");
+        // Override : catastrophe explicite au tick=1 pour mesurer l'effet.
+        s.catastrophe = Some(CatastrophePlan {
+            label: "test_quake".to_string(),
+            tick: 1,
+            center: glam::Vec3::ZERO,
+            radius_m: 100.0,
+            severity: 0.5,
+        });
+        s.spawn_initial();
+        // Tick 1 : applique la catastrophe à tous les agents dans 100 m.
+        step_once(&mut s);
+        let mut q = s.world.query::<&Health>();
+        let mut hit = 0;
+        for h in q.iter(&s.world) {
+            if h.vitality < 1.0 && h.injuries > 0.0 {
+                hit += 1;
+            }
+        }
+        assert!(hit >= 1, "catastrophe should have damaged at least one agent, got {hit}");
+        // Le journal de buffer borné doit contenir au moins un événement Catastrophe.
+        let has_catastrophe = s
+            .recent_events
+            .iter()
+            .any(|e| matches!(e.kind, EventKind::Catastrophe));
+        assert!(has_catastrophe, "catastrophe event must be recorded");
+    }
+
+    /// Phase 3 : population cap — la reproduction est gelée au-dessus de
+    /// `max_agents`, mais les morts continuent à libérer la place.
+    #[test]
+    fn population_cap_blocks_reproduction() {
+        use ge_agents::MATURITY_TICKS;
+        let mut s = make_state(0xCA70BEEF);
+        s.founder_count = 4;
+        s.max_agents = 4; // pas de place pour des nouveaux-nés
+        s.spawn_initial();
+        // Force la proximité pour rendre la mating géométriquement valide.
+        let mut q = s.world.query_filtered::<&mut Position, Without<Deceased>>();
+        for mut p in q.iter_mut(&mut s.world) {
+            p.0 = glam::Vec3::new(0.0, 0.0, 1.0);
+        }
+        for _ in 0..(MATURITY_TICKS + 200) {
+            step_once(&mut s);
+        }
+        // Aucun enfant attendu — cap saturé.
+        assert_eq!(s.agents_alive, 4);
+        assert_eq!(s.births_total, 4); // uniquement les fondateurs
     }
 
     /// Phase 3 : stabilité 100 fondateurs sur 1 000 ticks.
