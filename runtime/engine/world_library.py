@@ -58,6 +58,8 @@ _PERSISTENT_MODULES: Tuple[Tuple[str, str, str], ...] = (
     ("engine.cognitive_plasticity",
                                  "save_plasticity_state",
                                  "load_plasticity_state"),
+    ("engine.wildfire",          "save_wildfire_state",
+                                 "load_wildfire_state"),
 )
 
 
