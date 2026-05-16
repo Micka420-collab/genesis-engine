@@ -573,7 +573,7 @@ fn run_thermal_comfort(state: &mut AppState) {
         let w = weather_at(tick, &base, north);
         // Cible biome — abri/forêt amortit ±3°C.
         let chunk_coord = Chunk::from_world_pos(pos.x, pos.y, pos.z);
-        let buffer = state
+        let buffer: f32 = state
             .streamer
             .cache
             .get(&chunk_coord)
@@ -589,13 +589,13 @@ fn run_thermal_comfort(state: &mut AppState) {
                         Biome::TemperateForest
                         | Biome::TemperateRainforest
                         | Biome::TropicalRainforest
-                        | Biome::BorealForest => 3.0,
-                        Biome::TropicalDryForest => 1.5,
-                        _ => 0.0,
+                        | Biome::BorealForest => 3.0_f32,
+                        Biome::TropicalDryForest => 1.5_f32,
+                        _ => 0.0_f32,
                     })
                 }
             })
-            .unwrap_or(0.0);
+            .unwrap_or(0.0_f32);
 
         let mut t_felt = w.temp_c;
         // L'abri rapproche t_felt de la zone de confort.
