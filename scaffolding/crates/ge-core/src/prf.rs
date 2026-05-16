@@ -15,8 +15,8 @@ pub type WorldSeed = u128;
 
 /// Construit un RNG déterministe à partir d'un contexte.
 ///
-/// Exemple :
-/// ```rust
+/// Exemple (illustratif — voir les tests pour de vrais appels) :
+/// ```ignore
 /// let rng = prf_rng(world_seed, &["world", "chunk", "stone_density"], &[chunk_x as u64, chunk_y as u64]);
 /// ```
 pub fn prf_rng(seed: WorldSeed, ctx: &[&str], indices: &[u64]) -> ChaCha20Rng {
