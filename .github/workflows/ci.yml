@@ -30,6 +30,9 @@ jobs:
       - name: Run Python tests
         run: make test-python
 
+      - name: P0 smoke (operational runtime sanity)
+        run: PYTHONPATH=runtime python runtime/scripts/p0_smoke.py
+
   rust:
     runs-on: ubuntu-latest
     steps:
@@ -37,8 +40,30 @@ jobs:
 
       - name: Set up Rust 1.85
         uses: dtolnay/rust-toolchain@1.85.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            scaffolding/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('scaffolding/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cargo fmt check (non-blocking)
+        working-directory: scaffolding
+        continue-on-error: true
+        run: cargo fmt --all -- --check
 
       - name: Cargo check
         working-directory: scaffolding
         run: cargo check --workspace
+
+      - name: Cargo test (deterministic scenarios + Phase 3 hardening)
+        working-directory: scaffolding
+        run: cargo test --workspace --all-features
 
