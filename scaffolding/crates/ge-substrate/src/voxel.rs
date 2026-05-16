@@ -158,8 +158,12 @@ mod tests {
 
     #[test]
     fn water_voxel_layout_is_stable() {
-        // 7 × f32 = 28, padded à 32 pour align 16.
-        assert_eq!(size_of::<WaterVoxel>(), 32);
+        // volume + velocity[3] + sediment + temperature + salinity + turbidity
+        // + _pad = 9 × f32 = 36 bytes, padded à 48 pour align(16).
+        // (Earlier revisions had 7 f32 = 28 → 32 ; the struct grew to track
+        // marine fields. Update this assertion whenever the layout changes,
+        // it's a deliberate GPU-upload-stability guard.)
+        assert_eq!(size_of::<WaterVoxel>(), 48);
         assert_eq!(align_of::<WaterVoxel>(), 16);
     }
 
