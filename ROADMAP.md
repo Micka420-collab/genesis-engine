@@ -1,6 +1,6 @@
 # Genesis Engine — Roadmap Viable
 
-**Derniere mise a jour :** 2026-05-16
+**Derniere mise a jour :** 2026-05-17
 
 Ce fichier est la roadmap stable du projet. La file de sprint vivante reste
 dans [`NEXT-SPRINT.md`](NEXT-SPRINT.md). Ici, l'objectif est simple :
@@ -90,3 +90,21 @@ date avec manifest, journals et summary unique.
 
 **Critere de sortie :** aucun claim public majeur sans smoke test, artefact ou
 doc de verification associe.
+
+---
+
+## P5 — Backlog veille techno (combos differes)
+
+Combos identifies lors des veilles matinales mais trop couteux pour
+etre integres dans la session courante. Garde-fou : un combo qui
+n'avance pas a 60 jours doit etre soit promu (planning concret),
+soit explicitement rejete (justification 1 ligne).
+
+| Combo | Couche Genesis | Source veille | Gain estime | Cout |
+|---|---|---|---|---|
+| **Tri-Spirit Architecture** (planning / reasoning / reflex) | Agentic | arxiv 2604.13757 | structure cognitive 3-tiers, decoupage explicite de la cognition | refonte partielle `engine.cognition` (~6h) |
+| **Bevy 0.16 ECS Relationships + GPU-Driven Rendering** | World (port Rust) | bevy.org/news/bevy-0-16 | archetype fragmentation reduite, big-scenes plus rapides | conditionne a P1 (scaffolding Rust vert) |
+| **X-Wing KEM hybride X25519 x ML-KEM-768** | Platform | draft-ietf-mls-pq-ciphersuites + Cloudflare PQC TLS | un seul KEM standardise pour TLS / gRPC future-proof | conditionne a la sortie d'un endpoint reseau Genesis (~4h une fois necessaire) |
+| **Neo4j Native Vector Type** | Observatory | neo4j.com/blog (mai 2026) | vecteurs natifs sans helpers, contraintes de shape/dtype | conditionne au deploiement Neo4j (Observatory Phase 5+) |
+| **AgentSociety / Synthetic Social Graph** | Social | arxiv 2502.08691 + 2604.27271 | metriques d'emergence (cohesion + divergence) | **INTEGRE Wave 13 (2026-05-17)** -- `engine.social_resonance` |
+

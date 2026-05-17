@@ -1,5 +1,59 @@
 # Genesis Engine — Next Sprint Queue
-**Dernière mise à jour :** 16 mai 2026 (session 32 — Wave 12 cognitive plasticity).
+**Dernière mise à jour :** 17 mai 2026 (session 33 — Wave 15 social resonance, observatory).
+
+---
+
+## ✅ Livré session 33 (2026-05-17) — Wave 15 social resonance (observatory)
+
+**Veille du jour combo :** arxiv *The Synthetic Social Graph — Emergent
+Behavior in AI Agent Communities* (2604.27271, 184k posts / 465k
+commentaires d'agents LLM, mesure de normes émergentes par cohérence
+intra-groupe × divergence inter-groupes) × buffer `learned_skill`
+exposé par Wave 12 (`engine.cognitive_plasticity`).
+
+**Règle invariante respectée :** module strictement *read-only* —
+aucune mutation de `sim`, `agents`, `plasticity`. Smoke step 9 prouve
+par snapshot/diff que `intelligence`, `curiosity` et `learned_skill`
+restent bit-identiques après tous les appels publics.
+
+**Livré :**
+
+- `engine/social_resonance.py` (~270 LOC) — observateur pur :
+  * `compute_social_resonance(sim)` → par culture :
+    `n_alive`, `learned_mean`, `learned_std`,
+    `cohesion ∈ [0,1]` (1 = uniforme, 0 = dispersé),
+    `n_learners`, `learner_ratio`.
+  * `compute_inter_culture_divergence(sim)` → Jensen-Shannon
+    normalisée [0,1] sur 12 bins entre histogrammes des
+    `learned_skill` par culture (clé `"a__b"` triée).
+  * `compute_civilization_emergence_score(sim)` → score composite
+    (moyenne harmonique stricte de `avg_cohesion`,
+    `avg_divergence`, `learner_share` ; tout 0 collapse à 0).
+  * `log_social_resonance(sim, path)` → JSONL append.
+- `scripts/p43_social_resonance_smoke.py` (~270 LOC) — **9/9 PASS** :
+  * no-plasticity safe defaults (score = 0)
+  * cohésion NaN sous floor statistique (< 3 alive)
+  * cohésion = 1.0 sur distributions identiques
+  * cohésion bimodale < homogène (0.333 vs 1.000)
+  * JS = 0 sur cultures cognitivement identiques
+  * JS > 0.5 sur cultures aux extrêmes opposés (0.05 vs 1.40)
+  * score composite ∈ [0,1], collapse à 0 sans learner
+  * déterminisme : deux appels → SHA-256 JSON identique
+  * read-only : `intelligence`, `curiosity`, `learned_skill` intacts
+
+**Non-régression :** p41 cognitive_plasticity 9/9 PASS, interop
+elite_metrics base + effective + social_resonance OK sur 24 founders
+× 2 cultures.
+
+**Veille en backlog ROADMAP :**
+
+- Tri-Spirit Architecture (arxiv 2604.13757) — 3 couches cognitives
+  planning/reasoning/reflex → upgrade futur de `engine.cognition`.
+- Bevy 0.16 ECS Relationships + GPU-Driven Rendering → quand le
+  port Rust `scaffolding/crates` atteint P1.
+- X-Wing KEM hybride X25519 × ML-KEM-768 (RFC en cours) → à
+  câbler dès qu'un endpoint réseau Genesis sort du local-only.
+- Neo4j Native Vector Type → backlog Observatory long-terme.
 
 ---
 
