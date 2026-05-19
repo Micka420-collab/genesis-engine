@@ -15,6 +15,10 @@ from engine.material_synthesis import SynthesisConditions, MaterialRegistry
 from engine.architecture_layer import agent_place_voxel, install_architecture_layer
 from engine.social_topology import EdgeKind, add_edge, create_topology, install_social_topology
 from engine.knowledge_layers import install_knowledge_layers, knowledge_layers_snapshot
+from engine.statics_load import compute_stability_score, distribute_vertical_loads
+from engine.statics import Structure, VoxelBlock
+from engine.social_topology import gravity_trade_probability
+from engine.materials_project import find_nearest_record
 
 
 class KnowledgeLayerTests(unittest.TestCase):
@@ -72,6 +76,44 @@ class KnowledgeLayerTests(unittest.TestCase):
         self.assertIn("physics", snap)
         self.assertIn("chemistry", snap)
         self.assertIn("social", snap)
+
+    def test_load_spreading_tower_score(self):
+        blocks = [
+            VoxelBlock.from_material((0, 0, z), "stone", 0.25)
+            for z in range(4)
+        ]
+        struct = Structure(0, blocks, voxel_size_m=0.25)
+        loads = distribute_vertical_loads(struct)
+        self.assertGreater(loads[(0, 0, 0)], loads[(0, 0, 3)])
+        score = compute_stability_score(struct)
+        self.assertGreater(score, 0.3)
+
+    def test_gravity_trade_probability(self):
+        p_near = gravity_trade_probability(10.0, 10.0, 5.0)
+        p_far = gravity_trade_probability(10.0, 10.0, 50.0)
+        self.assertGreater(p_near, p_far)
+
+    def test_mp_nearest_bronze(self):
+        st = MaterialsProjectState()
+        ingest_records(load_bundle(), st)
+        rec = find_nearest_record({"Cu": 0.7, "Sn": 0.3}, st)
+        self.assertIsNotNone(rec)
+        self.assertIn("Cu", rec.elements)
+
+    def test_knowledge_wiring_build(self):
+        sim = Simulation(SimConfig(founders=2, max_agents=5, knowledge_layers=True))
+        sim.bootstrap()
+        sim.agents.inv_stone[0] = 2.0
+        from engine.cognition import decide, perceive, apply_decision
+        from engine.agent import ActionKind
+        from engine.agent import DriveKind
+        obs = perceive(sim.agents, 0, sim.streamer, tick=sim.tick)
+        obs.drives[int(DriveKind.THERMAL)] = 0.6
+        d = decide(sim.agents, obs, sim)
+        self.assertEqual(int(d.action), int(ActionKind.BUILD))
+        ev = apply_decision(sim.agents, 0, d, sim.streamer, sim.tick)
+        kinds = [e.get("kind") for e in ev]
+        self.assertIn("voxel_placed", kinds)
 
 
 if __name__ == "__main__":

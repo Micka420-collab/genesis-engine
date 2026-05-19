@@ -35,6 +35,8 @@ def install_knowledge_layers(
     if social:
         installed["social"] = install_social_topology(sim)
     sim._knowledge_layers_installed = True
+    from engine.knowledge_wiring import wire_knowledge_cognition
+    wire_knowledge_cognition(sim)
     return installed
 
 

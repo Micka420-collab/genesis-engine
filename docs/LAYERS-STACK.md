@@ -9,7 +9,8 @@ Stack optionnelle branchée via `install_knowledge_layers(sim)` ou
 |--------|------|
 | `engine/physics.py` | CODATA, mécanique, thermodynamique (conduction, radiation, Gibbs, Arrhenius) |
 | `engine/statics.py` | Stabilité voxel : support, compression, porte-à-faux, basculement |
-| `engine/physics_layer.py` | Tick : charge pesanteur agents, conductivité chunks, `check_voxel_structure_stable` |
+| `engine/physics_layer.py` | Tick : charge pesanteur, thermo chunks (lapse + météo), `check_voxel_structure_stable` |
+| `engine/statics_load.py` | Répartition des charges (style Gustave), score de stabilité [0,1] |
 
 **Gravité :** `G_EARTH = 9.81 m/s²`, poids agent = `mass_kg` + inventaire.
 
@@ -23,7 +24,7 @@ Stack optionnelle branchée via `install_knowledge_layers(sim)` ou
 |--------|------|
 | `engine/chemistry.py` | Tableau périodique, énergies de liaison, alliages |
 | `engine/material_synthesis.py` | `synthesize()`, validité physique |
-| `engine/materials_project.py` | Ingestion JSON (`runtime/data/materials_project_bundle.json`) → `STRENGTH_TABLE` |
+| `engine/materials_project.py` | Bundle JSON + `fetch_from_mp_api` (mp-api) → `STRENGTH_TABLE`, match composition |
 
 **Pipeline :** composition → `check_physical_validity` → `synthesize` → `MaterialRegistry`.
 
@@ -42,7 +43,8 @@ Pas de recettes HEARTH/HUT imposées : empreinte + toit + stabilité → nom cul
 
 | Module | Rôle |
 |--------|------|
-| `engine/social_topology.py` | Graphe d'arêtes typées (`KIN`, `ALLIANCE`, `TRADE`, `FEUD`, …) |
+| `engine/social_topology.py` | Graphe typé + commerce gravitaire (XTENT) + alliances émergentes |
+| `engine/knowledge_wiring.py` | `BUILD` → voxel, `SMELT` → pipeline bronze |
 | `NamedTopology` | Sous-graphes nommés (clan, guilde, marché) sans template |
 
 Au-delà de `group_id` dans `sim.py` : relations explicites multi-types, diffusion d'affinité le long des arêtes.
@@ -74,8 +76,13 @@ python run.py custom --knowledge-layers --founders 8 --ticks 300
 PYTHONPATH=runtime python -m pytest runtime/tests/test_knowledge_layers.py -q
 ```
 
+## Réalisme (sources)
+
+- **Statique** : règles Poutre/voûte + répartition multi-appuis (inspiré [Gustave](https://github.com/vsaulue/Gustave), [StableLego](https://arxiv.org/abs/2402.10711))
+- **Chimie** : [Materials Project API](https://docs.materialsproject.org/) (`formation_energy_per_atom`, densité)
+- **Social** : modèle gravitaire commerce (JASSS inter-settlement trade)
+
 ## Ponts futurs
 
 - `ge-substrate` (Rust) ↔ Python physics tick
-- MP REST ingestion batch
-- Cognition `BUILD` → `agent_place_voxel` automatique
+- FEA léger pour structures > 500 blocs

@@ -17,7 +17,7 @@ import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from engine.material_synthesis import MaterialRegistry, SynthesisConditions, synthesize
 
@@ -42,6 +42,7 @@ class MaterialsProjectState:
     strength_overrides: Dict[str, Dict[str, float]] = field(default_factory=dict)
     syntheses_attempted: int = 0
     syntheses_ok: int = 0
+    api_fetches: int = 0
 
 
 def _normalize_composition(elements: Dict[str, float]) -> Dict[str, float]:
@@ -114,21 +115,106 @@ def _merge_into_statics(overrides: Dict[str, Dict[str, float]]) -> None:
         pass
 
 
+def _composition_distance(a: Dict[str, float], b: Dict[str, float]) -> float:
+    keys = set(a) | set(b)
+    return sum(abs(float(a.get(k, 0.0)) - float(b.get(k, 0.0))) for k in keys)
+
+
+def find_nearest_record(
+    composition: Dict[str, float],
+    st: MaterialsProjectState,
+) -> Optional[MPRecord]:
+    """Match composition to closest MP record (L1 on mole fractions)."""
+    comp = _normalize_composition(composition)
+    best: Optional[MPRecord] = None
+    best_d = 1e9
+    for rec in st.records.values():
+        d = _composition_distance(comp, rec.elements)
+        if d < best_d:
+            best_d, best = d, rec
+    return best if best_d < 0.55 else None
+
+
+def formation_energy_favors_synthesis(rec: MPRecord) -> bool:
+    """Negative formation energy per atom → thermodynamically favored."""
+    if rec.formation_energy_per_atom is None:
+        return True
+    return float(rec.formation_energy_per_atom) < 0.0
+
+
+def fetch_from_mp_api(
+    material_ids: List[str],
+    st: MaterialsProjectState,
+    *,
+    api_key: Optional[str] = None,
+) -> int:
+    """Optional live fetch via ``mp-api`` (Materials Project REST).
+
+    Requires ``pip install mp-api`` and ``MP_API_KEY`` env var.
+    Returns count of records ingested; 0 if unavailable.
+    """
+    key = api_key or os.environ.get("MP_API_KEY", "")
+    if not key:
+        return 0
+    try:
+        from mp_api.client import MPRester
+    except ImportError:
+        return 0
+    records: List[MPRecord] = []
+    try:
+        with MPRester(key) as mpr:
+            docs = mpr.materials.summary.search(
+                material_ids=material_ids,
+                fields=["material_id", "formula_pretty", "density",
+                        "band_gap", "formation_energy_per_atom", "elements"],
+            )
+            for doc in docs:
+                elements = {}
+                if getattr(doc, "elements", None):
+                    n = len(doc.elements)
+                    if n > 0:
+                        share = 1.0 / n
+                        elements = {str(el): share for el in doc.elements}
+                records.append(MPRecord(
+                    mp_id=str(doc.material_id),
+                    formula=str(getattr(doc, "formula_pretty", "") or ""),
+                    density_g_cm3=float(getattr(doc, "density", 2.0) or 2.0),
+                    elements=elements or {"X": 1.0},
+                    band_gap=getattr(doc, "band_gap", None),
+                    formation_energy_per_atom=getattr(
+                        doc, "formation_energy_per_atom", None),
+                ))
+    except Exception:
+        return 0
+    n = ingest_records(records, st)
+    st.api_fetches += n
+    return n
+
+
 def run_synthesis_pipeline(
     composition: Dict[str, float],
     conditions: SynthesisConditions,
     st: MaterialsProjectState,
     registry: Optional[MaterialRegistry] = None,
+    *,
+    tools_available: Tuple[str, ...] = ("fire",),
+    require_mp_match: bool = False,
 ) -> Optional[Any]:
-    """composition → physical validity → synthesize → registry."""
+    """composition → MP match → physical validity → synthesize → registry."""
     from engine.material_synthesis import check_physical_validity
 
     st.syntheses_attempted += 1
     comp = _normalize_composition(composition)
-    ok, reason = check_physical_validity(comp, conditions, tools_available=("fire",))
+    match = find_nearest_record(comp, st)
+    if require_mp_match and match is None:
+        return None
+    if match is not None and not formation_energy_favors_synthesis(match):
+        return None
+    ok, _reason = check_physical_validity(
+        comp, conditions, tools_available=tools_available)
     if not ok:
         return None
-    mat = synthesize(comp, conditions, tools_available=("fire",))
+    mat = synthesize(comp, conditions, tools_available=tools_available)
     if mat is None:
         return None
     st.syntheses_ok += 1
@@ -160,6 +246,7 @@ def materials_project_snapshot(sim) -> Dict[str, object]:
         "syntheses_attempted": st.syntheses_attempted,
         "syntheses_ok": st.syntheses_ok,
         "sample_ids": list(st.records.keys())[:8],
+        "api_fetches": st.api_fetches,
     }
 
 
@@ -168,6 +255,9 @@ __all__ = [
     "MaterialsProjectState",
     "load_bundle",
     "ingest_records",
+    "find_nearest_record",
+    "formation_energy_favors_synthesis",
+    "fetch_from_mp_api",
     "run_synthesis_pipeline",
     "install_materials_project",
     "materials_project_snapshot",

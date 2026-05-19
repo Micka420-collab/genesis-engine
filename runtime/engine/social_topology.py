@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Dict, List, Optional, Set, Tuple
 
+import math
+
 import numpy as np
 
 from engine.core import prf_rng
@@ -58,7 +60,16 @@ class NamedTopology:
 class SocialTopologyState:
     edges: Dict[Tuple[int, int], SocialEdge] = field(default_factory=dict)
     topologies: Dict[int, NamedTopology] = field(default_factory=dict)
+    trade_volume: float = 0.0
+    alliances_formed: int = 0
     _next_topology_id: int = 1
+
+
+# Gravity / XTENT-style trade probability: P ~ (M_i * M_j) / d^beta
+TRADE_GRAVITY_BETA = 2.0
+TRADE_MIN_DISTANCE_M = 1.0
+ALLIANCE_AFFINITY_THRESHOLD = 0.55
+ALLIANCE_TICKS_REQUIRED = 40
 
 
 def install_social_topology(sim) -> SocialTopologyState:
@@ -137,10 +148,85 @@ def neighbors(st: SocialTopologyState, row: int,
     return out
 
 
+def gravity_trade_probability(
+    mass_a: float,
+    mass_b: float,
+    distance_m: float,
+    *,
+    beta: float = TRADE_GRAVITY_BETA,
+) -> float:
+    """Inter-settlement trade link probability (JASSS gravity / XTENT family)."""
+    d = max(TRADE_MIN_DISTANCE_M, float(distance_m))
+    m = max(0.1, float(mass_a)) * max(0.1, float(mass_b))
+    return min(1.0, m / (d ** beta))
+
+
+def _agent_trade_mass(agents, row: int) -> float:
+    total = float(agents.mass_kg[row])
+    for fld in ("inv_food", "inv_water", "inv_wood", "inv_stone", "inv_metal",
+                "inv_copper", "inv_tin", "inv_bronze"):
+        arr = getattr(agents, fld, None)
+        if arr is not None:
+            total += float(arr[row])
+    return total
+
+
+def propose_trade_edge(sim, st: SocialTopologyState, a: int, b: int) -> bool:
+    """Create TRADE edge when gravity model + complementary surplus."""
+    if a == b or not sim.agents.alive[a] or not sim.agents.alive[b]:
+        return False
+    px, py = float(sim.agents.pos[a, 0]), float(sim.agents.pos[a, 1])
+    ox, oy = float(sim.agents.pos[b, 0]), float(sim.agents.pos[b, 1])
+    dist = math.hypot(ox - px, oy - py)
+    p = gravity_trade_probability(
+        _agent_trade_mass(sim.agents, a),
+        _agent_trade_mass(sim.agents, b),
+        dist,
+    )
+    # Complementarity: one has food surplus, other has stone/metal.
+    food_a = float(sim.agents.inv_food[a])
+    food_b = float(sim.agents.inv_food[b])
+    craft_a = float(sim.agents.inv_stone[a]) + float(sim.agents.inv_metal[a])
+    craft_b = float(sim.agents.inv_stone[b]) + float(sim.agents.inv_metal[b])
+    complementary = (food_a > 0.2 and craft_b > 0.1) or (food_b > 0.2 and craft_a > 0.1)
+    if not complementary or p < 0.02:
+        return False
+    add_edge(st, a, b, EdgeKind.TRADE, weight=p)
+    st.trade_volume += p
+    return True
+
+
 def tick_social_topology(sim, st: SocialTopologyState) -> List[dict]:
-    """Diffuse affinity along edges; emit topology events."""
+    """Diffuse affinity along edges; gravity trade; alliance formation."""
     events: List[dict] = []
     n = sim.agents.n_active
+
+    # Emergent trade links among co-located agents (sparse scan).
+    if sim.tick % 5 == 0:
+        for row in range(n):
+            if not sim.agents.alive[row]:
+                continue
+            px, py = float(sim.agents.pos[row, 0]), float(sim.agents.pos[row, 1])
+            for other in range(n):
+                if other == row or not sim.agents.alive[other]:
+                    continue
+                d = math.hypot(
+                    float(sim.agents.pos[other, 0]) - px,
+                    float(sim.agents.pos[other, 1]) - py,
+                )
+                if d > 25.0:
+                    continue
+                key = (min(row, other), max(row, other))
+                if key in st.edges:
+                    continue
+                if propose_trade_edge(sim, st, row, other):
+                    events.append({
+                        "kind": "trade_link_formed",
+                        "a": row,
+                        "b": other,
+                        "distance_m": round(d, 2),
+                    })
+
     for (a, b), e in list(st.edges.items()):
         if a >= n or b >= n:
             continue
@@ -151,6 +237,29 @@ def tick_social_topology(sim, st: SocialTopologyState) -> List[dict]:
             delta = -abs(delta)
         sim.agents.relations[a].update_affinity(b, delta)
         sim.agents.relations[b].update_affinity(a, delta)
+
+    # Alliance crystallization after sustained positive affinity.
+    if sim.tick % 20 == 0:
+        for row in range(n):
+            if not sim.agents.alive[row]:
+                continue
+            for other, aff in sim.agents.relations[row].affinity.items():
+                if other >= n or not sim.agents.alive[other]:
+                    continue
+                if aff < ALLIANCE_AFFINITY_THRESHOLD:
+                    continue
+                key = (min(row, other), max(row, other))
+                if key in st.edges and st.edges[key].kind == EdgeKind.ALLIANCE:
+                    continue
+                if aff >= ALLIANCE_AFFINITY_THRESHOLD:
+                    add_edge(st, row, other, EdgeKind.ALLIANCE, weight=aff)
+                    st.alliances_formed += 1
+                    events.append({
+                        "kind": "alliance_formed",
+                        "a": row,
+                        "b": other,
+                        "weight": round(aff, 3),
+                    })
 
     for topo in st.topologies.values():
         if len(topo.members) < 2:
@@ -178,6 +287,8 @@ def social_topology_snapshot(sim) -> Dict[str, object]:
         "topologies": len(st.topologies),
         "edges_by_kind": kinds,
         "topology_names": [t.name for t in st.topologies.values()],
+        "trade_volume": round(st.trade_volume, 4),
+        "alliances_formed": st.alliances_formed,
     }
 
 
@@ -190,5 +301,7 @@ __all__ = [
     "add_edge",
     "create_topology",
     "neighbors",
+    "gravity_trade_probability",
+    "propose_trade_edge",
     "social_topology_snapshot",
 ]

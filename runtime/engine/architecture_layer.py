@@ -60,6 +60,13 @@ def agent_place_voxel(
     place_block(sim, row, (ix, iy, iz), material)
     pending.append((ix, iy, iz, material))
     arch.blocks_placed += 1
+    phy = getattr(sim, "_physics_layer", None)
+    if phy is not None:
+        from engine.physics_layer import structure_stability_score
+        phy.last_stability_score = structure_stability_score(trial)
+        phy.structures_checked += 1
+        if phy.last_stability_score > 0.15:
+            phy.structures_stable += 1
     return True, "placed"
 
 
