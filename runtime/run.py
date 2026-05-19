@@ -88,6 +88,8 @@ def _resolve_config(args) -> Tuple[SimConfig, int]:
         base.setdefault("max_emergent_founders", 2)
     if getattr(args, "full_biosphere", False):
         base["full_biosphere"] = True
+    if getattr(args, "knowledge_layers", False):
+        base["knowledge_layers"] = True
     if not base:
         raise SystemExit(
             f"Unknown experiment '{name}'. Either pick a preset "
@@ -183,6 +185,8 @@ def main() -> int:
                         "sapients (max 2 by default). No scripted founders.")
     p.add_argument("--full-biosphere", action="store_true",
                    help="Install photosynthesis + ancient plant/animal evolution.")
+    p.add_argument("--knowledge-layers", action="store_true",
+                   help="Physics + Materials Project + voxel architecture + social topology.")
     p.add_argument("--journal", default=None,
                    help="Override journal path (default: journals/<exp>.jsonl).")
     p.add_argument("--quiet", action="store_true",

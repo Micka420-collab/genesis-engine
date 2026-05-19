@@ -60,6 +60,8 @@ class SimConfig:
     koeppen_refresh_every: int = 200
     observable_every: int = 25
     hydrology_cross_chunk: bool = True
+    # Physics + chemistry + architecture + social topology layers.
+    knowledge_layers: bool = False
 
 
 @dataclass
@@ -106,6 +108,9 @@ class Simulation:
         if config.life_emergence:
             from engine.life_emergence import wire_life_emergence
             wire_life_emergence(self)
+        if config.knowledge_layers:
+            from engine.knowledge_layers import install_knowledge_layers
+            install_knowledge_layers(self)
 
     def bootstrap(self) -> None:
         if self._bootstrapped:
@@ -573,6 +578,12 @@ class Simulation:
             try:
                 from engine.life_emergence import life_emergence_snapshot
                 out["life_emergence"] = life_emergence_snapshot(self)
+            except Exception:
+                pass
+        if self.cfg.knowledge_layers:
+            try:
+                from engine.knowledge_layers import knowledge_layers_snapshot
+                out["knowledge_layers"] = knowledge_layers_snapshot(self)
             except Exception:
                 pass
         return out

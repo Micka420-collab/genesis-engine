@@ -1,0 +1,41 @@
+[
+  {
+    "mp_id": "mp-149",
+    "formula": "SiO2",
+    "density_g_cm3": 2.65,
+    "band_gap": 8.9,
+    "formation_energy_per_atom": -3.25,
+    "elements": {"Si": 0.333, "O": 0.667},
+    "spacegroup": "P3221"
+  },
+  {
+    "mp_id": "mp-13",
+    "formula": "Fe",
+    "density_g_cm3": 7.87,
+    "elements": {"Fe": 1.0}
+  },
+  {
+    "mp_id": "mp-30",
+    "formula": "Cu",
+    "density_g_cm3": 8.96,
+    "elements": {"Cu": 1.0}
+  },
+  {
+    "mp_id": "mp-118",
+    "formula": "Sn",
+    "density_g_cm3": 7.31,
+    "elements": {"Sn": 1.0}
+  },
+  {
+    "mp_id": "mp-bronze-proxy",
+    "formula": "Cu10Sn",
+    "density_g_cm3": 8.8,
+    "elements": {"Cu": 0.91, "Sn": 0.09}
+  },
+  {
+    "mp_id": "mp-2534",
+    "formula": "CaCO3",
+    "density_g_cm3": 2.71,
+    "elements": {"Ca": 0.2, "C": 0.2, "O": 0.6}
+  }
+]
