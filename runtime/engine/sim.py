@@ -48,6 +48,18 @@ class SimConfig:
     # Set True only in legacy regression tests that depend on
     # pre-Wave-12 scripted seeding (P-NEW.7 hearth, etc.).
     scripted_hearth_seed: bool = False
+    # Civilization emergence integrated in sim.step() (not external pipelines).
+    emergence_subsystems: bool = True
+    # Emergent life: appraise world → substrate → origins (no scripted founder cluster).
+    life_emergence: bool = True
+    full_biosphere: bool = False
+    emergent_origins: bool = False
+    max_emergent_founders: int = 2
+    substrate_threshold: float = 0.85
+    epidemic_observer: bool = True
+    koeppen_refresh_every: int = 200
+    observable_every: int = 25
+    hydrology_cross_chunk: bool = True
 
 
 @dataclass
@@ -80,11 +92,39 @@ class Simulation:
         # Phase 4: rate-limit competition penalties per (a,b) pair.
         self._last_competition_tick: Dict[Tuple[int, int], int] = {}
         self._competition_cooldown_ticks = 20
+        if config.emergence_subsystems:
+            from engine.sim_emergence import wire_civilization_emergence
+            epidemic_every = 5 if config.catastrophe_at_tick > 0 else 20
+            wire_civilization_emergence(
+                self,
+                koeppen_refresh_every=config.koeppen_refresh_every,
+                observable_every=config.observable_every,
+                hydrology_cross_chunk=config.hydrology_cross_chunk,
+                epidemic_snapshot_every=epidemic_every,
+                install_epidemic=config.epidemic_observer,
+            )
+        if config.life_emergence:
+            from engine.life_emergence import wire_life_emergence
+            wire_life_emergence(self)
 
     def bootstrap(self) -> None:
         if self._bootstrapped:
             return
         cfg = self.cfg
+        if cfg.emergent_origins:
+            # Life appears from substrate — no scripted founder cluster.
+            rng = prf_rng(cfg.seed, ["emergent", "bootstrap", "stream"], [0])
+            bx_m = cfg.bounds_km[0] * 1000.0 * 0.5
+            by_m = cfg.bounds_km[1] * 1000.0 * 0.5
+            for _ in range(12):
+                x = float(rng.uniform(-bx_m, bx_m))
+                y = float(rng.uniform(-by_m, by_m))
+                self.streamer.get(self.tick, world_to_chunk(x, y))
+            self._stream_around_agents()
+            self.annalist.record_tick(self.tick, self.agents, births=[], deaths=[],
+                                      raw_events=[], foundings=[])
+            self._bootstrapped = True
+            return
         rng = prf_rng(cfg.seed, ["bootstrap"], [cfg.founders])
         per_culture = max(1, cfg.founders // cfg.cultures)
         founder_idx = 0
@@ -98,8 +138,9 @@ class Simulation:
                 self.agents.spawn_founder(cfg.seed, founder_idx, pos, self.tick, culture_id=cult)
                 founder_idx += 1
         self._stream_around_agents()
-        births = [(r, None, None) for r in range(self.agents.n_active)]
-        self.annalist.record_tick(self.tick, self.agents, births=births, deaths=[], raw_events=[])
+        foundings = [(r,) for r in range(self.agents.n_active)]
+        self.annalist.record_tick(self.tick, self.agents, births=[], deaths=[],
+                                  raw_events=[], foundings=foundings)
         self._bootstrapped = True
 
     def _pick_land_position(self, rng, bounds_km, max_tries: int) -> Tuple[float, float]:
@@ -136,9 +177,15 @@ class Simulation:
             avg_precip = float(np.mean(chunk.food_capacity) * 3.0)
             w = weather_at(self.tick * int(self.cfg.drive_accel), base_t, avg_precip)
             regenerate_chunk_resources(chunk, w, dt_s=float(self.cfg.drive_accel))
+        if self.cfg.emergence_subsystems:
+            from engine.sim_emergence import tick_emergence_world
+            tick_emergence_world(self)
         self._tick_drives()
 
         raw_events: List[dict] = []
+        if self.cfg.life_emergence:
+            from engine.life_emergence import tick_life_emergence
+            raw_events.extend(tick_life_emergence(self))
         mate_intents: List[Tuple[int, int]] = []
         n = self.agents.n_active
         self._grid.rebuild(self.agents.pos[:n, :2], self.agents.alive[:n])
@@ -146,7 +193,7 @@ class Simulation:
         for row in alive_idx:
             row = int(row)
             obs = perceive(self.agents, row, self.streamer, grid=self._grid, tick=self.tick)
-            d = decide(self.agents, obs)
+            d = decide(self.agents, obs, sim=self)
             self.agents.action[row] = d.action
             self.agents.target_x[row] = d.target_x
             self.agents.target_y[row] = d.target_y
@@ -505,7 +552,7 @@ class Simulation:
         return out
 
     def snapshot(self):
-        return {
+        out = {
             "sim_id": self.sim_id, "tick": self.tick,
             "alive": int(self.stats.alive),
             "cum_births": int(self.stats.cum_births),
@@ -516,3 +563,16 @@ class Simulation:
             "wall_clock_s": self.annalist.wall_clock_s(),
             "groups_active": len(self._groups),
         }
+        if self.cfg.emergence_subsystems:
+            try:
+                from engine.sim_emergence import emergence_snapshot
+                out["emergence"] = emergence_snapshot(self)
+            except Exception:
+                pass
+        if self.cfg.life_emergence:
+            try:
+                from engine.life_emergence import life_emergence_snapshot
+                out["life_emergence"] = life_emergence_snapshot(self)
+            except Exception:
+                pass
+        return out

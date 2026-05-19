@@ -87,8 +87,10 @@ class ChunkFauna:
 @dataclass
 class AnimalEvolutionState:
     """Live state attached to ``sim._animal_state``."""
+    mode: str = "modern"
     chunk_fauna: Dict[Tuple[int, int, int], ChunkFauna] = field(
         default_factory=dict)
+    available_species: Set[str] = field(default_factory=set)
     extinct_species: Set[str] = field(default_factory=set)
     last_global_population: Dict[str, int] = field(default_factory=dict)
     last_per_kingdom: Dict[int, int] = field(default_factory=dict)
@@ -336,6 +338,40 @@ def tick_animal_evolution(sim, state: AnimalEvolutionState) -> None:
     state.last_predation_total = preds
     state.ticks_run += 1
 
+    # Ancient mode: species emerge when parent clade is present + O2 allows.
+    if state.mode == "ancient":
+        rng_em = prf_rng(sim.cfg.seed, ["animal_evol", "emerge"],
+                         [int(sim.tick)])
+        for sp in SPECIES:
+            if sp.name in state.available_species:
+                continue
+            if sp.name in state.extinct_species:
+                continue
+            parent_ok = (not sp.parent_clade
+                         or sp.parent_clade in state.available_species)
+            if not parent_ok:
+                continue
+            if oxygen < sp.min_oxygen_pct:
+                continue
+            parent_pop = global_pop.get(sp.parent_clade, 0) if sp.parent_clade else 1
+            if sp.parent_clade and parent_pop < PRESENT_THRESHOLD:
+                continue
+            if rng_em.random() < 1.0 / (20.0 * 86400.0) * accel * TICK_DT_S:
+                state.available_species.add(sp.name)
+                for coord, chunk in list(sim.streamer.cache.items()):
+                    biome = _dominant_biome(chunk)
+                    water_max = float(chunk.water.max())
+                    if biome not in sp.biome_affinity:
+                        continue
+                    if sp.aquatic and water_max < 50.0:
+                        continue
+                    fauna = state.chunk_fauna.setdefault(coord, ChunkFauna())
+                    if sp.name in fauna.populations:
+                        continue
+                    n0 = max(1, int(sp.carrying_capacity_per_chunk
+                                    * INITIAL_POP_FRACTION * 0.25))
+                    fauna.populations[sp.name] = n0
+
 
 # ---------------------------------------------------------------------------
 # Installer + reporter
@@ -354,16 +390,20 @@ def install_animal_evolution(sim, *,
     existing: Optional[AnimalEvolutionState] = getattr(sim, "_animal_state", None)
     if existing is not None:
         return existing
-    state = AnimalEvolutionState()
+    state = AnimalEvolutionState(mode=mode)
     sim._animal_state = state
 
     if mode == "modern":
         seed_set = SPECIES
+        for s in SPECIES:
+            state.available_species.add(s.name)
     else:
         seed_set = tuple(
             s for s in SPECIES
             if s.kingdom in (AnimalKingdom.INVERTEBRATE_ARTHROPOD,
                              AnimalKingdom.INVERTEBRATE_MOLLUSCA))
+        for s in seed_set:
+            state.available_species.add(s.name)
 
     for coord, chunk in list(sim.streamer.cache.items()):
         biome = _dominant_biome(chunk)

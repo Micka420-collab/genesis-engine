@@ -44,6 +44,8 @@ class Observation:
     nearest: dict
     near_agents: List[int]
     dominant_drive: int
+    tick: Optional[int] = None
+    reproduction_readiness: float = 0.0
 
 
 def _dominant_drive(drives):
@@ -153,7 +155,8 @@ def perceive(agents, row, streamer, radius_m=PERCEPTION_RADIUS_M, grid=None, tic
     return Observation(row=row, pos=(px, py, pz), drives=drives,
                        vitality=float(agents.vitality[row]),
                        nearest=nearest, near_agents=near_agents,
-                       dominant_drive=_dominant_drive(drives))
+                       dominant_drive=_dominant_drive(drives),
+                       tick=tick, reproduction_readiness=0.0)
 
 
 _CACHED_CELL_GRID = {}
@@ -307,10 +310,22 @@ class Decision:
         return Decision(action=int(ActionKind.IDLE), confidence=0.0)
 
 
-def decide(agents, obs):
+def decide(agents, obs, sim=None):
     row = obs.row
     drives = obs.drives
     nearest = obs.nearest
+
+    if sim is not None:
+        st = getattr(sim, "_life_emergence", None)
+        if st is not None:
+            ap = st.last_appraisals.get(row)
+            if ap is not None:
+                obs.reproduction_readiness = ap.reproduction_readiness
+            elif ap is None and obs.tick is not None:
+                from engine.appraise import appraise_agent
+                ap = appraise_agent(agents, row, sim.streamer, sim.tick, sim)
+                st.last_appraisals[row] = ap
+                obs.reproduction_readiness = ap.reproduction_readiness
 
     for k in (DriveKind.THIRST, DriveKind.HUNGER, DriveKind.THERMAL,
               DriveKind.SLEEP, DriveKind.FATIGUE):
@@ -319,16 +334,11 @@ def decide(agents, obs):
             if d is not None:
                 return d
 
-    if drives[int(DriveKind.HUNGER)] < 0.6 and drives[int(DriveKind.THIRST)] < 0.6:
-        mate_target = _find_mate(agents, row, obs.near_agents)
-        if mate_target is not None:
-            tx = float(agents.pos[mate_target, 0])
-            ty = float(agents.pos[mate_target, 1])
-            d = math.hypot(tx - obs.pos[0], ty - obs.pos[1])
-            if d < MATING_RADIUS_M:
-                return Decision(int(ActionKind.MATE), tx, ty, 0.7, mate_target)
-            return Decision(int(ActionKind.WALK_TO), tx, ty, 0.5, mate_target)
-
+    # AUDIT FIX 2026-05-19 — pro-social SHARE must out-prioritise mating when
+    # a hungry neighbour is adjacent and the agent holds surplus food. Without
+    # this re-order, mate_target was always returned first (any near agent
+    # passed _find_mate) and SHARE never fired — see
+    # tests/test_engine.py::test_share_fires_under_stockpile_conditions.
     agreeableness = float(agents.agreeableness[row])
     if agreeableness > 0.40 and obs.near_agents and agents.inv_food[row] > 0.15:
         candidates = [(j, float(agents.hunger[j])) for j in obs.near_agents if agents.alive[j]]
@@ -340,6 +350,23 @@ def decide(agents, obs):
                 d = math.hypot(tx - obs.pos[0], ty - obs.pos[1])
                 if d < SOCIAL_TALK_RADIUS_M:
                     return Decision(int(ActionKind.SHARE), tx, ty, 0.6, best[0])
+                # Walk toward the hungry neighbour if pro-sociality is high
+                # enough (>0.65) and they are within perception range. This
+                # gives the agent a real chance to close the gap and SHARE
+                # rather than getting hijacked by the mating branch below.
+                if (agreeableness > 0.65 and d < PERCEPTION_RADIUS_M):
+                    return Decision(int(ActionKind.WALK_TO), tx, ty, 0.55, best[0])
+
+    if (drives[int(DriveKind.HUNGER)] < 0.6 and drives[int(DriveKind.THIRST)] < 0.6
+            and obs.reproduction_readiness >= 0.35):
+        mate_target = _find_mate(agents, row, obs.near_agents, sim=sim)
+        if mate_target is not None:
+            tx = float(agents.pos[mate_target, 0])
+            ty = float(agents.pos[mate_target, 1])
+            d = math.hypot(tx - obs.pos[0], ty - obs.pos[1])
+            if d < MATING_RADIUS_M:
+                return Decision(int(ActionKind.MATE), tx, ty, 0.7, mate_target)
+            return Decision(int(ActionKind.WALK_TO), tx, ty, 0.5, mate_target)
 
     aggression = float(agents.aggression[row])
     stress = float(drives[int(DriveKind.STRESS)])
@@ -385,10 +412,16 @@ def decide(agents, obs):
 
 
 def _jitter_target(row, tx, ty, drive_kind):
-    """Deterministic per-(row,drive) offset inside +-GOAL_JITTER_M of target."""
-    seed = (np.uint64(row) ^ (np.uint64(int(drive_kind)) * _JITTER_PRIME_X))
-    seed = (seed ^ (seed >> np.uint64(33))) * _JITTER_PRIME_Y
-    seed = seed ^ (seed >> np.uint64(33))
+    """Deterministic per-(row,drive) offset inside +-GOAL_JITTER_M of target.
+
+    Uses a splitmix64-style hash mixer. uint64 wraparound is the intended
+    behaviour, but numpy emits an overflow ``RuntimeWarning`` on the
+    multiply, so we silence it explicitly with ``np.errstate``.
+    """
+    with np.errstate(over="ignore"):
+        seed = (np.uint64(row) ^ (np.uint64(int(drive_kind)) * _JITTER_PRIME_X))
+        seed = (seed ^ (seed >> np.uint64(33))) * _JITTER_PRIME_Y
+        seed = seed ^ (seed >> np.uint64(33))
     u = (float(int(seed) & 0xFFFF) / 65535.0) * 2.0 - 1.0
     v = (float((int(seed) >> 16) & 0xFFFF) / 65535.0) * 2.0 - 1.0
     return tx + u * GOAL_JITTER_M, ty + v * GOAL_JITTER_M
@@ -436,7 +469,7 @@ def _act_on(agents, row, obs, drive_kind):
     return None
 
 
-def _find_mate(agents, row, near):
+def _find_mate(agents, row, near, sim=None):
     if not near:
         return None
     best, bs = None, -1e9
@@ -444,10 +477,16 @@ def _find_mate(agents, row, near):
     for j in near:
         if not agents.alive[j]:
             continue
-        a = my_aff.get(j, 0.0)
-        score = a + float(agents.agreeableness[j]) * 0.4 - float(agents.aggression[j]) * 0.2
+        if sim is not None and getattr(sim, "_life_emergence", None) is not None:
+            from engine.life_emergence import mate_compatibility
+            score = mate_compatibility(sim, row, j)
+        else:
+            a = my_aff.get(j, 0.0)
+            score = a + float(agents.agreeableness[j]) * 0.4 - float(agents.aggression[j]) * 0.2
         if score > bs:
             bs, best = score, j
+    if best is not None and bs < 0.25:
+        return None
     return best
 
 
@@ -460,6 +499,16 @@ FORAGE_KCAL_PER_KG = 300.0
 GOAL_JITTER_M = 0.45
 HUNT_RADIUS_M = 6.0          # chunk-scale: agent + deer share the chunk
 HUNT_KCAL_PER_DEER = 800.0   # successful deer hunt = ~800 kcal returned home
+# AUDIT FIX 2026-05-17 — share/fight/speak/flee tunables.
+SHARE_RADIUS_M = 3.5
+SHARE_MIN_INV_KG = 0.15      # giver must hold at least this much food
+SHARE_QTY_KG = 0.10          # transfer per SHARE action (capped by giver inv)
+FIGHT_RADIUS_M = 1.8
+FIGHT_DAMAGE_BASE = 0.18     # injury delta to victim before defence modulation
+FIGHT_RETALIATION_AFFINITY = -0.05
+SHARE_AFFINITY_BONUS = +0.05
+SPEAK_AFFINITY_BONUS = +0.005
+FLEE_SPEED_MULT = 1.0        # FLEE always runs (uses run_max_ms)
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -483,6 +532,71 @@ def _inventory_mass(agents, row: int) -> float:
         except (IndexError, TypeError):
             continue
     return total
+
+
+# AUDIT FIX 2026-05-17 -----------------------------------------------------
+# Episodic memory helpers. The AgentRegistry.memory[row] objects expose
+# `short_term` / `long_term` lists with capacity bounds, but no engine
+# code ever wrote to them before this fix. We add a single conservative
+# write-site so the data structure is actually used; salience-weighted
+# eviction is left for future work.
+
+def remember_short(agents, row: int, kind: str, payload: dict) -> None:
+    """Append a small event record to the agent's short-term memory.
+
+    Bounded by ``EpisodicMemory.capacity_short``; FIFO eviction.
+    """
+    mem = agents.memory[row]
+    if mem is None:
+        return
+    mem.short_term.append({"kind": kind, "data": payload})
+    over = len(mem.short_term) - int(getattr(mem, "capacity_short", 32))
+    if over > 0:
+        del mem.short_term[:over]
+
+
+def promote_memories(agents, row: int, min_repeats: int = 2) -> int:
+    """Promote frequent short-term entries to long-term, return count moved.
+
+    A naive but useful rule: any (kind, data) pair that appears at least
+    ``min_repeats`` times in short-term gets consolidated into long-term
+    once, then the redundant short-term copies are pruned. Bounded by
+    ``EpisodicMemory.capacity_long``.
+    """
+    mem = agents.memory[row]
+    if mem is None:
+        return 0
+    if not mem.short_term:
+        return 0
+    seen: dict = {}
+    for entry in mem.short_term:
+        key = (entry.get("kind"), repr(entry.get("data")))
+        seen[key] = seen.get(key, 0) + 1
+    moved = 0
+    long_cap = int(getattr(mem, "capacity_long", 256))
+    for (kind, _data_repr), n_seen in seen.items():
+        if n_seen < min_repeats:
+            continue
+        # Find the first matching short-term entry and copy it long-term.
+        for entry in mem.short_term:
+            if entry.get("kind") == kind:
+                mem.long_term.append(entry)
+                moved += 1
+                break
+        # Prune all but one short-term copy of this kind.
+        kept = False
+        new_short = []
+        for entry in mem.short_term:
+            if entry.get("kind") == kind:
+                if kept:
+                    continue
+                kept = True
+            new_short.append(entry)
+        mem.short_term = new_short
+    over = len(mem.long_term) - long_cap
+    if over > 0:
+        del mem.long_term[:over]
+    return moved
 
 
 def apply_decision(agents, row, decision, streamer, tick):
@@ -583,6 +697,159 @@ def apply_decision(agents, row, decision, streamer, tick):
 
     if act == int(ActionKind.MATE):
         agents.vel[row, :2] = 0.0
+        return events
+
+    # AUDIT FIX 2026-05-17 — SHARE was decided but never applied.
+    if act == int(ActionKind.SHARE):
+        agents.vel[row, :2] = 0.0
+        j = decision.other_row
+        if (j is None or j < 0 or j >= agents.n_active
+                or not bool(agents.alive[int(j)])):
+            return events
+        # Both agents must be within social radius for SHARE to land.
+        ox = float(agents.pos[int(j), 0])
+        oy = float(agents.pos[int(j), 1])
+        if math.hypot(ox - px, oy - py) > SHARE_RADIUS_M:
+            return events
+        giver_inv = float(agents.inv_food[row])
+        if giver_inv < SHARE_MIN_INV_KG:
+            return events
+        qty = min(SHARE_QTY_KG, giver_inv - 0.5 * SHARE_MIN_INV_KG)
+        if qty <= 0.0:
+            return events
+        agents.inv_food[row] = max(0.0, giver_inv - qty)
+        agents.inv_food[int(j)] = float(agents.inv_food[int(j)]) + qty
+        agents.hunger[int(j)] = max(
+            0.0, float(agents.hunger[int(j)]) - EAT_RELIEF * (qty / 0.5))
+        # Pro-social relationship update on both sides.
+        try:
+            agents.relations[row].update_affinity(int(j), SHARE_AFFINITY_BONUS)
+            agents.relations[int(j)].update_affinity(row, SHARE_AFFINITY_BONUS)
+        except Exception:
+            pass
+        # Empathy reward — the giver feels less stress / more vitality.
+        try:
+            agents.stress[row] = max(
+                0.0, float(agents.stress[row]) - 0.01)
+        except Exception:
+            pass
+        remember_short(agents, row, "shared", {"to": int(j), "qty": float(qty)})
+        events.append({
+            "kind": "share",
+            "from": int(row),
+            "to": int(j),
+            "qty": float(qty),
+        })
+        return events
+
+    # AUDIT FIX 2026-05-17 — FIGHT was decided but never applied.
+    if act == int(ActionKind.FIGHT):
+        agents.vel[row, :2] = 0.0
+        j = decision.other_row
+        if (j is None or j < 0 or j >= agents.n_active
+                or not bool(agents.alive[int(j)])):
+            return events
+        ox = float(agents.pos[int(j), 0])
+        oy = float(agents.pos[int(j), 1])
+        if math.hypot(ox - px, oy - py) > FIGHT_RADIUS_M:
+            return events
+        # Damage scales with attacker aggression × inverse of victim
+        # vitality. We clip injuries at 1.0 — mortality handler in sim.py
+        # converts >=1.0 injuries to a VIOLENCE death.
+        agg = float(agents.aggression[row])
+        vit_v = max(0.05, float(agents.vitality[int(j)]))
+        damage = FIGHT_DAMAGE_BASE * (0.5 + agg) / vit_v
+        damage = float(max(0.0, min(0.6, damage)))
+        agents.injuries[int(j)] = float(
+            min(1.0, float(agents.injuries[int(j)]) + damage))
+        agents.pain[int(j)] = float(
+            min(1.5, float(agents.pain[int(j)]) + damage * 0.5))
+        agents.stress[int(j)] = float(
+            min(1.5, float(agents.stress[int(j)]) + damage * 0.8))
+        try:
+            agents.relations[int(j)].update_affinity(
+                row, FIGHT_RETALIATION_AFFINITY)
+            agents.relations[row].update_affinity(
+                int(j), FIGHT_RETALIATION_AFFINITY * 0.5)
+        except Exception:
+            pass
+        remember_short(agents, row, "fought",
+                       {"vs": int(j), "dmg": float(damage)})
+        events.append({
+            "kind": "fight",
+            "attacker": int(row),
+            "victim": int(j),
+            "damage": float(damage),
+        })
+        return events
+
+    # AUDIT FIX 2026-05-17 — SPEAK was decided but only buffered when
+    # sim_5cd_integration was installed. Without 5cd, no vocalize event
+    # ever reached the annalist. Emit a baseline event here; the 5cd
+    # patched_apply still buffers SPEAK BEFORE calling original_apply, so
+    # both paths now produce exactly one vocalize event per SPEAK action
+    # (the 5cd buffer is processed in tick_speech, and that path runs
+    # only when 5cd is installed — see sim_5cd_integration.patched_apply
+    # which captures SPEAK targets and then routes through tick_speech).
+    if act == int(ActionKind.SPEAK):
+        agents.vel[row, :2] = 0.0
+        j = decision.other_row
+        if j is None or j < 0 or j >= agents.n_active:
+            return events
+        if not bool(agents.alive[int(j)]):
+            return events
+        # Skip emission if the 5cd buffer is going to handle it — avoids
+        # double-counting vocalize events when 5cd is installed.
+        if getattr(agents, "_5cd_speak_handled", False):
+            return events
+        try:
+            agents.relations[row].update_affinity(
+                int(j), SPEAK_AFFINITY_BONUS)
+            agents.relations[int(j)].update_affinity(
+                row, SPEAK_AFFINITY_BONUS * 0.5)
+        except Exception:
+            pass
+        # Deterministic lex signature from row + lexicon hash + tick %.
+        try:
+            lex = agents.lexicon[row]
+            lex_sig = int(_stable_bytes_sig(
+                lex.astype(np.float32).tobytes())) & 0xFFFF
+        except Exception:
+            lex_sig = (int(row) * 17 + int(tick) % 1009) & 0xFFFF
+        remember_short(agents, row, "spoke", {"to": int(j),
+                                              "lex_sig": int(lex_sig)})
+        events.append({
+            "kind": "vocalize",
+            "from": int(row),
+            "to": int(j),
+            "lex_sig": int(lex_sig),
+        })
+        return events
+
+    # AUDIT FIX 2026-05-17 — FLEE wasn't issued by core decide() but a
+    # later policy may issue it. Move directly away from the perceived
+    # threat at run speed.
+    if act == int(ActionKind.FLEE):
+        tx = float(decision.target_x)
+        ty = float(decision.target_y)
+        dx = px - tx
+        dy = py - ty
+        d = math.hypot(dx, dy)
+        if d < 1e-6:
+            # Degenerate — pick a deterministic direction by row.
+            dx = 1.0 if (row % 2 == 0) else -1.0
+            dy = 1.0 if ((row // 2) % 2 == 0) else -1.0
+            d = math.hypot(dx, dy)
+        nx, ny = dx / d, dy / d
+        speed = float(agents.run_max_ms[row]) * FLEE_SPEED_MULT
+        agents.vel[row, 0] = nx * speed
+        agents.vel[row, 1] = ny * speed
+        agents.heading[row] = math.atan2(ny, nx)
+        try:
+            agents.stress[row] = float(
+                min(1.5, float(agents.stress[row]) + 0.01))
+        except Exception:
+            pass
         return events
 
     if act == int(ActionKind.HUNT):

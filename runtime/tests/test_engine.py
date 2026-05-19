@@ -114,7 +114,7 @@ class SimTests(unittest.TestCase):
         for _ in range(20):
             sim.step()
         self.assertGreaterEqual(sim.stats.alive, 0)
-        self.assertGreaterEqual(sim.stats.cum_births, cfg.founders)
+        self.assertGreaterEqual(sim.annalist.cum_foundings, cfg.founders)
         sim.annalist.close()
 
     def test_replay_equivalent(self):
@@ -131,34 +131,19 @@ class SimTests(unittest.TestCase):
         s1.annalist.close()
         s2.annalist.close()
 
-    @unittest.expectedFailure
     def test_share_fires_under_stockpile_conditions(self):
-        """Phase 5 calibration regression: with the recalibrated forage
-        economy (FORAGE_KCAL_PER_KG=300, SHARE threshold=0.15 kg), the
-        SHARE action must fire at least once over a moderate run with
-        agreeable agents and dense food.
+        """Phase 5 calibration: with FORAGE_KCAL_PER_KG=300 and the SHARE
+        threshold at 0.15 kg, the SHARE action must fire at least once
+        over a moderate run with agreeable agents and dense food.
 
-        Status: KNOWN FAILING — engine gap.
-
-        ``engine.cognition.decide`` returns ``ActionKind.SHARE`` correctly
-        (verified manually: agreeable agents within SOCIAL_TALK_RADIUS_M
-        with hungry neighbours do select it). But neither
-        ``engine.cognition.apply_decision`` nor
-        ``engine.sim_5cd_integration.patched_apply`` has a SHARE branch —
-        the action is decided and silently dropped, so no
-        ``{"kind": "share"}`` raw event ever reaches the annalist and
-        ``cum_shares`` stays at 0.
-
-        Fixing this requires:
-          1. ``apply_decision`` dispatch: transfer ``qty`` kg of inv_food
-             from giver to receiver, decrement giver hunger relief, emit
-             ``{"kind": "share", "from": row, "to": j, "qty": …}``.
-          2. Annalist already handles ``"share"`` events (see
-             ``annalist.py:159``) — no change needed there.
-
-        Tracked separately; this test is the contract we want to honour
-        once SHARE gets an apply-side implementation. Remove the
-        ``@unittest.expectedFailure`` decorator at that point.
+        Status: ACTIVE — was previously a KNOWN-FAILING engine gap. As of
+        the 2026-05-17 audit fix, ``engine.cognition.apply_decision`` has
+        a full SHARE branch that transfers ``qty`` kg of inv_food from
+        giver to receiver, decrements giver hunger, updates affinities,
+        and emits ``{"kind": "share", "from": …, "to": …, "qty": …}``.
+        ``engine.annalist`` already counted such events. The
+        ``@unittest.expectedFailure`` decorator was removed on 2026-05-18
+        when the post-audit run confirmed shares now fire and accumulate.
         """
         import numpy as np
         cfg = SimConfig(name="share_calibration", seed=0xBEEF, founders=20,

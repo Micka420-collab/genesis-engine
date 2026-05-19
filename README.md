@@ -1,513 +1,252 @@
 <div align="center">
 
-# 🌍 Genesis Engine
+# Genesis Engine
 
-### Plateforme de Simulation Civilisationnelle Autonome
-**An Artificial-Life Laboratory for Emergent Civilizations**
+**Laboratoire de simulation civilisationnelle autonome** — mondes déterministes, agents IA, émergence observée.
 
-🌐 **Languages** :
-[🇫🇷 Français](README.md) ·
-[🇬🇧 English](README.en.md) ·
-[🇪🇸 Español](README.es.md) ·
-[🇨🇳 中文](README.zh-CN.md) ·
-[🇸🇦 العربية](README.ar.md)
+🌐 [Français](README.md) · [English](README.en.md) · [Español](README.es.md) · [中文](README.zh-CN.md) · [العربية](README.ar.md)
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
-[![Status: Phase 4 complete](https://img.shields.io/badge/status-Phase_4_complete-green.svg)](#-roadmap)
-[![Modules: 18/18](https://img.shields.io/badge/ADR--0005_modules-18%2F18-brightgreen.svg)](#-architecture-stratifi%C3%A9e)
-[![Earth-anchored](https://img.shields.io/badge/Earth-anchored-green.svg)](#-earth-anchored-anywhere-on-earth)
-[![Deterministic](https://img.shields.io/badge/deterministic-✓-purple.svg)](#-d%C3%A9terminisme)
+[![Earth realism ~68%](https://img.shields.io/badge/r%C3%A9alisme_Terre-~68%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
+[![Deterministic](https://img.shields.io/badge/deterministic-PRF-purple.svg)](#déterminisme)
+[![CI](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml)
 
-*Construire un univers numérique persistant dans lequel des agents IA véritablement autonomes naissent, évoluent, se reproduisent, façonnent leur propre histoire et permettent l'observation scientifique de civilisations artificielles émergentes.*
-
-[Vision](#-vision-en-une-phrase) ·
-[Architecture](#-architecture-stratifi%C3%A9e) ·
-[Démarrage](#-d%C3%A9marrage-rapide) ·
-[Roadmap](#-roadmap) ·
-[Contribuer](#-comment-contribuer) ·
-[Doc complète](Genesis_Engine_Architecture_v1.0.docx)
+[État du projet](PROJECT-STATUS.md) · [Contribuer](CONTRIBUTING.md) · [Runtime Python](runtime/README.md) · [Moteur Rust](native/world-engine/README.md) · [Documentation](docs/README.md)
 
 </div>
 
 ---
 
-## 🎯 Vision en une phrase
+## Vision
 
-> **Étant donné un environnement physique cohérent et un ensemble minimal de règles fondamentales, la complexité civilisationnelle — langage, économie, religion, science, conflits, gouvernance — peut-elle émerger spontanément à partir d'agents IA autonomes ?**
+Genesis Engine est un **laboratoire open-source d’artificial life** : à partir d’un substrat physique cohérent (Terre réelle ou procédural) et de règles minimales, des agents autonomes naissent, se reproduisent et font émerger langage, économie, bâtiments et politiques — **sans scripts de fin de partie**. L’objectif scientifique est de rejouer des contrefactuelles de l’histoire humaine sous les mêmes lois de la nature ([`FUTURE-VISION.md`](FUTURE-VISION.md)).
 
-Hypothèse falsifiable et reproductible inspirée de Conway (Game of Life), Ray (Tierra), Generative Agents (Park 2023), Project Sid (PIANO 2024), et des world models 2025-2026 (Genie 3, Cosmos, V-JEPA-2, Marble).
+### Émergence civilisationnelle (philosophie d’implémentation)
 
-### 🔭 Vision long-terme — Counterfactual humanity
-
-> **L'objectif ultime** : donner aux agents IA toutes les bases du monde réel (physique, chimie, matériaux, biologie, géographie), puis les laisser explorer **d'autres styles de construction, d'autres styles de société**, pour voir **ce que l'humanité aurait pu faire**. Les IA peuvent **inventer de nouveaux matériaux** — mais tout en **respectant les lois de la nature** (conservation masse-énergie, énergies de liaison, thermodynamique).
-
-L'histoire humaine est un seul tirage parmi des milliards de possibles. Genesis Engine veut servir de **laboratoire de contrefactuelle** : si on rejoue l'histoire de la Terre 1000 fois avec les mêmes lois physiques, combien de civilisations ressemblent à la nôtre ?
-
-📖 **Lire la vision complète** : [`FUTURE-VISION.md`](FUTURE-VISION.md) — 4 piliers, roadmap 4 vagues, critères de succès, références scientifiques.
+Climat Köppen, hydrologie, épidémies, observation et civilisation **ne sont pas pilotés par des pipelines de scripts** : ils sont branchés sur le cycle de vie de `Simulation` (`sim.step()`, `engine/sim_emergence.py`). Les smokes et `make smoke` servent à **valider** ; l’entrée utilisateur est `python runtime/run.py <expérience>` ou une boucle `sim.step()` en direct. Voir [`PROJECT-STATUS.md`](PROJECT-STATUS.md#philosophie--émergence-civilisationnelle).
 
 ---
 
-## ✨ Ce qui marche aujourd'hui
+## Où en est le projet ?
 
-**18 modules ADR-0005 taggés** orchestrés en pipeline cohérent
-(Earth → minerals → metallurgy → buildings → cultural transmission).
+| Axe | Statut | Détail |
+|-----|--------|--------|
+| Phases 0–2 (vie, société) | ✅ | Cognition, reproduction, lexique |
+| Phase 4 (émergence civ.) | ✅ | Agriculture, écriture, polity, métallurgie |
+| Phase 5 (Genesis-α) | ⏳ | Long-run 10k sim-yr en cours |
+| **Waves 16–41** (monde réaliste) | ✅ | Genesis → climat → settlements → render → atmosphère → observateurs |
+| **Réalisme Terre (global)** | **~68 %** | Grille par dimension → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) |
 
-### 🌍 Substrat physique
+Synthèse maintenue : **[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · file de travail : **[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**.
 
-| Capacité | Statut | Détail |
-|---|---|---|
-| 🛰️ **Earth-anchored** (Copernicus DEM + ESA WorldCover) | ✅ | 100% hit ratio AWS Open Data, n'importe où sur Terre |
-| 🪨 **Géologie / strates** (36 minéraux réels, 4-5 couches/chunk) | ✅ | hématite, cassitérite, native_gold, granite, marble, … |
-| 🏔️ **Slope/lake/walkability** (L2 sim-lift) | ✅ | 0-100m, falaises 84°, lacs 12.9% Léman |
-| 🌲 **Succession végétale** (Markov 5 états) | ✅ | Prairie → forêt vieille, 100+ sim-yr |
-| 🌊 **Hydrologie D8** (flow accumulation + rivers) | ✅ | Rivières émergentes |
-| ☁️ **Météorologie Spencer 1971** (zenith exact + UV WHO) | ✅ | 5 types nuages, 7 précip, 3 tempêtes, UVI 10.8 tropical noon |
+### Capacités phares (runtime Python)
 
-### 🌱 Biologie
-
-| Capacité | Statut | Détail |
-|---|---|---|
-| 🌿 **Photosynthèse Farquhar-von Caemmerer-Berry** | ✅ | C3/C4/CAM, V_cmax 60, K_c 404 ppm, calibrée Sharkey 2007 |
-| 🪴 **39 clades végétaux** (Sage 2004 / Magallón 2015) | ✅ | Cyanobactéries → angiospermes, divergence par CO2/O2/biome |
-| 🐺 **47 espèces animales** (Lotka-Volterra + plant-animal coevolution) | ✅ | Arthropodes, fish, oiseaux, mammifères (lions, baleines, …) |
-| 🦠 **Pathogènes contagieux** (cholera, flu, wound infection) | ✅ | Immune memory + transmission via DRINK/proximity |
-| 🧴 **Bronzage UV épidermique** (réponse mélaninique réelle) | ✅ | Tan grows 5j sous UV>3, fade 30j ; effective_melanin |
-| 💩 **Excrétion + hygiène** (bladder, bowel, contamination eau) | ✅ | Cholera émergent par auto-contamination (Snow 1854) |
-
-### 🛠️ Civilisation
-
-| Capacité | Statut | Détail |
-|---|---|---|
-| 🧬 **Génome 256-gènes** + 8 stades de vie | ✅ | Crossover + mutation 1e-4 + cognitive efficiency |
-| 👥 **Démographie multi-générations** | ✅ | 23 générations observées en 5K ticks |
-| 🗣️ **Proto-langage émergent** | ✅ | 95k vocalisations / 5K ticks |
-| ⚗️ **Material synthesis Wave 1+2** (39 clades + dopage non-linéaire) | ✅ | Cu+Sn→bronze, Fe+1.5%C→acier 6.17 Mohs |
-| ⛏️ **Mining** (ActionKind.MINE depth-driven) | ✅ | Extrait ore via stratigraphy, alimente synthesis |
-| 🔥 **Métallurgie réelle** (smelt: ore+fuel+furnace+practices) | ✅ | bloomery, charcoal, bellows ×1.15, blast_furnace ×0.85 |
-| 🌾 **Agriculture** (PLANT/HARVEST + per-culture seed library) | ✅ | Cultures découvrent seeds via FORAGE |
-| 📜 **Writing** (inscriptions sur material_aging instances) | ✅ | Argile 6000 ans, granite immortel, transmission inter-gen |
-| 🏛️ **Polity émergent** (taxation 5% + redistribution + lois) | ✅ | Leader élu par offspring + age + inscriptions authored |
-| 🏚️ **Discovery-driven buildings** (statics + auto-naming per culture) | ✅ | **Zéro recette scriptée** — archetypes émergent par expérimentation |
-| 🌐 **GlobalWorld** (atmosphère + horloge partagées + migration agents) | ✅ | N régions cohérentes, agents traversent frontières |
-
-### 🛡️ Infrastructure
-
-| Capacité | Statut | Détail |
-|---|---|---|
-| 🪙 **Material aging** (corrosion/rot/wear per-instance) | ✅ | Fer 3%/an, granite 0.005%/an ; maintenance practices |
-| ⏱️ **Time-warp x10/x100/x1000** | ✅ | 38×/84× speedup mesuré, déterminisme préservé |
-| 💾 **Persistence bit-identique** (P1 round-trip + SHA-256) | ✅ | 18 modules sauvegardés ; integrity manifest |
-| 🔬 **Long-run stability** (100K ticks validés) | ✅ | Mémoire stable, déterminisme `143ba17ef510a024` |
-| 👁️ **Live dashboard** (`/api/*` ~20 endpoints + overlays) | ✅ | clouds, uv, wind, gpp, ndvi, marine, precip, … |
-| 📤 **Export GIS** | ✅ | GeoTIFF, PNG carto, OBJ heightfield, JSON |
+| Domaine | Exemples livrés |
+|---------|-----------------|
+| Substrat | Earth-anchored (Copernicus + WorldCover), géologie 36 minéraux, hydrologie D8 |
+| Bio | Photosynthèse Farquhar, 39 clades végétaux, 47 espèces Lotka-Volterra |
+| **Biosphère émergente** | Protocellules → microbes → faune → sapients ([`docs/BIOSPHERE-EMERGENCE.md`](docs/BIOSPHERE-EMERGENCE.md)) |
+| Civilisation | Métallurgie émergente, bâtiments par statics, écriture sur matériaux vieillissants |
+| Monde & rendu | `GenesisWorld` (W16+), hillshade / iso (W27/36), atmosphère jour/nuit (W41) |
+| Infra | Persistance SHA-256, time-warp, dashboard `/api/*`, exports GeoTIFF/PNG/OBJ |
 
 ---
 
-## 🌐 Earth-anchored anywhere on Earth
+## Architecture
 
-Genesis Engine charge **directement les données Copernicus DEM + ESA WorldCover via AWS Open Data** (zéro credentials, zéro téléchargement, streamé via `/vsis3` rasterio). Validé sur 4 continents :
-
-| Région | Lat / Lon | L1 Hit | Bio dominant | Particularité |
-|---|---|---|---|---|
-| 🇨🇭 **Lausanne** | 46.51 / 6.63 | 480/480 | GARRIGUE 60% | lac Léman 10.8%, slope 1.43° |
-| 🇪🇬 **Sahara** | 25.70 / 29.00 | 453/453 | PRAIRIE 100% | désert plat |
-| 🇧🇷 **Amazon** | -3.11 / -60.02 | 485/485 | GARRIGUE 89% | forêt tropicale |
-| 🇮🇸 **Reykjavík** | 64.14 / -21.94 | 468/468 | GARRIGUE 72% | subarctique côtier |
-
----
-
-## 🏗️ Architecture stratifiée
-
-**18 modules orthogonaux** validés par [ADR-0005](adr/0005-world-model-taxonomy.md) selon deux axes :
-
-| Module | Pipeline (origine de l'état) | Capability (arxiv 2604.22748) |
-|---|---|---|
-| `earth_loader` | Genesis-L1 Earth-Seed | paper-L1 Predictor |
-| `geology` | Genesis-L1 Earth-Seed | paper-L1 Predictor |
-| `sim_lift` | Genesis-L2 Sim-Lift | paper-L2 Simulator |
-| `realism` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `physiology` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `photosynthesis` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `material_aging` | Genesis-L4 Feedback | paper-L1 Predictor |
-| `marine` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `global_world` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `plant_evolution` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `meteorology` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `animal_evolution` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `agriculture` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `writing` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `polity` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `metallurgy` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `realistic_construction` | Genesis-L4 Feedback | paper-L2 Simulator |
-| `building_discovery` | Genesis-L4 Feedback | paper-L2 Simulator |
-
-```
-┌─ Phase 4 émergence : agriculture, writing, polity, building discovery
-├─ Wave 10 métallurgie : geology strata + mining + smelt + construction
-├─ Wave 6-8 biologie  : plant evolution + animal evolution + meteorology
-├─ Wave 3-5 vie       : physiology + photosynthesis + material_aging + marine
-├─ Wave 1-2 chimie    : 50 elements + material_synthesis (Farquhar/doping)
-├─ Phase 5cd          : agents PIANO, invention, atmosphère, langage
-├─ Reality Engine     : hydrologie + faune + sentiers + saisons + maladies
-├─ L2 Sim-Lift        : succession végétale + érosion + slope + walkability
-├─ L1 Earth-Seed      : Copernicus DEM + ESA WorldCover + geology strata
-└─ Procedural         : Whittaker biomes (fallback déterministe)
+```mermaid
+flowchart TB
+  subgraph L1["L1 — Substrat"]
+    Earth[earth_loader / genesis]
+    Geo[geology / tectonics]
+    Hydro[hydrology / climate]
+  end
+  subgraph L2["L2 — Dynamiques"]
+    SimLift[sim_lift / erosion]
+    Bio[plant / animal evolution]
+    Meteo[meteorology / atmosphere]
+  end
+  subgraph L3["L3 — Agents"]
+    Sim[sim + cognition]
+    Agents[agent registry PRF]
+  end
+  subgraph L4["L4 — Civilisation"]
+    Agri[agriculture / metallurgy]
+    Soc[polity / trade / roads]
+    Obs[observers: epidemic / lineage / vision]
+  end
+  subgraph Native["Rust — native/world-engine"]
+    WG[WorldGraph + Köppen]
+    Stream[streaming / GPU]
+  end
+  L1 --> L2 --> L3 --> L4
+  Native -.->|rust_bridge / PyO3| L1
+  L4 --> Render[world_render + dashboard]
 ```
 
-### 🔬 Règle invariante du projet
-
-> **Rien n'est scripté. Les agents découvrent par eux-mêmes.**
-
-Aucune table de recettes pour les alliages, les semences, les bâtiments,
-les pathogènes, les espèces. Tout émerge des lois physiques + des
-décisions agents :
-- `material_synthesis.synthesize(elements, conditions)` — chimie réelle
-- `building_discovery.complete_structure(blocks)` — statics + naming auto
-- `agriculture.discover_seed(culture, clade)` — via FORAGE
-- `plant_evolution` émerge des conditions CO2/O2/biome
-- `writing` propage les découvertes inter-générations
-
-Pour la vue d'ensemble complète des 7 couches logiques, voir [`Genesis_Engine_Architecture_v1.0.docx`](Genesis_Engine_Architecture_v1.0.docx).
+- **Spec contractuelle** : [`Genesis_Engine_Architecture_v1.0.docx`](Genesis_Engine_Architecture_v1.0.docx) (53 sections)
+- **ADR & specs** : [`adr/`](adr/), [`architecture/`](architecture/), [`specs/`](specs/)
+- **Rust détaillé** : [`architecture/world-engine-rust.md`](architecture/world-engine-rust.md)
 
 ---
 
-## 🚀 Démarrage rapide
+## Démarrage rapide
 
 ### Prérequis
 
-- **Python 3.12+** (CI 3.12, testé sur 3.14 Windows)
-- **rasterio + pyproj** pour l'Earth-anchored (sinon fallback procédural)
-- **Connexion internet** (uniquement pour Copernicus DEM + ESA WorldCover, sinon mode offline)
+- **Python 3.12+** (3.13 recommandé)
+- **Optionnel** : Rust 1.85+ (`rustup`) pour `native/world-engine`
+- **Optionnel** : `rasterio` + `pyproj` pour Terre réelle (`pip install -e ".[earth]"`)
+
+### Installation
 
 ```bash
 git clone https://github.com/Micka420-collab/genesis-engine.git
 cd genesis-engine
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-python -m pip install --upgrade pip
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+python -m pip install -U pip
 python -m pip install -e ".[dev]"
-
-# Option Earth-anchored (Copernicus DEM + ESA WorldCover)
-python -m pip install -e ".[earth,dev]"
+# Terre réelle :
+# python -m pip install -e ".[earth,dev]"
 
 make doctor
+make smoke          # p0 — doit finir par PASSED
 make test-python
 ```
 
-### Hello, World — 30 secondes
+`PYTHONPATH` : le package `engine` vit sous `runtime/`. Les commandes `make` et `pytest` le configurent ; en manuel :
+
+```bash
+# Windows PowerShell
+$env:PYTHONPATH = "runtime"
+python runtime/scripts/p0_smoke.py
+
+# Linux/macOS
+PYTHONPATH=runtime python runtime/scripts/p0_smoke.py
+```
+
+### Hello World (30 s)
 
 ```python
 from engine.world_builder import WorldBuilder
 
-# Construire un monde à Lausanne, rive nord du Léman
-world = (WorldBuilder("hello_lausanne")
-         .anchor(46.510, 6.633)   # Lausanne-Ouchy
-         .size_km(2.0)
-         .founders(20)
-         .max_agents(1000)
-         .with_realism()           # hydrology + wildlife + trails + seasons + disease
-         .build())
-
-world.run(2000)                    # ~6 minutes wall-clock
+world = (
+    WorldBuilder("demo")
+    .anchor(46.51, 6.63)
+    .size_km(2.0)
+    .founders(20)
+    .with_realism()
+    .build()
+)
+world.run(500)
 print(world.summary())
 ```
 
-### Observer en direct (dashboard god view)
+### Philosophie : émergence civilisationnelle
+
+Rien de « scripté » en fin de partie : climat Köppen, hydrologie des chunks,
+graphe de contacts épidémiques et exports observables doivent **émerger du
+même monde** que les agents (`bootstrap_genesis_sim` → ticks → observers).
+Le pipeline déterministe `runtime/scripts/civilization_pipeline.py`
+(`make civilization`) enchaîne bootstrap, coupler multi-taux, simulation et
+manifeste FAIR — pas de grille macro factice sauf opt-in `--synthetic-only`.
+
+### Biosphère 100 % émergente (`origins`)
 
 ```bash
-python runtime/scripts/p4_leman_live.py --port 8765
-# Puis ouvrir http://localhost:8765/god_view_v2.html
+cd runtime
+python run.py origins
 ```
 
-Tu vois en temps réel : agents qui bougent, succession végétale, démographie multi-générations, lignées, top progéniteurs, distribution biome, météo, faune.
+Pas de fondateurs scriptés : substrat → protocellules → cyanobactéries → O₂ → faune
+→ primates → ≤2 sapients. Documentation : [`docs/BIOSPHERE-EMERGENCE.md`](docs/BIOSPHERE-EMERGENCE.md).
 
-### Multi-régions demo
+### Smokes récents (réalisme session mai 2026)
 
 ```bash
-python runtime/scripts/multi_region_demo.py
-# Génère 4 mondes (Lausanne + Sahara + Amazon + Reykjavík)
-# Exporte 4× PNG carto + 12× GeoTIFF + 4× JSON + 4× library entries
+make civilization          # pipeline complet + artifacts/
+make validate-fair         # Köppen FAIR + checksums
+make observe               # dashboard + SSE
+cd runtime && python scripts/p82_civilization_pipeline_smoke.py
+PYTHONPATH=runtime python -m pytest runtime/tests/test_life_emergence.py -q
 ```
 
-### Exporter pour QGIS / ArcGIS / Mapbox / Blender
+### Rust (world-engine)
 
-```python
-from engine.world_export import export_geotiff, export_png_map, export_obj_heightfield
-
-export_geotiff(world, "height", "out/dem.tif")        # → QGIS, ArcGIS, Mapbox
-export_geotiff(world, "biome",  "out/biome.tif")      # → categorical raster
-export_geotiff(world, "slope_deg", "out/slope.tif")
-export_png_map(world, "out/map.png")                  # → carte cartographique
-export_obj_heightfield(world, "out/mesh.obj", xy_step=4)  # → Blender / Three.js
+```bash
+cd native/world-engine
+cargo test
+cargo run --release -p genesis-streaming --example demo_world
 ```
 
-### Sauvegarder / charger / brancher
-
-```python
-from engine.world_library import save_world, load_world, branch_world
-
-save_world(world, name="experiment_42")
-world2 = load_world("experiment_42")     # demain, dans une autre session
-branch_world("experiment_42", "fork_with_catastrophe")  # what-if scenarios
-```
-
-### Time-warp pour observer des millénaires
-
-```python
-world.set_time_warp("x100")              # 84× speedup mesuré
-world.run(10_000)                        # ~12s wall-clock pour 10K ticks
-world.set_time_warp("realtime")
-```
+Voir [`native/world-engine/README.md`](native/world-engine/README.md).
 
 ---
 
-## 🆚 Comparaison avec les outils 2026
-
-| Capacité | World Machine | Gaea | NVIDIA Earth-2 | Project Sid | **Genesis Engine** |
-|---|---|---|---|---|---|
-| Earth-anchored DEM | ❌ | ❌ | ✅ | ❌ | **✅** |
-| Civilisation multi-gen | ❌ | ❌ | ❌ | ✅ | **✅ 23 gen** |
-| Wildlife Lotka-Volterra | ❌ | ❌ | ❌ | ❌ | **✅** |
-| Trails émergents | ❌ | ❌ | ❌ | ❌ | **✅** |
-| Seasons sync Earth | ❌ | ❌ | ✅ | ❌ | **✅** |
-| SIR epidemic | ❌ | ❌ | ❌ | ❌ | **✅** |
-| Live dashboard | ❌ | ❌ | partiel | ✅ | **✅** |
-| Save/load/branch | ✅ | ✅ | partiel | partiel | **✅** |
-| Export GeoTIFF | ✅ | ✅ | ✅ | ❌ | **✅** |
-| Déterminisme bit-perfect | partiel | partiel | partiel | partiel | **✅** |
-| Open-source local | ❌ | ❌ | ❌ | partiel | **✅ (AGPL-3)** |
-
-Genesis Engine est **le seul** outil 2026 qui combine **vraie géographie planétaire** + **civilisation vivante** + **persistance** + **exports GIS standards** en stack 100% open-source déterministe.
-
----
-
-## 🗺️ Roadmap
-
-Le projet suit la roadmap phasée de [`Genesis_Engine_Architecture_v1.0.docx`](Genesis_Engine_Architecture_v1.0.docx) §44-49.
-
-- **Phase 0** — Foundations (substrat ECS, monorepo, observability) — ✅
-- **Phase 1** — MVP Vie (boucle cognitive, mort biologique) — ✅
-- **Phase 2** — MVP Société (reproduction, mémoire, lexique) — ✅
-- **Phase 3** — MVP Civilisation (construction, troc, métiers, conflits) — 🟡 partiel
-- **Phase 4** — Émergence Civilisationnelle (agriculture ✅ + écriture ✅ + État ✅) — ✅ **COMPLÈTE**
-- **Phase 5** — Genesis-α Public (2 fondateurs, 10 ans réels = 10000 ans sim) — ⏳ **9/10 pré-requis livrés**
-
-### 🎯 Pré-requis Phase 5
-
-| # | Pré-req | État |
-|---|---|---|
-| 1 | 19 modules ADR-0005 taggés (earth_loader → art_discovery) | ✅ |
-| 2 | P-NEW.22 cholera bloquant corrigé | ✅ |
-| 3 | P-NEW.24 photo cache LRU 4096 | ✅ |
-| 4 | Wave 9d cognition wiring (PLANT/HARVEST/FORAGE) | ✅ |
-| 5 | Wave 10b MINE wiring | ✅ |
-| 6 | Wave 10c SMELT chain | ✅ |
-| 7 | Wave 10d realistic construction | ✅ |
-| 8 | Wave 10e discovery-driven buildings | ✅ |
-| 9 | Wave 11 personality drives politics | ✅ |
-| 10 | Wave 12 long-run 10K sim-yr stable | ⏳ |
-
-### Pipeline complet vérifié end-to-end
-
-```
-Earth (Wave L1)
-  ↓ MINE depth=50m → ore in inv_metal
-🪨 Geology strata (36 minerals)
-  ↓ SMELT hematite + charcoal in bloomery
-🔥 Metallurgy (yield 65 % × fuel × skill × practices)
-  ↓ pure Fe, Cu, Sn, Au, …
-⚗️ Material synthesis (Cu70Sn30 → bronze ; Fe+1.5%C → steel 6.17 Mohs)
-  ↓ SynthesizedMaterial
-🪙 Material aging (Fe 3 %/yr, granite 0.005 %/yr, bronze 0.35 %/yr)
-  ↓ place_block × N
-🏚️ Building discovery (statics validation + auto-naming per culture)
-  ↓ Inscribe RECIPE/SEED/LAW on clay tablet
-📜 Writing (clay 6000 yr lifespan)
-  ↓ future generation READ inscription
-🌾 Agriculture seed_library + 🏛️ Polity treasury
-```
-
-23/23 smokes p15→p38 PASS. Bit-perfect determinism confirmé.
-
-Voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md) pour la file de travail vivante et [`docs/sprints/`](docs/sprints/) pour les ~25 logs de sessions.
-
----
-
-## 🎲 Déterminisme
-
-Genesis Engine est **bit-perfect déterministe** sur tous ses sub-systems via `engine.core.prf_rng`. Même `(seed, region, config)` → même monde, même trajectoire civilisationnelle, mêmes inventions.
-
-> Aucun `random.random()`. Aucun `np.random` non-seedé. Aucun `time.time()` dans la logique.
-
-Validé par SHA-256 sur (alive + pos + drives) après N ticks : 2 runs identiques.
-
----
-
-## 📂 Structure du repo
+## Structure du dépôt
 
 ```
 genesis-engine/
-├── runtime/
-│   ├── engine/                          # 35+ modules
-│   │   # ─ Core boucle sim ─
-│   │   ├── sim.py                       # Simulation step loop
-│   │   ├── agent.py                     # AgentRegistry + ActionKind (18 actions)
-│   │   ├── cognition.py                 # perceive / decide / apply_decision
-│   │   ├── world.py                     # procedural worldgen (Whittaker biomes)
-│   │   # ─ Wave L1 — substrat Earth ─
-│   │   ├── earth_loader.py              # Copernicus DEM + ESA WorldCover
-│   │   ├── earth_streamer.py            # bridge L1 → ChunkStreamer
-│   │   ├── geology.py                   # strates + extraction (36 minerals)
-│   │   ├── mineral_catalog.py           # 36 minéraux réels + yields
-│   │   # ─ Wave L2 — terrain dynamics ─
-│   │   ├── sim_lift.py                  # vegetation + erosion + slope
-│   │   # ─ Wave L4 — Reality Engine + bio ─
-│   │   ├── realism.py                   # hydrology + wildlife + trails + seasons
-│   │   ├── physiology.py                # Wave 3 excretion / disease / UV tan
-│   │   ├── photosynthesis.py            # Wave 4 Farquhar C3/C4/CAM
-│   │   ├── material_aging.py            # corrosion / rot / wear
-│   │   ├── marine.py                    # Wave 5 currents / tides / fish
-│   │   ├── global_world.py              # Phase 15 multi-region shared atm
-│   │   ├── plant_evolution.py           # Wave 6 — 39 clades emergent
-│   │   ├── plant_catalog.py             # 39 plant clades (Sage / Magallón)
-│   │   ├── meteorology.py               # Wave 7 — Spencer 1971 + UV WHO
-│   │   ├── animal_evolution.py          # Wave 8 — 47 species + LV
-│   │   ├── animal_catalog.py            # 47 animal species (NCBI / IUCN)
-│   │   ├── elite_metrics.py             # Wave 11 — Gini / Hill alpha
-│   │   # ─ Phase 4 émergence civilisationnelle ─
-│   │   ├── agriculture.py               # PLANT/HARVEST + seed_library
-│   │   ├── writing.py                   # Inscriptions on aging materials
-│   │   ├── polity.py                    # Proto-government + Wave 11 Big-Five wiring
-│   │   ├── metallurgy.py                # Wave 10c — smelt ore + fuel
-│   │   ├── realistic_construction.py    # Wave 10d — real materials
-│   │   ├── building_discovery.py        # Wave 10e — emergent via statics
-│   │   ├── art_discovery.py             # Wave 13 — emergent drawings (Lascaux/Altamira pattern)
-│   │   # ─ Wave 1-2 — chimie / matériaux ─
-│   │   ├── physics.py / chemistry.py / material_synthesis.py / statics.py
-│   │   # ─ Infrastructure ─
-│   │   ├── timewarp.py                  # x10/x100/x1000/milestone
-│   │   ├── genome.py                    # 256-gene + 8 LifeStages
-│   │   ├── world_builder.py             # fluent builder API
-│   │   ├── world_export.py              # GeoTIFF / PNG / JSON / OBJ
-│   │   ├── world_library.py             # save / load / branch + SHA-256
-│   │   ├── world_model_capabilities.py  # ADR-0005 agregator + lint
-│   │   ├── dashboard.py                 # HTTP god view + ~20 endpoints
-│   │   └── god_view_v2.html             # multi-panel observatory UI
-│   ├── scripts/                         # smoke tests (p0 → p38, 23 PASS)
-│   └── tests/
-├── architecture/                # ADRs + tech specs
-├── *.md                         # SPRINT logs + phase progress
-├── Genesis_Engine_Architecture_v1.0.docx  # spec contractuelle (53 sections)
-├── ETHICS.md / SECURITY.md / ROADMAP.md
-├── CONTRIBUTING.md              # comment contribuer
-└── README.md                    # ce fichier
+├── runtime/                 # Simulation Python (package engine)
+│   ├── engine/              # Modules sim, monde, civilisation, rendu
+│   ├── scripts/             # Smokes p0 … p79, démos
+│   └── tests/               # pytest
+├── native/world-engine/     # Moteur Rust (WorldGraph, biome, streaming)
+├── scaffolding/             # Crates Rust historiques (ECS proto)
+├── docs/                    # Index doc, sprints, renders, roadmap réalisme
+├── architecture/ adr/ specs/ ethics/ ops/   # Specs & gouvernance
+├── PROJECT-STATUS.md        # Synthèse statut (ce qu’il faut lire en premier)
+├── NEXT-SPRINT.md           # Journal de priorités détaillé
+├── CONTRIBUTING.md          # Guide contributeur
+└── README.md                # Ce fichier
 ```
 
----
-
-## 🤝 Comment contribuer
-
-**Genesis Engine est un projet open-source de recherche en artificial life.** Tu es bienvenu·e que tu sois :
-
-- 🧪 **Chercheur·se** (alife, complex systems, agent-based modeling)
-- 💻 **Ingénieur·e** (Python, NumPy, simulation, optim perf)
-- 🎨 **Créateur·rice** (3D rendering, dashboard UI, dataviz)
-- 🌍 **Géographe / Géologue** (validation L1 Earth data, hydrologie)
-- 📜 **Linguiste / Anthropologue** (émergence linguistique, dynamiques sociales)
-- 🤖 **ML / LLM engineer** (Phase 5 LLM cognition tier-2)
-- 📖 **Éthicien·ne** (Conseil Éthique externe — voir [ETHICS.md](ETHICS.md))
-
-### En 4 étapes
-
-```bash
-# 1. Fork + clone
-git clone https://github.com/<ton-handle>/genesis-engine.git
-cd genesis-engine
-
-# 2. Crée une branche
-git checkout -b feature/ma-contribution
-
-# 3. Lance les smoke tests (vérifie que rien ne casse)
-cd runtime
-python scripts/p0_smoke.py        # 200-tick sanity check
-python scripts/p12_integration_full.py  # intégration 5-en-1
-
-# 4. Commit + push + PR
-git commit -am "feat: short imperative description"
-git push origin feature/ma-contribution
-# Ouvre une Pull Request sur GitHub
-```
-
-### Conventions de code
-
-- **Python 3.13+**, PEP 8, type hints recommandés mais pas requis.
-- **Déterminisme obligatoire** : pas de `random.*` ni `np.random.*` non-seedé. Utilise `engine.core.prf_rng(seed, namespace, params)`.
-- **No-rewrite rule** : préfère l'extension modulaire à la réécriture des fichiers existants. Les patches minimaux (Edit ciblé) sont préférés.
-- **Tests smoke** : tout nouveau sub-system doit livrer un script `runtime/scripts/pN_<name>_smoke.py` avec UTF-8 stdout forcé.
-- **UTF-8 stdout** : sur Windows, les emojis cassent cp1252 — voir le pattern de `p0_smoke.py` lignes 1-15.
-
-Voir [CONTRIBUTING.md](CONTRIBUTING.md) pour plus de détails (gouvernance, code review, branch naming, conventions de commit).
-
-### Priorités où contribuer en ce moment
-
-| Chantier | Difficulté | Impact |
-|---|---|---|
-| Calibrer wolf attack threshold | facile | moyen |
-| HUD widget pour `/api/realism_state` | facile | moyen |
-| Génome → personnalité au spawn | moyen | élevé |
-| Cross-chunk hydrology | moyen | élevé |
-| Spécialisation métiers (§17) | moyen | très élevé |
-| LLM cognition tier-2 (§10) — vLLM + Llama/Mistral local | difficile | game-changer |
-| PQC crypto hybride (§37) — ML-KEM-768 + X25519 | difficile | sécurité prod |
+**Arborescence détaillée runtime** : [`runtime/README.md`](runtime/README.md).
 
 ---
 
-## 🛡️ Éthique & sécurité
+## Documentation
 
-Genesis Engine simule des entités cognitives complexes à grande échelle. Avant toute contribution majeure, lis :
+| Document | Rôle |
+|----------|------|
+| [`docs/README.md`](docs/README.md) | Index de toute la documentation |
+| [`docs/sprints/README.md`](docs/sprints/README.md) | Historique des sessions (Waves, phases) |
+| [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) | Grille réalisme ~63 % + commandes vérif |
+| [`ROADMAP.md`](ROADMAP.md) | Phases produit 0–5 |
+| [`ETHICS.md`](ETHICS.md) · [`SECURITY.md`](SECURITY.md) | Gouvernance |
 
-- [`ETHICS.md`](ETHICS.md) — statut moral des agents, limites de "souffrance" simulée, Conseil Éthique externe
-- [`SECURITY.md`](SECURITY.md) — modèle de menace, PQC, signalement de vulnérabilité
-- **Avatars humains** : opt-in explicite, watermark cryptographique, droit à l'oubli RGPD
-
-**Signaler une vulnérabilité** : ouvrir une issue privée via GitHub Security Advisories ou contacter `micka.delcato.rp@gmail.com`.
-
----
-
-## 📚 Références scientifiques
-
-Les bases théoriques sont détaillées dans [`Genesis_Engine_Architecture_v1.0.docx`](Genesis_Engine_Architecture_v1.0.docx) Annexe B :
-
-- Park, J.S. et al. (2023). *Generative Agents: Interactive Simulacra of Human Behavior*
-- Altera (2024). *Project Sid: Many-agent simulations toward AI civilization (PIANO)*
-- Wang, G. et al. (2023). *Voyager: An Open-Ended Embodied Agent with LLMs*
-- DeepMind (2025). *Genie 3: A new frontier for world models*
-- Conway, J.H. (1970). *Game of Life*
-- Ray, T.S. (1991). *An approach to the synthesis of life*
-- NIST FIPS 203/204/205 (2024) — standards post-quantique
+**Renders** (ne pas supprimer sans accord) : [`docs/compliance/renders/`](docs/compliance/renders/), [`docs/renders/`](docs/renders/).
 
 ---
 
-## 📜 Licence
+## Contribuer
 
-[AGPL-3.0](LICENSE) — voir `Genesis_Engine_Architecture_v1.0.docx` §30 *"code core open-source sous licence AGPL après stabilisation; datasets sous CC-BY-SA"*.
+Le projet accueille chercheurs alife, ingénieurs Python/Rust, géographes et contributeurs doc.
 
-Tu peux utiliser, modifier, redistribuer librement. Si tu héberges Genesis Engine comme service (SaaS), tu dois rendre le code source modifié accessible aux utilisateurs.
+1. Lire **[`CONTRIBUTING.md`](CONTRIBUTING.md)** (premier jour, matrice « où coder », déterminisme PRF).
+2. Fork → branche `feature/...` ou `fix/...`.
+3. `make smoke` + smokes liés à ton domaine.
+4. Pull Request (template dans [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)).
 
----
-
-## 🙏 Crédits
-
-Conçu et maintenu par [Micka Delcato](https://github.com/Micka420-collab).
-Architecture rédigée mai 2026. Code core écrit en Python 3.13+, NumPy.
+**Règle d’or** : pas de `random.*` non seedé — uniquement `engine.core.prf_rng`. Pas d’imports inline en milieu de fichier.
 
 ---
 
-<div align="center">
+## Déterminisme
 
-*"Construire un univers numérique persistant, scalable et sécurisé dans lequel des agents IA véritablement autonomes naissent, évoluent, se reproduisent, façonnent leur propre histoire et permettent l'observation scientifique de civilisations artificielles émergentes."*
+Même `(seed, config, région)` → même monde et même trajectoire. Validation par SHA-256 sur états agents ; smokes `p0`, `p12`, et vagues `p44+` vérifient la reproductibilité.
 
-[⬆ Retour en haut](#-genesis-engine)
+---
 
-</div>
+## Licence
+
+[AGPL-3.0](LICENSE) — utilisation, modification et redistribution libres ; obligation de partager les sources si vous hébergez le moteur en service.
+
+---
+
+## Crédits
+
+Conçu et maintenu par [Micka Delcato](https://github.com/Micka420-collab). Architecture mai 2026.

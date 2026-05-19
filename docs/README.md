@@ -1,64 +1,108 @@
-# 📚 Genesis Engine — Documentation
+# Documentation Genesis Engine
 
-Index of all canonical user-facing documentation.
-
-> For **historical sprint reports** (chronological journal of what AI agents have coded), see [`docs/sprints/`](sprints/README.md).
-> For **architecture/operations/ethics specs**, see the topic-specific subfolders at repo root: `adr/`, `architecture/`, `ethics/`, `ops/`, `protocol/`, `roadmap/`, `security/`, `specs/`, `diagrams/`.
+Index de la documentation **orientée contributeurs**. Pour démarrer le code : [`../README.md`](../README.md) et [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 ---
 
-## 🎯 Vision & strategy
+## Statut & roadmap
 
 | Document | Description |
-|---|---|
-| [`../README.md`](../README.md) | Project overview, quick start, capability table |
-| [`../FUTURE-VISION.md`](../FUTURE-VISION.md) | Long-term goal: counterfactual humanity laboratory |
-| [`../ROADMAP.md`](../ROADMAP.md) | Phased roadmap (Phase 0 → Phase 5) |
-| [`../NEXT-SPRINT.md`](../NEXT-SPRINT.md) | Live priority queue |
-| [`PROJECT-VIABILITY.md`](PROJECT-VIABILITY.md) | Installability, supported entry points, viability gates |
-| [`EXECUTIVE-SUMMARY.md`](EXECUTIVE-SUMMARY.md) | 1-page summary for stakeholders |
-| [`INDEX.md`](INDEX.md) | Cross-cutting reference index |
+|----------|-------------|
+| [`../PROJECT-STATUS.md`](../PROJECT-STATUS.md) | **Synthèse** phases, waves 16–41, réalisme ~63 % |
+| [`../NEXT-SPRINT.md`](../NEXT-SPRINT.md) | File de travail détaillée (journal session) |
+| [`../ROADMAP.md`](../ROADMAP.md) | Phases produit 0 → 5 |
+| [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md) | Grille réalisme Terre + commandes vérif p72–p79 |
+| [`../FUTURE-VISION.md`](../FUTURE-VISION.md) | Vision long terme (contrefactuelle humanity) |
 
 ---
 
-## 🏗️ Architecture & subsystems
+## Guides par stack
 
 | Document | Description |
-|---|---|
-| [`../Genesis_Engine_Architecture_v1.0.docx`](../Genesis_Engine_Architecture_v1.0.docx) | **Contractual spec** — 53 sections, 7 logical layers |
-| [`STACK.md`](STACK.md) | Tech stack 2026 (Python, NumPy, rasterio, NATS, vLLM, ...) |
-| [`REALITY-ENGINE.md`](REALITY-ENGINE.md) | 5 Reality Engine subsystems: hydrology, wildlife, trails, seasons, disease |
-| [`WORLD-CREATION-SOFTWARE.md`](WORLD-CREATION-SOFTWARE.md) | `WorldBuilder`, exports, library APIs |
-| [`WAVE1-KNOWLEDGE-BASE.md`](WAVE1-KNOWLEDGE-BASE.md) | FUTURE-VISION Wave 1: physics + chemistry + materials + statics |
+|----------|-------------|
+| [`../runtime/README.md`](../runtime/README.md) | Runtime Python, smokes, dashboard |
+| [`../native/world-engine/README.md`](../native/world-engine/README.md) | Moteur Rust, cargo, WorldGraph |
+| [`STACK.md`](STACK.md) | Stack technique 2026 |
+| [`REALITY-ENGINE.md`](REALITY-ENGINE.md) | Hydrologie, faune, saisons, maladies |
+| [`BIOSPHERE-EMERGENCE.md`](BIOSPHERE-EMERGENCE.md) | Pipeline 100 % émergent : protocellules → humains |
+| [`WORLD-CREATION-SOFTWARE.md`](WORLD-CREATION-SOFTWARE.md) | WorldBuilder, exports, library |
+| [`PROJECT-VIABILITY.md`](PROJECT-VIABILITY.md) | Entry points supportés, gates install |
 
 ---
 
-## 📖 Detailed conceptual docs (numbered)
+## Historique des sessions (sprints)
 
-| File | Topic |
-|---|---|
-| [`01-vision-and-philosophy.md`](01-vision-and-philosophy.md) | Founding hypothesis, philosophy |
-| [`02-system-overview.md`](02-system-overview.md) | Layered architecture overview |
-| [`03-agent-cognition.md`](03-agent-cognition.md) | Agent cognitive architecture (PIANO) |
-| [`04-world-engine.md`](04-world-engine.md) | World engine internals |
-| [`05-emergent-systems.md`](05-emergent-systems.md) | Emergent dynamics (language, economy, religion) |
-| [`06-observation-and-tooling.md`](06-observation-and-tooling.md) | Observatory, exports, debugging |
-| [`07-glossary-and-conventions.md`](07-glossary-and-conventions.md) | Glossary + naming conventions |
+Journal chronologique de ce que les agents IA et contributeurs ont livré :
+
+- **Index & convention** : [`sprints/README.md`](sprints/README.md)
+- **Session majeure 18 mai 2026** : Waves **16 → 41** (`sprints/2026-05-18_WAVE*.md`)
+  - W16 genesis · W17 tectonique · W18 hydrologie chunk · W19–21 climat/marine
+  - W22 global genesis · W23–26 NCA/WFC · W27 render · W28–32 settlements/polity
+  - W33–40 observateurs · W41 atmosphère temporelle
+- Phases antérieures : `2026-05-11` … `2026-05-16` dans le même dossier
+
+> **Politique** : ne pas déplacer massivement ces fichiers — l’index suffit. Renommer selon `YYYY-MM-DD_<TYPE>-<topic>.md`.
 
 ---
 
-## 🛡️ Governance
+## Renders & conformité visuelle
+
+Assets PNG/GIF de preuve (ne pas supprimer sans accord équipe) :
+
+| Dossier | Contenu |
+|---------|---------|
+| [`compliance/renders/`](compliance/renders/) | Captures compliance waves 27–37 (chunks, macro, trade, iso, timelapse) |
+| [`renders/`](renders/) | Sorties récentes (ex. wave 41 atmosphère jour/nuit, iso 36) |
+
+Les smokes régénèrent certaines images ; les README et sprints **pointent** vers ces chemins.
+
+---
+
+## Architecture & gouvernance (racine repo)
+
+| Zone | Chemin |
+|------|--------|
+| Spec contractuelle | [`../Genesis_Engine_Architecture_v1.0.docx`](../Genesis_Engine_Architecture_v1.0.docx) |
+| ADR | [`../adr/`](../adr/) |
+| Architecture notes | [`../architecture/`](../architecture/) |
+| Specs techniques | [`../specs/`](../specs/) |
+| Éthique | [`../ethics/`](../ethics/), [`../ETHICS.md`](../ETHICS.md) |
+| Sécurité | [`../security/`](../security/), [`../SECURITY.md`](../SECURITY.md) |
+| Ops | [`../ops/`](../ops/) |
+| Protocoles | [`../protocol/`](../protocol/) |
+
+---
+
+## Docs conceptuelles numérotées
+
+| Fichier | Sujet |
+|---------|--------|
+| [`01-vision-and-philosophy.md`](01-vision-and-philosophy.md) | Hypothèse, philosophie |
+| [`02-system-overview.md`](02-system-overview.md) | Vue couches |
+| [`03-agent-cognition.md`](03-agent-cognition.md) | Cognition agents (PIANO) |
+| [`04-world-engine.md`](04-world-engine.md) | Moteur monde |
+| [`05-emergent-systems.md`](05-emergent-systems.md) | Langage, économie, religion |
+| [`06-observation-and-tooling.md`](06-observation-and-tooling.md) | Observatoire, exports |
+| [`07-glossary-and-conventions.md`](07-glossary-and-conventions.md) | Glossaire |
+
+Référence croisée : [`INDEX.md`](INDEX.md).
+
+---
+
+## Audits & améliorations
+
+| Fichier | Description |
+|---------|-------------|
+| [`../AUDIT.md`](../AUDIT.md) | Audit racine |
+| [`../runtime/AUDIT.md`](../runtime/AUDIT.md) | Audit runtime |
+| [`IMPROVEMENTS-SESSION.md`](IMPROVEMENTS-SESSION.md) | Notes session réalisme (mai 2026) |
+
+---
+
+## Gouvernance contributeur
 
 | Document | Description |
-|---|---|
-| [`../ETHICS.md`](../ETHICS.md) | Moral status of agents, External Ethics Council |
-| [`../SECURITY.md`](../SECURITY.md) | Threat model, PQC, vulnerability reporting |
-| [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | How to contribute |
-| [`../CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) | Contributor Covenant 2.1 |
-| [`../CHANGELOG.md`](../CHANGELOG.md) | Versioned change log |
-
----
-
-## 📅 History
-
-For the chronological journal of every AI coding session (sprints, phase progress, audits, technology watches), see [`sprints/README.md`](sprints/README.md).
+|----------|-------------|
+| [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Workflow, tests, conventions |
+| [Contributor Covenant](https://www.contributor-covenant.org/version/2/1/code_of_conduct/) | Code de conduite (référence ; fichier local à ajouter si besoin) |
+| [`../CHANGELOG.md`](../CHANGELOG.md) | Journal des versions |

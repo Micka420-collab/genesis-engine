@@ -106,6 +106,7 @@ class Annalist:
         self.lineage = LineageMap()
         self.metrics = Metrics()
         self.cum_births = 0
+        self.cum_foundings = 0
         self.cum_deaths = 0
         self.cum_fights = 0
         self.cum_shares = 0
@@ -126,8 +127,16 @@ class Annalist:
         if self.journal:
             self.journal.close()
 
-    def record_tick(self, tick, agents, births, deaths, raw_events):
+    def record_tick(self, tick, agents, births, deaths, raw_events,
+                    foundings=None):
         out = []
+        for row_tuple in (foundings or []):
+            row = int(row_tuple[0])
+            self.cum_foundings += 1
+            pos = tuple(agents.pos[row].tolist())
+            out.append(self._event("founding", tick, [str(agents.uuid[row])], pos,
+                                   {"generation": int(agents.generation[row]),
+                                    "emergent": bool(row_tuple[1]) if len(row_tuple) > 1 else False}))
         for child, pa, pb in births:
             self.cum_births += 1
             self.lineage.record_birth(child, pa, pb)
@@ -169,6 +178,22 @@ class Annalist:
                 pos = tuple(((agents.pos[a] + agents.pos[b]) * 0.5).tolist())
                 out.append(self._event("mating", tick,
                                        [str(agents.uuid[a]), str(agents.uuid[b])], pos, {}))
+            elif kind == "emergent_origin":
+                row = int(raw["row"])
+                self.cum_foundings += 1
+                pos = tuple(agents.pos[row].tolist())
+                out.append(self._event("founding", tick, [str(agents.uuid[row])], pos,
+                                       {"emergent": True, "substrate": float(raw.get("substrate", 0)),
+                                        "founder_index": int(raw.get("founder_index", 0))}))
+            elif kind == "sapient_emergence":
+                row = int(raw["row"])
+                self.cum_foundings += 1
+                pos = tuple(agents.pos[row].tolist())
+                out.append(self._event("founding", tick, [str(agents.uuid[row])], pos,
+                                       {"emergent": True, "from_species": raw.get("from_species"),
+                                        "oxygen_pct": float(raw.get("oxygen_pct", 0))}))
+            elif kind in ("protocell_division", "microbe_emergence"):
+                out.append(self._event("innovation", tick, [], (0.0, 0.0, 0.0), raw))
             elif kind == "vocalize":
                 self.cum_vocalizations += 1
                 a = raw["from"]; b = raw["to"]
