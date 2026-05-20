@@ -927,6 +927,9 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/sun_state":
             from engine.earth_sun_state import sun_state_snapshot
             self._json(200, sun_state_snapshot(self.sim_ref)); return
+        if path == "/api/languages":
+            from engine.speech_audio_bridge import languages_snapshot
+            self._json(200, languages_snapshot(self.sim_ref)); return
         if path == "/api/observer_feed":
             qs = self._qs()
             try:
@@ -957,6 +960,10 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if path == "/earth_console_agent_anim.js":
             self._serve_file("earth_console_agent_anim.js",
+                             content_type="application/javascript; charset=utf-8")
+            return
+        if path == "/earth_console_speech.js":
+            self._serve_file("earth_console_speech.js",
                              content_type="application/javascript; charset=utf-8")
             return
         if path == "/api/wind_field":

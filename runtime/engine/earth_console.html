@@ -358,6 +358,7 @@
       <button class="btn icon" data-speed="2">2×</button>
       <button class="btn icon" data-speed="5">5×</button>
       <button class="btn" id="btnRecenter">⊙ Agents</button>
+      <button class="btn" id="btnListen" title="Écouter les agents (E)">🎧 Écoute</button>
       <div class="zoom-presets view-hidden" id="zoomPresets" title="Échelles (1–4)">
         <button class="btn" type="button" data-zoom="macro">1 Macro</button>
         <button class="btn" type="button" data-zoom="region">2 Région</button>
@@ -454,6 +455,17 @@
         <button class="layer-chip" data-overlay="wind">Vent</button>
       </div>
 
+      <div class="section-title">Parole des agents</div>
+      <div id="speechListenPanel">
+        <button class="btn" type="button" id="btnListenSide" style="width:100%">🎧 Activer l'écoute</button>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:var(--muted)">
+          <input type="checkbox" id="chkSpeakAloud" checked> Synthèse vocale (zoom agent)
+        </label>
+        <div style="margin-top:6px;font-size:10px;color:var(--muted)">Proto-langages par culture :</div>
+        <div id="speechLangs" style="margin-top:4px">—</div>
+        <div class="speech-log" id="speechLog">—</div>
+      </div>
+
       <div class="section-title">Agent sélectionné</div>
       <div class="agent-detail" id="agentDetail">Clique un agent dans la liste.</div>
 
@@ -490,7 +502,7 @@
       <button type="button" id="rpExit">✕</button>
     </div>
     <div class="footer-row">
-      <span id="footerHelp"><kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>G</kbd> globe</span>
+      <span id="footerHelp"><kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>I</kbd> iso · <kbd>V</kbd> ciel · <kbd>L</kbd> 2D · <kbd>E</kbd> écoute · <kbd>1–4</kbd> zoom</span>
       <div id="timelineWrap"><canvas id="timelineCanvas"></canvas></div>
       <span class="zoom-readout" id="zoomReadout">zoom —</span>
     </div>
@@ -502,6 +514,7 @@
 <script src="/earth_console_sun_shadow.js"></script>
 <script src="/earth_console_ambient_audio.js"></script>
 <script src="/earth_console_agent_anim.js"></script>
+<script src="/earth_console_speech.js"></script>
 <script>
 const API = '';
 let overlay = '';
@@ -537,6 +550,7 @@ let lastObserverFeed = null;
 let lastSunState = null;
 let ambientAudio = null;
 let agentAnim = null;
+let agentSpeech = null;
 let consoleRafId = null;
 let popHistory = [];
 let metricsHistory = { tick: [], population: [] };
@@ -587,6 +601,41 @@ function initPresenceLayers() {
   }
   if (!ambientAudio && typeof EarthConsoleAmbientAudio !== 'undefined') {
     ambientAudio = new EarthConsoleAmbientAudio();
+  }
+}
+function initSpeech() {
+  if (agentSpeech || typeof EarthConsoleSpeech === 'undefined') return;
+  agentSpeech = new EarthConsoleSpeech({
+    api: API,
+    get w2s() { return w2s; },
+    get camCenterX() { return camCenterX; },
+    get camCenterY() { return camCenterY; },
+    get camZoom() { return camZoom; },
+    get selectedRow() { return selectedRow; },
+  });
+}
+function syncSpeechOpts() {
+  if (!agentSpeech) return;
+  agentSpeech.opts.api = API;
+  agentSpeech.opts.w2s = w2s;
+  agentSpeech.opts.camCenterX = camCenterX;
+  agentSpeech.opts.camCenterY = camCenterY;
+  agentSpeech.opts.camZoom = camZoom;
+  agentSpeech.opts.selectedRow = selectedRow;
+  const chk = document.getElementById('chkSpeakAloud');
+  if (chk) agentSpeech.speakAloud = chk.checked;
+}
+function toggleListen() {
+  initSpeech();
+  syncSpeechOpts();
+  if (ambientAudio) ambientAudio.unlock();
+  if (agentSpeech) {
+    const on = agentSpeech.toggle();
+    const lbl = on ? '🔇 Couper écoute' : '🎧 Activer l\'écoute';
+    document.getElementById('btnListen')?.classList.toggle('active', on);
+    document.getElementById('btnListenSide')?.classList.toggle('primary', on);
+    const side = document.getElementById('btnListenSide');
+    if (side) side.textContent = lbl;
   }
 }
 async function loadSunState() {
@@ -647,6 +696,8 @@ resize();
 viewport.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
   initPresenceLayers();
+  initSpeech();
+  syncSpeechOpts();
   if (ambientAudio) ambientAudio.unlock();
   dragging = true; dragX = e.clientX; dragY = e.clientY;
   camStartX = camCenterX; camStartY = camCenterY;
@@ -1067,6 +1118,8 @@ function startConsoleRaf() {
     if (ambientAudio?.enabled) {
       ambientAudio.update(lastSunState, camZoom, agentsForDisplay(), lastObserverFeed);
     }
+    syncSpeechOpts();
+    if (agentSpeech?.enabled) agentSpeech.tickBubbles();
     if (viewMode === 'lite2d' || viewMode === 'sky') drawLiteAgents();
     else drawAgents();
     consoleRafId = requestAnimationFrame(frame);
@@ -1503,8 +1556,12 @@ window.addEventListener('keydown', e => {
   if (e.code === 'Digit2') applyZoomPreset('region');
   if (e.code === 'Digit3') applyZoomPreset('village');
   if (e.code === 'Digit4') applyZoomPreset('agent');
+  if (e.code === 'KeyE') toggleListen();
   if (e.code === 'KeyP') setReplayMode(!replayActive);
 });
+document.getElementById('btnListen')?.addEventListener('click', toggleListen);
+document.getElementById('btnListenSide')?.addEventListener('click', toggleListen);
+document.getElementById('chkSpeakAloud')?.addEventListener('change', syncSpeechOpts);
 document.getElementById('zoomPresets').addEventListener('click', e => {
   const b = e.target.closest('[data-zoom]');
   if (b) applyZoomPreset(b.dataset.zoom);
@@ -1803,6 +1860,7 @@ document.getElementById('artifactFile').addEventListener('change', async e => {
 
 initObserver();
 initPresenceLayers();
+initSpeech();
 document.getElementById('chipObserver')?.addEventListener('click', () => {
   observerEnabled = !observerEnabled;
   document.getElementById('chipObserver')?.classList.toggle('active', observerEnabled);

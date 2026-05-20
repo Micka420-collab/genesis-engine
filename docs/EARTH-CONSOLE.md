@@ -36,6 +36,9 @@ Ouvre **http://127.0.0.1:8090/** dans le navigateur.
 | **Vue isométrique** | 2.5D avec chantiers qui grandissent (`/api/render?mode=iso`, tuiles 12×6) |
 | **Soleil / ombres** | `GET /api/sun_state` → `earth_console_sun_shadow.js` |
 | **Zoom agent** | Sons procéduraux (`earth_console_ambient_audio.js`) + interpolation (`earth_console_agent_anim.js`) |
+| **Écoute / langage** | `GET /api/audio` + `GET /api/languages` · bulles + synthèse vocale (`earth_console_speech.js`, touche **E**) |
+
+Raccourcis : **I** iso · **V** vue ciel · **L** 2D · **1–4** zoom · **E** écoute · clic carte = activer le son.
 | **2D lite (◎)** | Terrain biomes (`/api/lite_field`), lois L0 HUD, agents glow + flèches de mouvement |
 | **Vue du ciel (🛰)** | Humains (posture, peau, outil), chantiers, terraformation (`/api/observer_feed`, **V**) |
 | **Terre réaliste** | Palette atlas unifiée, hillshade, hypsométrie (`earth_visual_tokens.py`) |

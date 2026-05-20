@@ -67,6 +67,9 @@ def wire_emergence_v2(sim, *,
         run_discovery_lab(sim, plateau=True)
         out["algorithm_lab"] = install_best_operator(sim)
 
+    from engine.speech_audio_bridge import install_speech_audio
+    out["speech_audio"] = install_speech_audio(sim)
+
     if autonomous_world or getattr(sim.cfg, "autonomous_world", False):
         from engine.autonomous_world import install_autonomous_world
         out["autonomous_world"] = install_autonomous_world(sim)

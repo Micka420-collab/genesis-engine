@@ -40,6 +40,10 @@ def test_earth_console_html_exists():
     assert "data-view-mode=\"sky\"" in text
     assert "/api/observer_feed" in text
     assert "observerLayer" in text
+    assert "earth_console_speech.js" in text
+    assert "btnListen" in text
+    assert "KeyE" in text or "toggleListen" in text
+    assert "/api/sun_state" in text or "loadSunState" in text
 
 
 def test_run_earth_console_script_exists():

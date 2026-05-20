@@ -120,10 +120,16 @@ def audio_snapshot(sim, sound_field: SoundField, qs: Dict[str, str]) -> dict:
                 "error": "listener position missing"}
 
     out = []
+    agents = getattr(sim, "agents", None)
     for u, perceived in sound_field.audible_at(x, y, AUDIBILITY_THRESHOLD_DB):
         lex_vec = _agent_lex_vector(sim, u.speaker_row)
-        out.append(utterance_to_dict(u, perceived_db=perceived,
-                                     lex_vector=lex_vec))
+        d = utterance_to_dict(u, perceived_db=perceived, lex_vector=lex_vec)
+        if agents is not None and hasattr(agents, "culture_id"):
+            try:
+                d["culture_id"] = int(agents.culture_id[u.speaker_row])
+            except Exception:
+                pass
+        out.append(d)
     return {
         "utterances": out,
         "listener": {"x": x, "y": y, "row": row_used},
