@@ -1,0 +1,13 @@
+[package]
+name        = "genesis-ecosystem"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Flora and fauna spawn rules"
+
+[dependencies]
+genesis-core    = { path = "../core" }
+genesis-biome   = { path = "../biome" }
+genesis-noise   = { path = "../noise" }
+smallvec  = { workspace = true }
+serde     = { workspace = true }

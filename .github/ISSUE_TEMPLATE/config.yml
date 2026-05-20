@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/Micka420-collab/genesis-engine/blob/main/docs/README.md
+    about: Index de la documentation
+  - name: État du projet
+    url: https://github.com/Micka420-collab/genesis-engine/blob/main/PROJECT-STATUS.md
+    about: Synthèse phases, waves et réalisme ~63 %
+  - name: Guide contributeur
+    url: https://github.com/Micka420-collab/genesis-engine/blob/main/CONTRIBUTING.md
+    about: Premier jour, tests, conventions PR

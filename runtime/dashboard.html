@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Genesis Engine — Observation Dashboard</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1f2630;
+    --fg: #e6edf3;
+    --muted: #8b95a4;
+    --accent: #58a6ff;
+    --good: #3fb950;
+    --bad: #f85149;
+    --warn: #d29922;
+    --border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--fg);
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 18px;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .filler { flex: 1; }
+  header label {
+    font-size: 12px; color: var(--muted);
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer;
+  }
+  header input[type="file"] { display: none; }
+  header button {
+    background: var(--panel-2); color: var(--fg);
+    border: 1px solid var(--border); padding: 5px 10px;
+    border-radius: 6px; font-size: 12px; cursor: pointer;
+  }
+  header button:hover { background: #2c333d; }
+  .grid {
+    display: grid;
+    grid-template-columns: 280px 1fr 380px;
+    grid-template-rows: 1fr;
+    overflow: hidden;
+  }
+  .col { overflow: auto; padding: 16px; }
+  .col.left { border-right: 1px solid var(--border); }
+  .col.right { border-left: 1px solid var(--border); background: var(--panel); }
+  h2 { font-size: 13px; color: var(--muted); margin: 0 0 8px;
+       text-transform: uppercase; letter-spacing: 0.05em; }
+  .kpi-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; margin-bottom: 16px;
+  }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .kpi .v { font-size: 22px; font-weight: 600; }
+  .kpi .k { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  canvas { display: block; }
+  .chart {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px; margin-bottom: 12px;
+  }
+  .chart-title { font-size: 12px; color: var(--muted); margin: 0 0 4px 8px; }
+  .map-wrap {
+    background: #050708; border: 1px solid var(--border);
+    border-radius: 8px; height: 60%; min-height: 320px;
+    position: relative; overflow: hidden;
+  }
+  .map-controls {
+    position: absolute; top: 8px; left: 8px; display: flex; gap: 6px;
+  }
+  .map-controls button {
+    background: rgba(22,27,34,0.85); color: var(--fg);
+    border: 1px solid var(--border); padding: 3px 8px;
+    border-radius: 4px; font-size: 11px; cursor: pointer;
+  }
+  .map-controls button.active { border-color: var(--accent); color: var(--accent); }
+  .events {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px; font-family: ui-monospace, monospace;
+    font-size: 11px; line-height: 1.4; max-height: 100%; overflow: auto;
+  }
+  .ev { display: grid; grid-template-columns: 60px 90px 1fr; gap: 6px;
+        padding: 2px 4px; border-bottom: 1px solid #20262e; }
+  .ev:last-child { border-bottom: none; }
+  .ev .t { color: var(--muted); }
+  .ev .k { font-weight: 600; }
+  .ev .k.birth { color: var(--good); }
+  .ev .k.death { color: var(--bad); }
+  .ev .k.mating { color: #b388ff; }
+  .ev .k.share { color: var(--accent); }
+  .ev .k.conflict, .ev .k.fight { color: var(--bad); }
+  .ev .k.vocalization { color: #ffa657; }
+  .ev .k.group_formed { color: var(--warn); }
+  .ev .k.group_dissolved { color: #8b95a4; }
+  .ev .k.innovation, .ev .k.invent { color: #79c0ff; }
+  .ev .k.catastrophe { color: #ff7b72; font-weight: 700; }
+  .ev .k.build { color: #56d364; }
+  .config-block {
+    font-family: ui-monospace, monospace; font-size: 11px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px;
+    margin-bottom: 16px; color: var(--muted);
+    white-space: pre-wrap;
+  }
+  .legend { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .dot { display: inline-block; width: 8px; height: 8px;
+         border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  #empty {
+    color: var(--muted); padding: 60px 24px; text-align: center;
+    font-size: 14px;
+  }
+  #empty code { background: var(--panel-2); padding: 2px 6px;
+                border-radius: 4px; color: var(--fg); }
+  .pill {
+    display: inline-block; padding: 1px 6px; border-radius: 9px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    font-size: 10px; color: var(--muted); margin-left: 4px;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Genesis Engine · Observation</h1>
+    <label>
+      summary.json
+      <input id="file-summary" type="file" accept=".json">
+    </label>
+    <label>
+      journal.jsonl
+      <input id="file-journal" type="file" accept=".jsonl,.log,.json">
+    </label>
+    <label>
+      snapshot.json
+      <input id="file-snapshot" type="file" accept=".json">
+    </label>
+    <label>
+      SSE
+      <input id="sse-url" type="text" placeholder="http://127.0.0.1:8765/events"
+             style="width:200px;font-size:11px;background:var(--panel-2);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:2px 6px;">
+    </label>
+    <button id="btn-sse" type="button">Connect SSE</button>
+    <span class="filler"></span>
+    <button id="btn-clear">Clear</button>
+    <span class="legend">
+      <span class="dot" style="background:#3fb950"></span>alive
+      <span class="dot" style="background:#f85149"></span>dead
+      <span class="dot" style="background:#58a6ff"></span>culture
+    </span>
+  </header>
+
+  <div id="empty">
+    <p>Pick a <code>summary.json</code> from <code>runtime/artifacts/</code>
+       and the matching <code>journal.jsonl</code> from <code>runtime/journals/</code>.</p>
+    <p>Optional: load <code>&lt;name&gt;_snapshot.json</code> for the god-view map.</p>
+    <p>Example: <code>python run.py exp5_stress_200 --ticks 300</code></p>
+  </div>
+
+  <div id="root" class="grid" style="display:none">
+    <div class="col left">
+      <h2>Run</h2>
+      <div id="config" class="config-block">—</div>
+
+      <h2>KPIs</h2>
+      <div class="kpi-grid" id="kpis"></div>
+
+      <h2>Epidemic</h2>
+      <div id="epidemic-panel" class="config-block" style="display:none">—</div>
+
+      <h2>Event mix</h2>
+      <div class="chart">
+        <div class="chart-title">cumulative events by kind</div>
+        <canvas id="chart-events" width="240" height="180"></canvas>
+      </div>
+    </div>
+
+    <div class="col">
+      <h2>Population</h2>
+      <div class="chart">
+        <div class="chart-title">alive vs cumulative births / deaths</div>
+        <canvas id="chart-pop" width="700" height="180"></canvas>
+      </div>
+      <h2>Drives</h2>
+      <div class="chart">
+        <div class="chart-title">average hunger / thirst / vitality</div>
+        <canvas id="chart-drives" width="700" height="180"></canvas>
+      </div>
+      <h2>Society</h2>
+      <div class="chart">
+        <div class="chart-title">cumulative shares / fights / matings / vocalizations</div>
+        <canvas id="chart-social" width="700" height="180"></canvas>
+      </div>
+
+      <h2>God view — final snapshot</h2>
+      <div class="map-wrap">
+        <div class="map-controls">
+          <button data-color="culture">color: culture</button>
+          <button data-color="action">color: action</button>
+          <button data-color="vitality">color: vitality</button>
+          <button data-color="hunger">color: hunger</button>
+          <button data-color="nearby">color: nearby</button>
+          <button type="button" id="btn-vision">vision cones</button>
+        </div>
+        <canvas id="map" width="700" height="380"></canvas>
+      </div>
+    </div>
+
+    <div class="col right">
+      <h2>Event log <span id="evcount" class="pill"></span></h2>
+      <div class="events" id="events"></div>
+    </div>
+  </div>
+
+<script>
+// ----- state --------------------------------------------------------------
+const state = {
+  summary: null,
+  events: [],
+  snapshot: null,
+  mapColorMode: "culture",
+  showVisionCones: false,
+  visionCones: [],
+  sse: null,
+};
+
+const ACTIONS = ["IDLE","WALK_TO","DRINK","EAT","SLEEP","FORAGE","SEEK_SHELTER",
+  "MATE","SPEAK","SHARE","FIGHT","BUILD","FLEE","EXPLORE","HUNT","PLANT",
+  "HARVEST","MINE","SMELT"];
+
+const PALETTE = [
+  "#58a6ff", "#f85149", "#3fb950", "#d29922", "#b388ff",
+  "#56d364", "#ff7b72", "#79c0ff", "#a371f7", "#f0883e",
+];
+
+// ----- file loaders -------------------------------------------------------
+function readJSON(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => { try { res(JSON.parse(r.result)); } catch (e) { rej(e); } };
+    r.onerror = () => rej(r.error);
+    r.readAsText(file);
+  });
+}
+
+function readJSONL(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const out = [];
+      for (const line of r.result.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        try { out.push(JSON.parse(line)); }
+        catch (e) { /* skip malformed */ }
+      }
+      res(out);
+    };
+    r.onerror = () => rej(r.error);
+    r.readAsText(file);
+  });
+}
+
+document.getElementById("file-summary").addEventListener("change", async (e) => {
+  if (!e.target.files[0]) return;
+  state.summary = await readJSON(e.target.files[0]);
+  render();
+});
+document.getElementById("file-journal").addEventListener("change", async (e) => {
+  if (!e.target.files[0]) return;
+  state.events = await readJSONL(e.target.files[0]);
+  render();
+});
+function normalizeSnapshot(raw) {
+  if (!raw) return null;
+  state.visionCones = raw.vision_cones || [];
+  if (raw.agents && raw.bounds_m) return raw;
+  const compact = raw.agents_compact || [];
+  const bounds = raw.bounds_m || [500, 500];
+  return {
+    bounds_m: bounds,
+    agents: compact.map((a) => ({
+      x: a.x, y: a.y, h: a.h, t: a.t, v: a.v,
+      c: a.c, g: a.g, a: a.a,
+      nearby: a.nearby != null ? a.nearby : 0,
+      vision_m: a.vision_m != null ? a.vision_m : 60,
+    })),
+  };
+}
+
+document.getElementById("file-snapshot").addEventListener("change", async (e) => {
+  if (!e.target.files[0]) return;
+  state.snapshot = normalizeSnapshot(await readJSON(e.target.files[0]));
+  render();
+});
+document.getElementById("btn-clear").addEventListener("click", () => {
+  state.summary = null; state.events = []; state.snapshot = null;
+  render();
+});
+
+document.querySelectorAll(".map-controls button[data-color]").forEach((b) => {
+  b.addEventListener("click", () => {
+    state.mapColorMode = b.dataset.color;
+    document.querySelectorAll(".map-controls button[data-color]")
+      .forEach((x) => x.classList.toggle("active", x === b));
+    drawMap();
+  });
+});
+document.getElementById("btn-vision")?.addEventListener("click", () => {
+  state.showVisionCones = !state.showVisionCones;
+  const btn = document.getElementById("btn-vision");
+  if (btn) btn.classList.toggle("active", state.showVisionCones);
+  drawMap();
+});
+
+// ----- render -------------------------------------------------------------
+function render() {
+  const has = state.summary || state.events.length || state.snapshot;
+  document.getElementById("empty").style.display = has ? "none" : "block";
+  document.getElementById("root").style.display = has ? "grid" : "none";
+  if (!has) return;
+  renderConfig();
+  renderKPIs();
+  renderEpidemic();
+  renderEventMix();
+  renderPop();
+  renderDrives();
+  renderSocial();
+  drawMap();
+  renderEventLog();
+}
+
+function renderConfig() {
+  const s = state.summary;
+  const el = document.getElementById("config");
+  if (!s) { el.textContent = "(no summary loaded)"; return; }
+  const c = s.config || {};
+  el.textContent =
+    `experiment: ${s.experiment}\n` +
+    `seed:       0x${(c.seed || 0).toString(16)}\n` +
+    `founders:   ${c.founders}\n` +
+    `cap:        ${c.max_agents}\n` +
+    `bounds_km:  ${(c.bounds_km || []).join(" x ")}\n` +
+    `cultures:   ${c.cultures}\n` +
+    `drive_accel:${c.drive_accel}\n` +
+    `5cd:        ${c["5cd_installed"]}\n` +
+    `coupler:    ${c.multi_rate_coupler ?? "?"}\n` +
+    `ticks_run:  ${s.ticks_run}  wall:${(s.wall_clock_s||0).toFixed(1)}s` +
+    `  ${(s.tps||0).toFixed(1)} TPS`;
+}
+
+function renderEpidemic() {
+  const panel = document.getElementById("epidemic-panel");
+  const ep = (state.summary || {}).epidemic;
+  if (!ep || !panel) {
+    if (panel) panel.style.display = "none";
+    return;
+  }
+  panel.style.display = "block";
+  const lines = ["epidemic observer"];
+  const cmp = ep.r0_comparison || {};
+  for (const [p, v] of Object.entries(cmp)) {
+    lines.push(
+      `${p}: R0_SIR=${v.r0_sir_estimate} R0_net=${v.r0_network_estimate}`);
+  }
+  const pp = ep.per_pathogen || {};
+  for (const [p, v] of Object.entries(pp)) {
+    lines.push(
+      `${p}: I=${v.n_infectious} S=${v.n_susceptible} R=${v.n_recovered}`);
+  }
+  panel.textContent = lines.join("\n");
+}
+
+document.getElementById("btn-sse")?.addEventListener("click", () => {
+  const url = document.getElementById("sse-url")?.value?.trim();
+  if (!url) return;
+  if (state.sse) {
+    state.sse.close();
+    state.sse = null;
+  }
+  if (typeof EventSource === "undefined") {
+    alert("EventSource not supported in this browser");
+    return;
+  }
+  state.sse = new EventSource(url);
+  state.sse.addEventListener("tick", (ev) => {
+    try {
+      state.summary = JSON.parse(ev.data);
+      render();
+    } catch (e) { /* ignore */ }
+  });
+  state.sse.onerror = () => {
+    console.warn("SSE disconnected");
+  };
+});
+
+function renderKPIs() {
+  const s = state.summary || {};
+  const m = s.metrics || {};
+  const groups = m.groups_formed_cum || 0;
+  const vocs = m.vocalizations_cum || 0;
+  const lex = m.distinct_lex_signatures || 0;
+  const kpis = [
+    ["final alive", s.final_alive ?? "—"],
+    ["births",      s.cum_births ?? "—"],
+    ["deaths",      s.cum_deaths ?? "—"],
+    ["events",      s.cum_events ?? "—"],
+    ["groups",      groups],
+    ["lex sigs",    lex],
+    ["vocalize",    vocs],
+    ["TPS",         (s.tps || 0).toFixed(1)],
+  ];
+  const el = document.getElementById("kpis");
+  el.innerHTML = "";
+  for (const [k, v] of kpis) {
+    const div = document.createElement("div");
+    div.className = "kpi";
+    div.innerHTML = `<div class="v">${v}</div><div class="k">${k}</div>`;
+    el.appendChild(div);
+  }
+}
+
+// ----- helpers ------------------------------------------------------------
+function plotLine(ctx, series, opts) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, W, H);
+  if (!series.length) return;
+  const allY = series.flatMap(s => s.ys);
+  if (!allY.length) return;
+  const allX = series[0].xs;
+  if (!allX.length) return;
+  const xmin = allX[0], xmax = allX[allX.length - 1];
+  const ymin = opts && opts.ymin !== undefined ? opts.ymin : Math.min(...allY);
+  let ymax = opts && opts.ymax !== undefined ? opts.ymax : Math.max(...allY);
+  if (ymax <= ymin) ymax = ymin + 1;
+  const m = { l: 36, r: 8, t: 8, b: 18 };
+  // grid
+  ctx.strokeStyle = "#1f2630"; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = m.t + (H - m.t - m.b) * (i / 4);
+    ctx.beginPath(); ctx.moveTo(m.l, y); ctx.lineTo(W - m.r, y); ctx.stroke();
+  }
+  // axes
+  ctx.fillStyle = "#8b95a4"; ctx.font = "10px ui-monospace, monospace";
+  for (let i = 0; i <= 4; i++) {
+    const yv = ymax - (ymax - ymin) * (i / 4);
+    const y = m.t + (H - m.t - m.b) * (i / 4);
+    ctx.fillText(yv.toFixed(1), 2, y + 3);
+  }
+  ctx.fillText(`t=${xmin}`, m.l, H - 4);
+  ctx.fillText(`t=${xmax}`, W - m.r - 36, H - 4);
+  // lines
+  for (const s of series) {
+    ctx.strokeStyle = s.color; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < s.xs.length; i++) {
+      const xx = m.l + (W - m.l - m.r) * ((s.xs[i] - xmin) / Math.max(1, xmax - xmin));
+      const yy = m.t + (H - m.t - m.b) * (1 - (s.ys[i] - ymin) / (ymax - ymin));
+      if (i === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+  // legend
+  let lx = m.l + 4, ly = m.t + 10;
+  for (const s of series) {
+    ctx.fillStyle = s.color; ctx.fillRect(lx, ly - 6, 10, 2);
+    ctx.fillStyle = "#e6edf3";
+    ctx.fillText(s.label, lx + 14, ly);
+    lx += ctx.measureText(s.label).width + 30;
+  }
+}
+
+function renderPop() {
+  const m = (state.summary || {}).metrics || {};
+  if (!m.tick) return;
+  const ctx = document.getElementById("chart-pop").getContext("2d");
+  plotLine(ctx, [
+    { xs: m.tick, ys: m.population || [], color: "#58a6ff", label: "alive" },
+    { xs: m.tick, ys: m.births_cum || [], color: "#3fb950", label: "births" },
+    { xs: m.tick, ys: m.deaths_cum || [], color: "#f85149", label: "deaths" },
+  ], { ymin: 0 });
+}
+
+function renderDrives() {
+  const m = (state.summary || {}).metrics || {};
+  if (!m.tick) return;
+  const ctx = document.getElementById("chart-drives").getContext("2d");
+  plotLine(ctx, [
+    { xs: m.tick, ys: m.avg_hunger || [], color: "#d29922", label: "hunger" },
+    { xs: m.tick, ys: m.avg_thirst || [], color: "#58a6ff", label: "thirst" },
+    { xs: m.tick, ys: m.avg_vitality || [], color: "#3fb950", label: "vitality" },
+  ], { ymin: 0, ymax: 1.2 });
+}
+
+function renderSocial() {
+  const m = (state.summary || {}).metrics || {};
+  if (!m.tick) return;
+  const ctx = document.getElementById("chart-social").getContext("2d");
+  plotLine(ctx, [
+    { xs: m.tick, ys: m.shares_cum || [], color: "#58a6ff", label: "shares" },
+    { xs: m.tick, ys: m.fights_cum || [], color: "#f85149", label: "fights" },
+    { xs: m.tick, ys: m.matings_cum || [], color: "#b388ff", label: "matings" },
+  ], { ymin: 0 });
+}
+
+function renderEventMix() {
+  // Histogram from the journal events themselves, fallback to cumulative
+  // counters in summary.metrics if the journal isn't loaded.
+  const ctx = document.getElementById("chart-events").getContext("2d");
+  const counts = {};
+  if (state.events.length) {
+    for (const e of state.events) {
+      counts[e.kind] = (counts[e.kind] || 0) + 1;
+    }
+  } else if (state.summary && state.summary.metrics) {
+    const m = state.summary.metrics;
+    counts.birth = (m.births_cum || [0]).at(-1);
+    counts.death = (m.deaths_cum || [0]).at(-1);
+    counts.share = (m.shares_cum || [0]).at(-1);
+    counts.fight = (m.fights_cum || [0]).at(-1);
+    counts.mating = (m.matings_cum || [0]).at(-1);
+    counts.vocalize = m.vocalizations_cum || 0;
+  }
+  const entries = Object.entries(counts).filter(([_, v]) => v).sort((a, b) => b[1] - a[1]);
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#0d1117"; ctx.fillRect(0, 0, W, H);
+  const max = entries.length ? Math.max(...entries.map(e => e[1])) : 1;
+  const rowH = 16;
+  entries.slice(0, 10).forEach(([kind, v], i) => {
+    const y = 4 + i * rowH;
+    const w = (W - 100) * (v / max);
+    ctx.fillStyle = PALETTE[i % PALETTE.length];
+    ctx.fillRect(80, y + 3, w, rowH - 6);
+    ctx.fillStyle = "#e6edf3";
+    ctx.font = "10px ui-monospace, monospace";
+    ctx.fillText(kind, 4, y + 11);
+    ctx.fillStyle = "#8b95a4";
+    ctx.fillText(String(v), W - 36, y + 11);
+  });
+}
+
+function drawMap() {
+  const snap = state.snapshot;
+  const cv = document.getElementById("map");
+  const ctx = cv.getContext("2d");
+  // Resize to wrapper.
+  const wrap = cv.parentElement;
+  cv.width = wrap.clientWidth;
+  cv.height = wrap.clientHeight;
+  const W = cv.width, H = cv.height;
+  ctx.fillStyle = "#050708"; ctx.fillRect(0, 0, W, H);
+  if (!snap) {
+    ctx.fillStyle = "#8b95a4"; ctx.font = "12px sans-serif";
+    ctx.fillText("Load snapshot.json to see the god-view.", 16, 28);
+    return;
+  }
+  const [bxm, bym] = snap.bounds_m || [500, 500];
+  // Bounds (m) → canvas px. Centered.
+  const sx = W / (2 * bxm), sy = H / (2 * bym);
+  const s = Math.min(sx, sy) * 0.9;
+  const ox = W / 2, oy = H / 2;
+  // Bounding box
+  ctx.strokeStyle = "#1f2630"; ctx.lineWidth = 1;
+  ctx.strokeRect(ox - bxm * s, oy - bym * s, 2 * bxm * s, 2 * bym * s);
+  // Agents
+  const mode = state.mapColorMode;
+  if (state.showVisionCones && state.visionCones.length) {
+    ctx.strokeStyle = "rgba(88, 166, 255, 0.35)";
+    ctx.fillStyle = "rgba(88, 166, 255, 0.06)";
+    for (const vc of state.visionCones) {
+      const cx = ox + vc.x * s;
+      const cy = oy - vc.y * s;
+      const rr = (vc.r || 60) * s;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rr, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+  for (const a of snap.agents) {
+    const xx = ox + a.x * s;
+    const yy = oy - a.y * s;
+    let color = "#58a6ff";
+    if (mode === "culture") color = PALETTE[(a.c % PALETTE.length + PALETTE.length) % PALETTE.length];
+    else if (mode === "action") color = PALETTE[((a.a || 0) % PALETTE.length + PALETTE.length) % PALETTE.length];
+    else if (mode === "vitality") {
+      const v = Math.max(0, Math.min(1, a.v));
+      color = `rgb(${Math.round(255*(1-v))},${Math.round(255*v)},80)`;
+    }     else if (mode === "hunger") {
+      const v = Math.max(0, Math.min(1, a.h));
+      color = `rgb(${Math.round(255*v)},${Math.round(255*(1-v))},60)`;
+    } else if (mode === "nearby") {
+      const n = a.nearby != null ? a.nearby : 0;
+      const v = Math.min(1, n / 8);
+      color = `rgb(${Math.round(80+120*v)},${Math.round(180-80*v)},255)`;
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(xx, yy, 2.2, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#8b95a4";
+  ctx.font = "11px ui-monospace, monospace";
+  ctx.fillText(`agents=${snap.agents.length}  bounds=±${bxm.toFixed(0)}×${bym.toFixed(0)} m  color=${mode}`, 8, H - 6);
+}
+
+function renderEventLog() {
+  const el = document.getElementById("events");
+  el.innerHTML = "";
+  const evs = state.events.slice(-300);
+  document.getElementById("evcount").textContent =
+    `${state.events.length} total, last ${evs.length}`;
+  for (const e of evs) {
+    const div = document.createElement("div");
+    div.className = "ev";
+    div.innerHTML =
+      `<span class="t">t=${e.tick}</span>` +
+      `<span class="k ${e.kind}">${e.kind}</span>` +
+      `<span class="m">${formatMeta(e)}</span>`;
+    el.appendChild(div);
+  }
+  el.scrollTop = el.scrollHeight;
+}
+
+function formatMeta(e) {
+  const md = e.metadata || {};
+  switch (e.kind) {
+    case "birth":  return `gen=${md.generation ?? "?"}`;
+    case "death":  return `${md.cause ?? "?"} age=${md.age_ticks ?? "?"} kids=${md.offspring_count ?? 0}`;
+    case "share":  return `qty=${(md.qty || 0).toFixed(3)}kg`;
+    case "conflict":
+    case "fight":  return `dmg=${(md.damage || 0).toFixed(3)}`;
+    case "vocalization": return `lex=${md.lex_sig ?? "?"}`;
+    case "group_formed": return `gid=${md.group_id} size=${md.size}`;
+    case "group_dissolved": return `gid=${md.group_id} (${md.reason || "?"})`;
+    case "innovation": return md.tech_name || `tech=${md.tech ?? "?"}`;
+    case "invent": return `${md.name || "artifact"} fn=${md.function ?? "?"}`;
+    case "catastrophe": return "shockwave";
+    case "build": return `kind=${md.structure_kind ?? "?"}`;
+    default: return Object.keys(md).slice(0, 3).join(" ");
+  }
+}
+
+window.addEventListener("resize", () => { drawMap(); });
+</script>
+</body>
+</html>

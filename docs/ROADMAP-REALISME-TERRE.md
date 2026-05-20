@@ -1,0 +1,92 @@
+# Roadmap réalisme Terre — Genesis Engine
+
+Estimation honnête du niveau de réalisme **au 19 mai 2026** après la session « objectif 80 % ».
+
+## Grille de maturité (cible utilisateur ~80 %)
+
+| Dimension | % session | Justification | Gap vers 80 % |
+|-----------|-----------|---------------|---------------|
+| Climat / biomes | **76 %** | Köppen FAIR (checksums), bootstrap Genesis p80, harness 6 stations | Circulation 3D, Beck 2018 |
+| Géologie / relief | **55 %** | Tectonique + stratigraphie légère | Érosion GPU dynamique, datation absolue |
+| Écologie / hydrologie | **58 %** | Saint-Venant 1D + LBM D2Q9 cross-chunk (p81) | Biogeochimie, bassins versants complets |
+| Sociétés / agents | **70 %** | R0 réseau vs SIR, exp4 + dashboard | Économie complète, memotype borné |
+| Rendu visuel | **73 %** | PBR-lite, HG phase + ray-march colonne | Volumétrique GPU, humains photoréalistes |
+| Observation IA | **78 %** | SSE `observation_server.py`, dashboard auto-refresh | Fog-of-war, multi-tenant |
+| Pont Python↔Rust | **55 %** | maturin CI, `genesis_world` + mock p73 | WorldGraph passes prod |
+
+**Global pondéré : ~68 %** (moyenne simple des 7 dimensions).
+
+> L’objectif **80 % absolu** (simulation « publication-grade » type Terre) n’est pas atteint en une session : il exigerait modèles 3D atmosphère, hydrologie physique complète, et pont Rust en production. La session a **maximisé les gains mesurables** sur chaque axe ; le chemin vers 80 % global est documenté ci-dessous.
+
+---
+
+## Livrables session (19 mai 2026)
+
+| Livrable | Statut | Fichiers |
+|----------|--------|----------|
+| Köppen grille macro + métriques FAIR | ✅ | `runtime/engine/koeppen_grid.py`, `p75_*` |
+| MultiRateCoupler Python → sim | ✅ | `runtime/engine/multi_rate_coupler.py`, `p76_*` |
+| Contact graph épidémie | ✅ | `runtime/engine/epidemic_observer.py`, `p77_*` |
+| Rendu PBR-lite | ✅ | `runtime/engine/world_render.py`, `p78_*` |
+| Vision cone + JSONL | ✅ | `runtime/engine/agent_observation.py`, `p79_*` |
+| Pont Rust mock | ✅ | `runtime/engine/rust_bridge.py`, `p73_*` mis à jour |
+| Cross-chunk hydrology stub | ✅ | `chunk_hydrology.cross_chunk_flow_stub` |
+| Stratigraphie légère | ✅ | `tectonic_geology.stratigraphy_layer_index` |
+| Fog altitude amélioré | ✅ | `world_atmosphere.atmospheric_fog_factor` |
+| Dashboard vision | ✅ | `runtime/dashboard.html` |
+
+---
+
+## P0 — Fondations (sessions précédentes ✅)
+
+| Livrable | Fichiers |
+|----------|----------|
+| Harness Köppen–Geiger Rust + Python | `crates/biome/src/koeppen.rs`, `p74_*` |
+| MultiRateCoupler + TickDomain Rust | `crates/core/`, `crates/worldgraph/` |
+| Snapshots agents | `agent_observation.py` |
+| Atmosphère ACES / Rayleigh | `world_atmosphere.py` |
+
+---
+
+## Prochain sprint (vers 80 % global)
+
+1. **CI maturin** : `genesis_world` natif vert → pont Rust ~70 %+.
+2. **Köppen** : export NetCDF diagnostics ; valider 50 stations (Beck 2018).
+3. **WorldGraph** : 1 pass Rust depuis `genesis_bootstrap` (tectonics/ecology).
+4. **Hydrologie** : LBM 2D minimal ou D8 accumulation cross-macro.
+5. **Observation** : WebSocket `append_observable_jsonl` live.
+
+---
+
+## Commandes de vérification
+
+```bash
+# Rust (si cargo disponible)
+cd native/world-engine
+cargo test -p genesis-core -p genesis-biome -p genesis-worldgraph
+
+# Python (depuis runtime/)
+python scripts/p74_koeppen_harness_smoke.py
+python scripts/p75_koeppen_grid_smoke.py
+python scripts/p76_multi_rate_coupler_smoke.py
+python scripts/p77_epidemic_contact_smoke.py
+python scripts/p78_pbr_render_smoke.py
+python scripts/p79_vision_observation_smoke.py
+python scripts/p72_world_atmosphere_smoke.py
+python scripts/p73_agent_observation_smoke.py
+python scripts/p73_rust_worldgraph_smoke.py
+
+# Pytest
+cd runtime && python -m pytest tests/ -q
+```
+
+---
+
+## Exemple métriques Köppen (FAIR)
+
+```python
+from engine.world_genesis import GenesisParams, generate_world
+from engine.koeppen_grid import fair_koeppen_manifest
+world = generate_world(GenesisParams(seed=42, resolution=128))
+print(fair_koeppen_manifest(world))
+```

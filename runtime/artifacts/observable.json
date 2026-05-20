@@ -1,0 +1,355 @@
+{
+  "tick": 20,
+  "sim_id": "685b05c2-ae4d-4275-b8c8-76abbcca5d27",
+  "bounds_m": [
+    200.0,
+    200.0
+  ],
+  "n_alive": 6,
+  "perception_radius_m": 60.0,
+  "agents": [
+    {
+      "row": 0,
+      "uuid": "a06791cf-9f27-8e93-b165-b4e15d06b2bc",
+      "generation": 0,
+      "x_m": -12.67000675201416,
+      "y_m": 14.94761848449707,
+      "culture_id": 0,
+      "group_id": -1,
+      "vitality": 1.0,
+      "hunger": 0.324801504611969,
+      "thirst": 0.4157409071922302,
+      "injuries": 0.0,
+      "pathogen_load": 0.0,
+      "perception_radius_m": 60.0,
+      "nearby_agents": 4,
+      "action": 7,
+      "intelligence": 0.9078711867332458
+    },
+    {
+      "row": 1,
+      "uuid": "b0f5642c-ed79-8fa2-b12d-8008e369e728",
+      "generation": 0,
+      "x_m": -12.682086944580078,
+      "y_m": -22.680166244506836,
+      "culture_id": 0,
+      "group_id": -1,
+      "vitality": 1.0,
+      "hunger": 0.324801504611969,
+      "thirst": 0.4157409071922302,
+      "injuries": 0.0,
+      "pathogen_load": 0.0,
+      "perception_radius_m": 60.0,
+      "nearby_agents": 4,
+      "action": 1,
+      "intelligence": 0.8777663111686707
+    },
+    {
+      "row": 2,
+      "uuid": "b7362cea-009c-8fc5-83f9-f683f17d7fe3",
+      "generation": 0,
+      "x_m": -1.8228285312652588,
+      "y_m": 15.188252449035645,
+      "culture_id": 0,
+      "group_id": -1,
+      "vitality": 1.0,
+      "hunger": 0.324801504611969,
+      "thirst": 0.4157409071922302,
+      "injuries": 0.0,
+      "pathogen_load": 0.0,
+      "perception_radius_m": 60.0,
+      "nearby_agents": 4,
+      "action": 1,
+      "intelligence": 0.4087638258934021
+    },
+    {
+      "row": 3,
+      "uuid": "d7e15b0f-1776-8da8-940b-487dba34380a",
+      "generation": 0,
+      "x_m": -34.32178497314453,
+      "y_m": -7.069114685058594,
+      "culture_id": 0,
+      "group_id": -1,
+      "vitality": 1.0,
+      "hunger": 0.324801504611969,
+      "thirst": 0.4157409071922302,
+      "injuries": 0.0,
+      "pathogen_load": 0.0,
+      "perception_radius_m": 60.0,
+      "nearby_agents": 4,
+      "action": 1,
+      "intelligence": 0.6919541954994202
+    },
+    {
+      "row": 4,
+      "uuid": "40ccc1fa-845e-8670-9aba-5f0cb2d98ca3",
+      "generation": 0,
+      "x_m": -12.46274471282959,
+      "y_m": 15.457489013671875,
+      "culture_id": 0,
+      "group_id": -1,
+      "vitality": 1.0,
+      "hunger": 0.324801504611969,
+      "thirst": 0.4157409071922302,
+      "injuries": 0.0,
+      "pathogen_load": 0.0,
+      "perception_radius_m": 60.0,
+      "nearby_agents": 4,
+      "action": 7,
+      "intelligence": 0.22866064310073853
+    },
+    {
+      "row": 5,
+      "uuid": "46446a61-9afc-8b86-9d1d-e59acd4356be",
+      "generation": 0,
+      "x_m": -13.364097595214844,
+      "y_m": 14.93704605102539,
+      "culture_id": 0,
+      "group_id": -1,
+      "vitality": 1.0,
+      "hunger": 0.324801504611969,
+      "thirst": 0.4157409071922302,
+      "injuries": 0.0,
+      "pathogen_load": 0.0,
+      "perception_radius_m": 60.0,
+      "nearby_agents": 4,
+      "action": 7,
+      "intelligence": 0.49222153425216675
+    }
+  ],
+  "meta": {
+    "emergence": "genesis_bootstrap",
+    "genesis": true,
+    "genesis_seed": 3248954592,
+    "world_signature": "7a6d7eb0bc1c8140205c772d2fc3935b66bd0ba9e4dac9647f997910b4b68304",
+    "modules_installed": [
+      "climate",
+      "genesis",
+      "geology",
+      "hydrology",
+      "marine",
+      "meteorology",
+      "wildfire"
+    ]
+  },
+  "vision_cones": [
+    {
+      "row": 0,
+      "x": -12.67000675201416,
+      "y": 14.94761848449707,
+      "r": 60.0,
+      "see": [
+        4,
+        5,
+        1,
+        2,
+        3
+      ],
+      "uuids": [
+        "40ccc1fa-845e-8670-9aba-5f0cb2d98ca3",
+        "46446a61-9afc-8b86-9d1d-e59acd4356be",
+        "b0f5642c-ed79-8fa2-b12d-8008e369e728",
+        "b7362cea-009c-8fc5-83f9-f683f17d7fe3",
+        "d7e15b0f-1776-8da8-940b-487dba34380a"
+      ]
+    },
+    {
+      "row": 1,
+      "x": -12.682086944580078,
+      "y": -22.680166244506836,
+      "r": 60.0,
+      "see": [
+        4,
+        5,
+        0,
+        2,
+        3
+      ],
+      "uuids": [
+        "40ccc1fa-845e-8670-9aba-5f0cb2d98ca3",
+        "46446a61-9afc-8b86-9d1d-e59acd4356be",
+        "a06791cf-9f27-8e93-b165-b4e15d06b2bc",
+        "b7362cea-009c-8fc5-83f9-f683f17d7fe3",
+        "d7e15b0f-1776-8da8-940b-487dba34380a"
+      ]
+    },
+    {
+      "row": 2,
+      "x": -1.8228285312652588,
+      "y": 15.188252449035645,
+      "r": 60.0,
+      "see": [
+        4,
+        5,
+        0,
+        1,
+        3
+      ],
+      "uuids": [
+        "40ccc1fa-845e-8670-9aba-5f0cb2d98ca3",
+        "46446a61-9afc-8b86-9d1d-e59acd4356be",
+        "a06791cf-9f27-8e93-b165-b4e15d06b2bc",
+        "b0f5642c-ed79-8fa2-b12d-8008e369e728",
+        "d7e15b0f-1776-8da8-940b-487dba34380a"
+      ]
+    },
+    {
+      "row": 3,
+      "x": -34.32178497314453,
+      "y": -7.069114685058594,
+      "r": 60.0,
+      "see": [
+        4,
+        5,
+        0,
+        1,
+        2
+      ],
+      "uuids": [
+        "40ccc1fa-845e-8670-9aba-5f0cb2d98ca3",
+        "46446a61-9afc-8b86-9d1d-e59acd4356be",
+        "a06791cf-9f27-8e93-b165-b4e15d06b2bc",
+        "b0f5642c-ed79-8fa2-b12d-8008e369e728",
+        "b7362cea-009c-8fc5-83f9-f683f17d7fe3"
+      ]
+    },
+    {
+      "row": 4,
+      "x": -12.46274471282959,
+      "y": 15.457489013671875,
+      "r": 60.0,
+      "see": [
+        5,
+        0,
+        1,
+        2,
+        3
+      ],
+      "uuids": [
+        "46446a61-9afc-8b86-9d1d-e59acd4356be",
+        "a06791cf-9f27-8e93-b165-b4e15d06b2bc",
+        "b0f5642c-ed79-8fa2-b12d-8008e369e728",
+        "b7362cea-009c-8fc5-83f9-f683f17d7fe3",
+        "d7e15b0f-1776-8da8-940b-487dba34380a"
+      ]
+    },
+    {
+      "row": 5,
+      "x": -13.364097595214844,
+      "y": 14.93704605102539,
+      "r": 60.0,
+      "see": [
+        4,
+        0,
+        1,
+        2,
+        3
+      ],
+      "uuids": [
+        "40ccc1fa-845e-8670-9aba-5f0cb2d98ca3",
+        "a06791cf-9f27-8e93-b165-b4e15d06b2bc",
+        "b0f5642c-ed79-8fa2-b12d-8008e369e728",
+        "b7362cea-009c-8fc5-83f9-f683f17d7fe3",
+        "d7e15b0f-1776-8da8-940b-487dba34380a"
+      ]
+    }
+  ],
+  "agents_compact": [
+    {
+      "row": 0,
+      "uuid": "a06791cf-9f27-8e93-b165-b4e15d06b2bc",
+      "gen": 0,
+      "x": -12.67000675201416,
+      "y": 14.94761848449707,
+      "h": 0.324801504611969,
+      "t": 0.4157409071922302,
+      "v": 1.0,
+      "c": 0,
+      "g": -1,
+      "a": 7,
+      "vision_m": 60.0,
+      "nearby": 4,
+      "pathogen": 0.0
+    },
+    {
+      "row": 1,
+      "uuid": "b0f5642c-ed79-8fa2-b12d-8008e369e728",
+      "gen": 0,
+      "x": -12.682086944580078,
+      "y": -22.680166244506836,
+      "h": 0.324801504611969,
+      "t": 0.4157409071922302,
+      "v": 1.0,
+      "c": 0,
+      "g": -1,
+      "a": 1,
+      "vision_m": 60.0,
+      "nearby": 4,
+      "pathogen": 0.0
+    },
+    {
+      "row": 2,
+      "uuid": "b7362cea-009c-8fc5-83f9-f683f17d7fe3",
+      "gen": 0,
+      "x": -1.8228285312652588,
+      "y": 15.188252449035645,
+      "h": 0.324801504611969,
+      "t": 0.4157409071922302,
+      "v": 1.0,
+      "c": 0,
+      "g": -1,
+      "a": 1,
+      "vision_m": 60.0,
+      "nearby": 4,
+      "pathogen": 0.0
+    },
+    {
+      "row": 3,
+      "uuid": "d7e15b0f-1776-8da8-940b-487dba34380a",
+      "gen": 0,
+      "x": -34.32178497314453,
+      "y": -7.069114685058594,
+      "h": 0.324801504611969,
+      "t": 0.4157409071922302,
+      "v": 1.0,
+      "c": 0,
+      "g": -1,
+      "a": 1,
+      "vision_m": 60.0,
+      "nearby": 4,
+      "pathogen": 0.0
+    },
+    {
+      "row": 4,
+      "uuid": "40ccc1fa-845e-8670-9aba-5f0cb2d98ca3",
+      "gen": 0,
+      "x": -12.46274471282959,
+      "y": 15.457489013671875,
+      "h": 0.324801504611969,
+      "t": 0.4157409071922302,
+      "v": 1.0,
+      "c": 0,
+      "g": -1,
+      "a": 7,
+      "vision_m": 60.0,
+      "nearby": 4,
+      "pathogen": 0.0
+    },
+    {
+      "row": 5,
+      "uuid": "46446a61-9afc-8b86-9d1d-e59acd4356be",
+      "gen": 0,
+      "x": -13.364097595214844,
+      "y": 14.93704605102539,
+      "h": 0.324801504611969,
+      "t": 0.4157409071922302,
+      "v": 1.0,
+      "c": 0,
+      "g": -1,
+      "a": 7,
+      "vision_m": 60.0,
+      "nearby": 4,
+      "pathogen": 0.0
+    }
+  ]
+}

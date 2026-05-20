@@ -1,0 +1,20 @@
+[package]
+name        = "genesis-agent-api"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Read/write API for AI agents into the world"
+
+[dependencies]
+genesis-core      = { path = "../core" }
+genesis-biome     = { path = "../biome" }
+genesis-climate   = { path = "../climate" }
+genesis-streaming = { path = "../streaming" }
+
+glam   = { workspace = true }
+serde  = { workspace = true }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
+crossbeam-channel = { workspace = true }
+smallvec = { workspace = true }
+tokio = { workspace = true }

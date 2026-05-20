@@ -224,6 +224,62 @@ def sample_terrain(seed: int, params: TerrainParams,
     return elev_m.astype(np.float32), temp_c.astype(np.float32), precip_mm.astype(np.float32)
 
 
+def sample_terrain_with_genesis(seed: int, params: TerrainParams,
+                                  x_m: np.ndarray, y_m: np.ndarray,
+                                  anchor) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Sample chunk terrain anchored to a continental :class:`GenesisAnchor`.
+
+    The chunk's elevation = ``blend * macro_elev + (1-blend) * pure_FBM``
+    plus a micro FBM residual ``micro_amp_m`` (so that even when the
+    macro is the truth, the chunk gets unique 32 m-scale detail).
+
+    Temperature is the macro value plus a small jitter, with the
+    adiabatic lapse rate applied to the *micro* elevation residual only
+    (the macro already encodes its own lapse). Precipitation is the
+    macro value plus a small jitter (no negative).
+
+    Imported lazily to avoid the world <-> world_genesis circular load:
+    world.py is a strict prerequisite of world_genesis.py.
+    """
+    from engine.world_genesis import sample_macro_grid
+
+    ox_km, oy_km = anchor.sim_origin_macro_km
+    x_km = x_m.astype(np.float32) * 0.001 + np.float32(ox_km)
+    y_km = y_m.astype(np.float32) * 0.001 + np.float32(oy_km)
+    macro_elev, macro_temp, macro_precip = sample_macro_grid(
+        anchor.world, x_km, y_km)
+
+    # Micro residual via the existing FBM noise — same lattice as before
+    # so determinism contract is preserved.
+    x = x_m / params.scale_m
+    y = y_m / params.scale_m
+    micro_e = fbm_2d(seed, "genesis_micro_elev", x, y, params.elev_octaves)
+    micro_t = fbm_2d(seed, "genesis_micro_t", x * 0.3, y * 0.3,
+                     params.temp_octaves)
+    micro_p = fbm_2d(seed, "genesis_micro_p", x * 0.5, y * 0.5,
+                     params.precip_octaves)
+
+    # Optional fallback to pure-FBM blend (useful for transitions or A/B).
+    blend = float(np.clip(anchor.blend, 0.0, 1.0))
+    if blend < 1.0:
+        fbm_full_elev = params.sea_level_m + micro_e * params.max_elev_m
+        macro_elev = (macro_elev * blend +
+                      fbm_full_elev * (1.0 - blend)).astype(np.float32)
+
+    micro_offset_m = (micro_e * anchor.micro_amp_m).astype(np.float32)
+    elev = (macro_elev + micro_offset_m).astype(np.float32)
+    # Marginal lapse from the elevation that the macro did NOT see.
+    macro_land = np.maximum(macro_elev, 0.0)
+    blended_land = np.maximum(elev, 0.0)
+    micro_lapse = -(blended_land - macro_land) / 1000.0 * 6.5
+    temp = (macro_temp + micro_lapse +
+            micro_t * anchor.micro_amp_temp_c).astype(np.float32)
+    precip = np.maximum(
+        macro_precip + micro_p * anchor.micro_amp_precip_mm,
+        0.0).astype(np.float32)
+    return elev, temp, precip
+
+
 # ---------------------------------------------------------------------------
 # Chunks
 # ---------------------------------------------------------------------------
@@ -267,14 +323,26 @@ def invalidate_resource_masks(chunk: "Chunk") -> None:
     chunk._mask_cache = None
 
 
-def generate_chunk(seed: int, coord: Tuple[int, int, int], params: TerrainParams) -> Chunk:
+def generate_chunk(seed: int, coord: Tuple[int, int, int],
+                    params: TerrainParams, *, genesis=None) -> Chunk:
+    """Generate a single chunk.
+
+    If ``genesis`` is a :class:`engine.world_genesis.GenesisAnchor`, the
+    chunk is anchored to a continental macro field (tectonics + erosion
+    + orographic precip). Otherwise the legacy pure-FBM ``sample_terrain``
+    is used — bit-for-bit identical to pre-Wave-16 behaviour.
+    """
     cx, cy, cz = coord
     ox = cx * CHUNK_SIDE_M
     oy = cy * CHUNK_SIDE_M
     xs = (ox + (np.arange(CHUNK_SIZE) + 0.5) * VOXEL_SIZE_M).astype(np.float32)
     ys = (oy + (np.arange(CHUNK_SIZE) + 0.5) * VOXEL_SIZE_M).astype(np.float32)
     XX, YY = np.meshgrid(xs, ys, indexing="xy")
-    elev, temp, precip = sample_terrain(seed, params, XX, YY)
+    if genesis is None:
+        elev, temp, precip = sample_terrain(seed, params, XX, YY)
+    else:
+        elev, temp, precip = sample_terrain_with_genesis(
+            seed, params, XX, YY, genesis)
     biome = classify_biome_array(temp, precip, elev)
 
     # Resources (vectorized + small deterministic noise)
@@ -338,22 +406,42 @@ def generate_chunk(seed: int, coord: Tuple[int, int, int], params: TerrainParams
 
 class ChunkStreamer:
     def __init__(self, seed: int, params: TerrainParams,
-                 keep_alive_ticks: int = 10_000):
+                 keep_alive_ticks: int = 10_000,
+                 genesis=None):
         self.seed = seed
         self.params = params
         self.keep_alive_ticks = keep_alive_ticks
         self.cache: Dict[Tuple[int, int, int], Chunk] = {}
         self.last_touch: Dict[Tuple[int, int, int], int] = {}
+        # Optional GenesisAnchor — when set, chunks are anchored to a
+        # continental macro map. Mutate at runtime via :meth:`set_genesis`.
+        self.genesis = genesis
+
+    def set_genesis(self, genesis) -> None:
+        """Attach (or clear) a :class:`GenesisAnchor` for chunk generation.
+
+        Mutates the streamer in place. Existing cached chunks are *not*
+        regenerated — call :meth:`clear_cache` if you want the new
+        anchor to apply retroactively.
+        """
+        self.genesis = genesis
+
+    def clear_cache(self) -> None:
+        """Drop all cached chunks and their last-touch records."""
+        self.cache.clear()
+        self.last_touch.clear()
 
     def touch_area(self, tick: int, coords: Iterable[Tuple[int, int, int]]) -> None:
         for c in coords:
             self.last_touch[c] = tick
             if c not in self.cache:
-                self.cache[c] = generate_chunk(self.seed, c, self.params)
+                self.cache[c] = generate_chunk(self.seed, c, self.params,
+                                                genesis=self.genesis)
 
     def get(self, tick: int, coord: Tuple[int, int, int]) -> Chunk:
         if coord not in self.cache:
-            self.cache[coord] = generate_chunk(self.seed, coord, self.params)
+            self.cache[coord] = generate_chunk(self.seed, coord, self.params,
+                                                genesis=self.genesis)
         self.last_touch[coord] = tick
         return self.cache[coord]
 

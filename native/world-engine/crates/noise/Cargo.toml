@@ -1,0 +1,21 @@
+[package]
+name        = "genesis-noise"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Coherent noise primitives (simplex, FBM, ridged, domain warp)"
+
+[dependencies]
+genesis-core = { path = "../core" }
+glam     = { workspace = true }
+wide     = { workspace = true }
+rayon    = { workspace = true }
+
+[dev-dependencies]
+proptest  = { workspace = true }
+noise     = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name    = "fbm_bench"
+harness = false

@@ -45,6 +45,26 @@ The live forward-looking queue is at the root: [`NEXT-SPRINT.md`](../../NEXT-SPR
 - [`2026-05-15_SPRINT.md`](2026-05-15_SPRINT.md) — World Creation Software v1.
 - [`2026-05-16_SPRINT.md`](2026-05-16_SPRINT.md) — Multi-region demo + GIS exports.
 
+### May 18, 2026 — Session 34 : Waves 16 → 41 (pipeline « monde réaliste »)
+
+Livraison majeure en parallèle. Index rapide :
+
+| Wave | Fichier sprint | Thème |
+|------|----------------|-------|
+| 16 | [`2026-05-18_WAVE16-WORLD-GENESIS.md`](2026-05-18_WAVE16-WORLD-GENESIS.md) | GenesisWorld ultra-réaliste |
+| 17 | [`2026-05-18_WAVE17-TECTONIC-GEOLOGY.md`](2026-05-18_WAVE17-TECTONIC-GEOLOGY.md) | Géologie tectonique |
+| 18 | [`2026-05-18_WAVE18-CHUNK-HYDROLOGY.md`](2026-05-18_WAVE18-CHUNK-HYDROLOGY.md) | Hydrologie chunk |
+| 19–21 | `WAVE19` … `WAVE21` | Climat macro, biomes, bathymétrie |
+| 22 | [`2026-05-18_WAVE22-GLOBAL-GENESIS.md`](2026-05-18_WAVE22-GLOBAL-GENESIS.md) | Genesis global |
+| 23–26 | `WAVE23` … `WAVE26` | NCA terrain, WFC végétation |
+| 27 | [`2026-05-18_WAVE27-WORLD-RENDER.md`](2026-05-18_WAVE27-WORLD-RENDER.md) | Rendu hillshade (→ `docs/compliance/renders/`) |
+| 28–32 | `WAVE28` … `WAVE32` | Settlements, routes, commerce, cultures, polities |
+| 33–40 | `WAVE33` … `WAVE40` | Observateurs stone-age → lineage |
+| 36–37 | `WAVE36`, `WAVE37` | Rendu isométrique + timelapse GIF |
+| 41 | [`2026-05-18_WAVE41-WORLD-ATMOSPHERE.md`](2026-05-18_WAVE41-WORLD-ATMOSPHERE.md) | Atmosphère jour/nuit (→ `docs/renders/wave41_*`) |
+
+Consolidation : [`2026-05-18_PHASE3-CONSOLIDATION.md`](2026-05-18_PHASE3-CONSOLIDATION.md).
+
 ---
 
 ## 🎯 Key milestones surfaced in this history
@@ -58,6 +78,8 @@ The live forward-looking queue is at the root: [`NEXT-SPRINT.md`](../../NEXT-SPR
 | 2026-05-14 | **FUTURE-VISION Wave 1**: physics + chemistry + statics + synthesis modules |
 | 2026-05-15 | `WorldBuilder` fluent API + multi-region |
 | 2026-05-16 | GIS export pipeline (GeoTIFF, PNG, OBJ) |
+| 2026-05-18 | **Waves 16–41** : pipeline monde réaliste complet + atmosphère W41 |
+| 2026-05-19 | Réalisme Terre ~63 % — Köppen, PBR, vision cones (p74–p79) |
 
 ---
 
@@ -79,5 +101,6 @@ This convention is enforced going forward. Old files without dates were renamed 
 
 - Want to **understand the current state** of the engine → [main README](../../README.md)
 - Want to **see the long-term vision** → [FUTURE-VISION.md](../../FUTURE-VISION.md)
+- Want a **short status snapshot** → [PROJECT-STATUS.md](../../PROJECT-STATUS.md)
 - Want to **see what's coming next** → [NEXT-SPRINT.md](../../NEXT-SPRINT.md)
 - Want to **contribute** → [CONTRIBUTING.md](../../CONTRIBUTING.md)

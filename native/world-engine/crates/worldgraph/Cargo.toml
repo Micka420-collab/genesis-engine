@@ -1,0 +1,24 @@
+[package]
+name        = "genesis-worldgraph"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Declarative content-addressed DAG of world-generation passes"
+
+[dependencies]
+genesis-core    = { path = "../core" }
+genesis-cache   = { path = "../cache" }
+
+rayon       = { workspace = true }
+parking_lot = { workspace = true }
+dashmap     = { workspace = true }
+serde       = { workspace = true }
+bincode     = { workspace = true }
+blake3      = { workspace = true }
+thiserror   = { workspace = true }
+tracing     = { workspace = true }
+smallvec    = { workspace = true }
+ahash       = { workspace = true }
+
+[dev-dependencies]
+proptest    = { workspace = true }

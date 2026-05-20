@@ -1,0 +1,37 @@
+name: "Alpine valley — centennial drift"
+description: >
+  Run a 100-year (365-tick × 100 years) simulation of a 16×16 chunk alpine
+  region with a slightly warmed climate to study biome migration.
+version: "1"
+metadata:
+  authors: ["Genesis Engine team"]
+  license: "Apache-2.0"
+  keywords: ["climate", "biome", "centennial", "alpine"]
+
+world:
+  seed: 19_660_523
+  extent_chunks: { min_cx: 0, max_cx: 15, min_cy: 0, max_cy: 15 }
+  climate:
+    t_equator_c: 30.0      # +2 °C global warming proxy
+    t_pole_c: -23.0
+    continentality: 0.7
+
+experiment:
+  ticks: 365               # one year of daily ticks (use 36_500 for centennial)
+  dt_seconds: 86_400.0     # 1 day per tick
+
+measurements:
+  - kind: MeanTemperature
+    every_ticks: 7         # weekly
+  - kind: TotalPrecipitation
+    every_ticks: 7
+  - kind: MeanWindSpeed
+    every_ticks: 30        # monthly
+  - kind: BiomeHistogram
+    every_ticks: 90        # quarterly
+
+exports:
+  - format: Csv
+    path: alpine_centennial.csv
+  - format: Json
+    path: alpine_centennial.json

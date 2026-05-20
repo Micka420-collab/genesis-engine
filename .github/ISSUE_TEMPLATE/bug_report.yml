@@ -1,0 +1,22 @@
+name: Bug report
+description: Something is broken or incorrect
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Steps to reproduce and expected vs actual behavior.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Python / Rust version
+      placeholder: "Python 3.12, rustc 1.85"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or smoke output
+      render: shell

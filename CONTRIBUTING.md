@@ -2,7 +2,68 @@
 
 Merci de t'intéresser à Genesis Engine ! Ce document explique **comment contribuer** au moteur, les **conventions** à respecter, et la **gouvernance** du projet.
 
-> Genesis Engine est un laboratoire open-source d'artificial life dont l'objectif scientifique est de tester si la complexité civilisationnelle (langage, économie, religion, science, gouvernance) peut émerger spontanément à partir d'agents IA autonomes. Voir [README.md](README.md) et [`Genesis_Engine_Architecture_v1.0.docx`](Genesis_Engine_Architecture_v1.0.docx).
+> Genesis Engine est un laboratoire open-source d'artificial life dont l'objectif scientifique est de tester si la complexité civilisationnelle (langage, économie, religion, science, gouvernance) peut émerger spontanément à partir d'agents IA autonomes. Voir [README.md](README.md), [PROJECT-STATUS.md](PROJECT-STATUS.md) et [`Genesis_Engine_Architecture_v1.0.docx`](Genesis_Engine_Architecture_v1.0.docx).
+
+---
+
+## Premier jour (First day)
+
+Checklist pour être opérationnel en ~30 minutes :
+
+```bash
+git clone https://github.com/<ton-handle>/genesis-engine.git
+cd genesis-engine
+python -m venv .venv
+# Windows: .venv\Scripts\activate  |  Linux/macOS: source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -e ".[dev]"
+
+make doctor          # outils + imports
+make smoke           # p0 baseline
+make test-python     # pytest runtime/tests
+
+# Rust world-engine (core, biome, worldgraph)
+make rust-test
+
+# Pont Python natif (optionnel)
+make maturin-dev
+PYTHONPATH=runtime python runtime/scripts/p73_rust_worldgraph_smoke.py
+
+# Smokes réalisme (p72–p82)
+make smoke-realism
+```
+
+### Maturin / `genesis_world`
+
+Depuis la racine du dépôt :
+
+```bash
+pip install maturin
+cd native/world-engine
+maturin develop -m crates/pybindings/Cargo.toml --release
+```
+
+Le module expose `PyWorld(seed=…).observe_chunk(cx, cy)` et `biome_at(x,y,z)`.
+Le runtime utilise `engine.rust_bridge.create_py_world` (natif ou mock).
+
+Lire ensuite : [`runtime/README.md`](runtime/README.md) (PYTHONPATH, smokes) et [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (où le projet en est scientifiquement).
+
+---
+
+## Où coder quoi
+
+| Domaine | Stack | Chemin principal |
+|---------|-------|------------------|
+| Agents, cognition, civilisation | **Python** | `runtime/engine/` |
+| Smokes & démos | **Python** | `runtime/scripts/` |
+| Genesis monde, rendu, atmosphère | **Python** | `world_genesis.py`, `world_render.py`, `world_atmosphere.py` |
+| Köppen, coupler, épidémie contact | **Python** | `koeppen_grid.py`, `multi_rate_coupler.py`, `epidemic_observer.py` |
+| Chunks, WorldGraph, biome bas niveau | **Rust** | `native/world-engine/crates/` |
+| Bindings Python ↔ Rust | **Rust + Python** | `crates/pybindings/`, `runtime/engine/rust_bridge.py` |
+| Spec / ADR | **Markdown** | `adr/`, `architecture/`, `specs/` |
+| Historique livraisons | **Doc** | `docs/sprints/` (index, pas déplacement massif) |
+
+**Règle** : ne pas dupliquer la logique civilisation en Rust tant que le pont n'est pas explicitement requis par un ADR ou une issue.
 
 ---
 
@@ -128,10 +189,11 @@ Sur GitHub, ouvre une **Pull Request** vers `main`. Le template te demandera :
 
 ### Python
 
-- **Python 3.13+**
+- **Python 3.12+** (3.13 recommandé ; CI 3.12)
 - **PEP 8** (line length 100, pas 79)
 - **Type hints recommandés** mais pas obligatoires
-- **Imports** : stdlib → third-party (numpy/rasterio) → engine (`engine.xxx`)
+- **Imports en tête de fichier uniquement** — pas d'imports inline au milieu d'une fonction (lisibilité, lint, revue)
+- **Ordre des imports** : stdlib → third-party (numpy/rasterio) → `engine.*`
 
 ### Déterminisme **obligatoire**
 
@@ -208,6 +270,11 @@ Le script doit :
 ## 🧪 Tests obligatoires avant PR
 
 ```bash
+# Depuis la racine (recommandé)
+make smoke
+make test-python
+
+# Ou depuis runtime/
 cd runtime
 
 # 1. Smoke baseline (sanity check)
@@ -265,7 +332,7 @@ Voir [`ETHICS.md`](ETHICS.md). En particulier :
 
 - **Maintainer principal** : [Micka Delcato](https://github.com/Micka420-collab)
 - **Décisions architecturales** : via ADRs (Architecture Decision Records) dans `architecture/` — ouvre une PR avec l'ADR proposé.
-- **Roadmap** : trackée dans [`NEXT-SPRINT.md`](NEXT-SPRINT.md) et [`ROADMAP.md`](ROADMAP.md), maintenue par le mainteneur principal après discussion publique.
+- **Roadmap** : [`PROJECT-STATUS.md`](PROJECT-STATUS.md) (synthèse), [`NEXT-SPRINT.md`](NEXT-SPRINT.md) (détail), [`ROADMAP.md`](ROADMAP.md), [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md).
 - **Releases** : suit le [Semantic Versioning](https://semver.org/). La version actuelle est en alpha pré-publique.
 
 ---

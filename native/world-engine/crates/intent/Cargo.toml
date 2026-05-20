@@ -1,0 +1,18 @@
+[package]
+name        = "genesis-intent"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Intent-aware prefetcher for AI agents"
+
+[dependencies]
+genesis-core      = { path = "../core" }
+genesis-streaming = { path = "../streaming" }
+glam        = { workspace = true }
+parking_lot = { workspace = true }
+dashmap     = { workspace = true }
+smallvec    = { workspace = true }
+tokio       = { workspace = true }
+tracing     = { workspace = true }
+serde       = { workspace = true }
+ahash       = { workspace = true }

@@ -1,0 +1,48 @@
+{
+  "schema": "genesis.koeppen.fair/v1",
+  "seed": 3248954592,
+  "generated_at_utc": "2026-05-19T07:17:17Z",
+  "koeppen_harness_pass_rate": 1.0,
+  "koeppen_land_cells": 926,
+  "koeppen_biome_coherence_rate": 0.567,
+  "kappa_biome_coherence": 0.567,
+  "koeppen_class_counts": {
+    "Af": 4,
+    "Aw": 5,
+    "BSh": 5,
+    "BSk": 61,
+    "BWh": 61,
+    "BWk": 194,
+    "Cfa": 14,
+    "Cfb": 12,
+    "Dfb": 23,
+    "Dfc": 92,
+    "EF": 455
+  },
+  "koeppen_class_fractions": {
+    "Af": 0.0043,
+    "Aw": 0.0054,
+    "BSh": 0.0054,
+    "BSk": 0.0659,
+    "BWh": 0.0659,
+    "BWk": 0.2095,
+    "Cfa": 0.0151,
+    "Cfb": 0.013,
+    "Dfb": 0.0248,
+    "Dfc": 0.0994,
+    "EF": 0.4914
+  },
+  "koeppen_mean_temp_c": -7.86,
+  "koeppen_mean_precip_mm": 293.7,
+  "fohn_orographic_boost": 1.302,
+  "checksum_sha256": {
+    "temp_c": "727037348b78624cb1ebff8d8c256c28e674913d11f6cd7bb8c883ea68fb158b",
+    "precip_mm": "e6e0d1a11bd6d7343ce9a6e3ee6a5af6c1f2ae37c73299deebb019f7689789c9",
+    "koeppen_grid": "ee4620106c3ac0858acb2253b58e21648984047737581310aedb731673c95054",
+    "biome": "8d7f5862f594cfb15c31dcbb910b7c57b9b56092642a9a03bee1c151f8566dfa"
+  },
+  "checksum_blake2b256": {
+    "temp_c": "d181d4d43159eb9796dfc6f8861e9a9ed84c981998c37ac671b50b8123dab861",
+    "precip_mm": "ce0cafeda55e58c3f128f6a555cae9dd2a2a2613210d6c4a3480fc4711f9c760"
+  }
+}

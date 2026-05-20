@@ -23,6 +23,7 @@ ENV/
 # --- IDE / Editors ---
 .vscode/
 .idea/
+.claude/
 *.swp
 *~
 .DS_Store

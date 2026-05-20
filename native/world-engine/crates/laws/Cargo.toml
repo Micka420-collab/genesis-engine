@@ -1,0 +1,14 @@
+[package]
+name        = "genesis-laws"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Real physical laws — Stefan-Boltzmann, Saint-Venant, Darcy, Lotka-Volterra"
+
+[dependencies]
+genesis-physics = { path = "../physics" }
+serde     = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

@@ -1,0 +1,19 @@
+[package]
+name        = "genesis-terrain"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Heightmap, tectonics, and erosion"
+
+[dependencies]
+genesis-core  = { path = "../core" }
+genesis-noise = { path = "../noise" }
+glam      = { workspace = true }
+rayon     = { workspace = true }
+smallvec  = { workspace = true }
+serde     = { workspace = true }
+thiserror = { workspace = true }
+tracing   = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

@@ -727,6 +727,7 @@ def install(sim, *, world_seed: Optional[int] = None) -> None:
     def patched_apply(agents, row, decision, streamer, tick):
         # Only override when this is the registered sim instance.
         events = []
+        speak_handled = False
         if agents is sim.agents:
             decision = value_override(sim, agents, int(row), decision)
             # Capture SPEAK / FORAGE for post-tick emission.
@@ -737,6 +738,10 @@ def install(sim, *, world_seed: Optional[int] = None) -> None:
                     if tgt is None:
                         tgt = -1
                     sim._5cd_speech_buffer.append((int(row), int(tgt)))
+                    # AUDIT FIX 2026-05-17 — tell the new core SPEAK
+                    # branch we already buffered this vocalize event so
+                    # it doesn't emit a duplicate.
+                    speak_handled = True
                 elif act == int(ActionKind.FORAGE):
                     sim._5cd_forage_buffer.append(int(row))
                 elif act == int(ActionKind.MATE):
@@ -750,7 +755,20 @@ def install(sim, *, world_seed: Optional[int] = None) -> None:
                                        "a": int(row), "b": int(other)})
             except Exception:
                 pass
-        base_events = original_apply(agents, row, decision, streamer, tick)
+        # Flip a per-call flag the core SPEAK handler reads; clear after.
+        if speak_handled:
+            try:
+                setattr(agents, "_5cd_speak_handled", True)
+            except Exception:
+                pass
+        try:
+            base_events = original_apply(agents, row, decision, streamer, tick)
+        finally:
+            if speak_handled:
+                try:
+                    setattr(agents, "_5cd_speak_handled", False)
+                except Exception:
+                    pass
         if base_events:
             events.extend(base_events)
         return events

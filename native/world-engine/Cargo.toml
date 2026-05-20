@@ -1,0 +1,117 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/noise",
+    "crates/terrain",
+    "crates/climate",
+    "crates/biome",
+    "crates/hydrology",
+    "crates/ecosystem",
+    "crates/streaming",
+    "crates/persist",
+    "crates/agent-api",
+    "crates/pybindings",
+    "crates/cache",
+    "crates/worldgraph",
+    "crates/gpu",
+    "crates/intent",
+    "crates/mesh",
+    "crates/weather",
+    "crates/physics",
+    "crates/laws",
+    "crates/scenario",
+    "crates/studio",
+]
+
+[workspace.package]
+version      = "0.1.0"
+edition      = "2021"
+rust-version = "1.85"
+license      = "Apache-2.0 OR MIT"
+authors      = ["Genesis Engine contributors"]
+repository   = "https://github.com/genesis-engine/world-engine"
+
+[workspace.dependencies]
+# core math / SIMD
+glam       = { version = "0.29", features = ["bytemuck", "serde"] }
+wide       = "0.7"
+bytemuck   = { version = "1.18", features = ["derive"] }
+
+# concurrency
+rayon      = "1.10"
+tokio      = { version = "1.40", features = ["rt-multi-thread", "macros", "sync", "time", "fs"] }
+parking_lot = "0.12"
+dashmap    = "6.1"
+crossbeam-channel = "0.5"
+
+# noise
+# (we vendor a simplex implementation in `genesis-noise`; we still keep a
+# fallback dep for cross-checking results in tests)
+noise      = "0.9"
+
+# determinism / hashing
+siphasher  = "1.0"
+blake3     = "1.5"
+
+# ECS
+bevy_ecs   = { version = "0.14", default-features = false }
+
+# serialization
+rkyv       = { version = "0.7", features = ["validation", "size_64"] }
+bincode    = "1.3"
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+zstd       = "0.13"
+
+# errors / utils
+thiserror  = "1.0"
+anyhow     = "1.0"
+smallvec   = { version = "1.13", features = ["serde"] }
+ahash      = "0.8"
+once_cell  = "1.19"
+
+# observability
+tracing             = "0.1"
+tracing-subscriber  = { version = "0.3", features = ["env-filter"] }
+
+# bindings
+pyo3       = { version = "0.22", features = ["extension-module", "abi3-py39"] }
+
+# GPU
+wgpu       = { version = "22.1", default-features = false, features = ["wgsl", "dx12", "metal", "vulkan"] }
+pollster   = "0.4"
+bytemuck_derive = "1.7"
+
+# fs / mmap
+memmap2    = "0.9"
+hex        = "0.4"
+
+# scenarios + CLI
+serde_yaml = "0.9"
+clap       = { version = "4.5", features = ["derive", "color"] }
+indicatif  = "0.17"
+chrono     = { version = "0.4", features = ["serde"] }
+
+# dev
+criterion  = { version = "0.5", features = ["html_reports"] }
+proptest   = "1.5"
+
+[profile.release]
+opt-level     = 3
+lto           = "fat"
+codegen-units = 1
+panic         = "abort"
+strip         = "symbols"
+
+[profile.bench]
+inherits  = "release"
+debug     = true
+strip     = false
+
+# Tight dev loop without sacrificing perf in deps
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

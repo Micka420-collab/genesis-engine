@@ -1,0 +1,12 @@
+[package]
+name        = "genesis-hydrology"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Rivers, lakes, drainage basins"
+
+[dependencies]
+genesis-core    = { path = "../core" }
+genesis-terrain = { path = "../terrain" }
+smallvec  = { workspace = true }
+serde     = { workspace = true }

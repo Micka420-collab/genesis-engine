@@ -1,0 +1,17 @@
+[package]
+name        = "genesis-biome"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Whittaker biome classifier"
+
+[dependencies]
+genesis-core    = { path = "../core" }
+genesis-climate = { path = "../climate" }
+serde     = { workspace = true }
+thiserror = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

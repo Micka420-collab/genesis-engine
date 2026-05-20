@@ -1,0 +1,22 @@
+[package]
+name        = "genesis-gpu"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "GPU compute passes (wgpu/WGSL) — optional acceleration"
+
+[features]
+default = []
+# Enable GPU-backed passes (pulls in wgpu).
+gpu     = ["dep:wgpu", "dep:pollster", "dep:bytemuck_derive"]
+
+[dependencies]
+genesis-core    = { path = "../core" }
+genesis-terrain = { path = "../terrain" }
+bytemuck    = { workspace = true }
+thiserror   = { workspace = true }
+tracing     = { workspace = true }
+
+wgpu        = { workspace = true, optional = true }
+pollster    = { workspace = true, optional = true }
+bytemuck_derive = { workspace = true, optional = true }

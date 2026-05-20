@@ -54,7 +54,14 @@ def run_experiment(name: str, cfg: SimConfig, ticks: int,
         "cum_events": int(sim.stats.cum_events),
         "metrics": sim.annalist.metrics_to_dict(),
         "journal": journal,
+        "multi_rate_coupler": bool(getattr(sim, "_coupler_wrapped", False)),
+        "emergence_subsystems": bool(cfg.emergence_subsystems),
     }
+    emergence = (sim.snapshot().get("emergence") or {})
+    if emergence.get("epidemic"):
+        summary["epidemic"] = emergence["epidemic"]
+    if emergence.get("koeppen"):
+        summary["koeppen"] = emergence["koeppen"]
     sim.annalist.close()
     out = os.path.join(RUNTIME_DIR, "artifacts", f"{name}.json")
     os.makedirs(os.path.dirname(out), exist_ok=True)

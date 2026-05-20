@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose a new capability
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Layer
+      options:
+        - L1 Substrat
+        - L2 Dynamiques
+        - L3 Agents
+        - L4 Civilisation
+        - Rust / native
+        - Docs / CI

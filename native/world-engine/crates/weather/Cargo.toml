@@ -1,0 +1,20 @@
+[package]
+name        = "genesis-weather"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Time-evolving weather (precipitation, fronts, storms) as a WorldGraph pass"
+
+[dependencies]
+genesis-core      = { path = "../core" }
+genesis-noise     = { path = "../noise" }
+genesis-climate   = { path = "../climate" }
+genesis-worldgraph = { path = "../worldgraph" }
+
+glam     = { workspace = true }
+serde    = { workspace = true }
+blake3   = { workspace = true }
+bincode  = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

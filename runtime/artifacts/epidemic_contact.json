@@ -1,0 +1,55 @@
+{
+  "installed": true,
+  "n_snapshots": 20,
+  "n_ticks_run": 20,
+  "last_tick": 20,
+  "n_alive_last": 6,
+  "per_pathogen": {
+    "cholera": {
+      "n_susceptible": 6,
+      "n_infectious": 0,
+      "n_recovered": 0,
+      "mean_load": 0.0,
+      "max_load": 0.0,
+      "mean_immune": 0.0,
+      "r0_estimate": 0.0
+    },
+    "flu": {
+      "n_susceptible": 6,
+      "n_infectious": 0,
+      "n_recovered": 0,
+      "mean_load": 0.0,
+      "max_load": 0.0,
+      "mean_immune": 0.0,
+      "r0_estimate": 0.0
+    },
+    "wound": {
+      "n_susceptible": 6,
+      "n_infectious": 0,
+      "n_recovered": 0,
+      "mean_load": 0.0,
+      "max_load": 0.0,
+      "mean_immune": 0.0,
+      "r0_estimate": 0.0
+    }
+  },
+  "contact_graph": {
+    "n_snapshots": 20,
+    "last_edges": 0,
+    "contact_radius_m": 4.0
+  },
+  "r0_comparison": {
+    "cholera": {
+      "r0_sir_estimate": 0.0,
+      "r0_network_estimate": 0.0
+    },
+    "flu": {
+      "r0_sir_estimate": 0.0,
+      "r0_network_estimate": 0.0
+    },
+    "wound": {
+      "r0_sir_estimate": 0.0,
+      "r0_network_estimate": 0.0
+    }
+  }
+}

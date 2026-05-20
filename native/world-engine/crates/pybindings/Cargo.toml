@@ -1,0 +1,21 @@
+[package]
+name        = "genesis-pybindings"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Python module `genesis_world` (PyO3)"
+
+[lib]
+name       = "genesis_world"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+genesis-core      = { path = "../core" }
+genesis-biome     = { path = "../biome" }
+genesis-streaming = { path = "../streaming" }
+genesis-agent-api = { path = "../agent-api" }
+genesis-intent    = { path = "../intent" }
+genesis-mesh      = { path = "../mesh" }
+
+pyo3   = { workspace = true }
+tokio  = { workspace = true }

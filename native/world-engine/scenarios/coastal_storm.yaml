@@ -1,0 +1,35 @@
+name: "Coastal storm one-week regime"
+description: >
+  Short 7-day experiment on a 4×4 coastal patch with elevated storminess,
+  intended to validate the precipitation + wind tendencies.
+version: "1"
+metadata:
+  authors: ["Genesis Engine team"]
+  license: "Apache-2.0"
+  keywords: ["storm", "coastal", "precipitation", "validation"]
+
+world:
+  seed: 0xCAFE_BABE
+  extent_chunks: { min_cx: -2, max_cx: 1, min_cy: -2, max_cy: 1 }
+  climate:
+    t_equator_c: 28.0
+    t_pole_c: -25.0
+    continentality: 0.2    # coastal → low continentality
+
+experiment:
+  ticks: 168               # 24h × 7
+  dt_seconds: 3_600.0      # 1 hour per tick
+
+measurements:
+  - kind: TotalPrecipitation
+    every_ticks: 1
+  - kind: MeanWindSpeed
+    every_ticks: 1
+  - kind: MeanTemperature
+    every_ticks: 6
+
+exports:
+  - format: Csv
+    path: coastal_storm.csv
+  - format: Json
+    path: coastal_storm.json

@@ -1,10 +1,9 @@
-LINE_1 = "first line"
-LINE_2 = "second line"
-LINE_3 = "third line"
-LINE_4 = "fourth line"
-LINE_5 = "fifth line"
-LINE_6 = "sixth line"
-LINE_7 = "seventh line"
-LINE_8 = "eighth line"
-LINE_9 = "ninth line"
-LINE_10 = "tenth line"
+"""Deprecated dead-code placeholder.
+
+This module used to hold ten unused module-level constants (``LINE_1`` …
+``LINE_10``). They were never imported by any engine, test or experiment
+file. The 2026-05-18 audit removed them. The module is kept as an empty
+stub so any stale ``import engine.__test_sync`` does not break, but it
+exposes no public surface.
+"""
+__all__: list[str] = []

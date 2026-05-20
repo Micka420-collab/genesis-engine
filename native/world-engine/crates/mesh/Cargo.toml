@@ -1,0 +1,21 @@
+[package]
+name        = "genesis-mesh"
+version     = { workspace = true }
+edition     = { workspace = true }
+license     = { workspace = true }
+description = "Voxel mesh extraction — Naive Surface Nets + simplification"
+
+[dependencies]
+genesis-core      = { path = "../core" }
+genesis-streaming = { path = "../streaming" }
+glam      = { workspace = true }
+serde     = { workspace = true }
+smallvec  = { workspace = true }
+rayon     = { workspace = true }
+thiserror = { workspace = true }
+tracing   = { workspace = true }
+bytemuck  = { workspace = true }
+ahash     = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
