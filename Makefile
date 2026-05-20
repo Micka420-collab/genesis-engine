@@ -14,6 +14,7 @@ help:
 	@echo "  make smoke          # run baseline p0 smoke"
 	@echo "  make civilization   # Genesis bootstrap + agents + FAIR exports"
 	@echo "  make terre          # preset terre (400 ticks, live observe JSONL)"
+	@echo "  make terre-long     # preset terre 2000 ticks + enriched artifact"
 	@echo "  make validate-fair  # Köppen FAIR + checksums (p80)"
 	@echo "  make observe        # SSE observation server + dashboard URL"
 	@echo "  make validate-all   # pytest + smokes p72–p82"
@@ -73,6 +74,9 @@ civilization:
 terre:
 	PYTHONPATH=runtime $(PYTHON) runtime/run.py terre --ticks 400
 
+terre-long:
+	PYTHONPATH=runtime $(PYTHON) runtime/run.py terre --ticks 2000
+
 validate-fair:
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p80_koeppen_genesis_smoke.py
 
@@ -101,9 +105,10 @@ validate-all: test-python
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p81_hydrology_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p82_civilization_pipeline_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p82_observation_sse_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p83_terre_report_smoke.py
 
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release
 
-.PHONY: help setup setup-earth setup-dev doctor compile-python test-python smoke smoke-realism civilization terre validate-fair observe validate-all maturin-dev rust-check rust-test rust-check-scaffolding rust-test-scaffolding test
+.PHONY: help setup setup-earth setup-dev doctor compile-python test-python smoke smoke-realism civilization terre terre-long validate-fair observe validate-all maturin-dev rust-check rust-test rust-check-scaffolding rust-test-scaffolding test
 

@@ -378,6 +378,9 @@ def main() -> int:
     if live:
         summary["observable"] = live
 
+    from engine.run_report import enrich_run_summary
+    summary = enrich_run_summary(sim, summary)
+
     artifact_dir = os.path.join(HERE, "artifacts")
     os.makedirs(artifact_dir, exist_ok=True)
     artifact_path = os.path.join(artifact_dir, f"{name}.json")

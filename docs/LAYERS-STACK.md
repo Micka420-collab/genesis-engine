@@ -86,7 +86,8 @@ PYTHONPATH=runtime python -m pytest runtime/tests/test_knowledge_layers.py -q
 
 | Module | Rôle |
 |--------|------|
-| `engine/trade_exchange.py` | Transferts inventaire sur arêtes TRADE (food ↔ stone) |
+| `engine/trade_exchange.py` | Transferts food/stone/water/wood sur arêtes TRADE |
+| `engine/run_report.py` | Enrichissement artifact post-run (journal, observe, stack) |
 | `engine/commerce_emergence.py` | Settlements + `trade_flow` → boost liens TRADE + flux 1-hop |
 | `engine/full_stack.py` | Post-`Simulation()` : genesis bootstrap, rust WorldGraph, MP API (si clé), 5cd |
 | `engine/rust_worldgraph_tick.py` | `observe_chunk` sparse chaque N ticks via `sim_emergence` |

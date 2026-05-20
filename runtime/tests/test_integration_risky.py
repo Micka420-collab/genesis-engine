@@ -287,6 +287,41 @@ class IntegrationRiskyTests(unittest.TestCase):
         self.assertGreater(direct, 0.0)
         self.assertLess(direct, 50.0)
 
+    def test_trade_exchange_water(self):
+        sim = Simulation(
+            SimConfig(
+                founders=2,
+                max_agents=4,
+                life_emergence=False,
+                epidemic_observer=False,
+                emergence_subsystems=False,
+            )
+        )
+        sim.bootstrap()
+        sim.agents.inv_water[0] = 0.9
+        sim.agents.inv_water[1] = 0.05
+        sim.agents.inv_food[0] = 0.4
+        sim.agents.inv_food[1] = 0.4
+        from engine.trade_exchange import execute_bilateral_trade
+
+        before = float(sim.agents.inv_water[1])
+        xfer = execute_bilateral_trade(sim, 0, 1, edge_weight=0.9, macro_flow=0.0)
+        self.assertIsNotNone(xfer)
+        self.assertIn("water_a_to_b", xfer)
+        self.assertGreater(float(sim.agents.inv_water[1]), before)
+
+    def test_enrich_run_summary_schema(self):
+        sim = Simulation(
+            SimConfig(founders=2, max_agents=4, life_emergence=False,
+                         epidemic_observer=False, emergence_subsystems=False)
+        )
+        sim.bootstrap()
+        from engine.run_report import enrich_run_summary
+
+        out = enrich_run_summary(sim, {"experiment": "x", "ticks_run": 1})
+        self.assertEqual(out["report_schema"], "genesis.run_report/v1")
+        self.assertIn("stack_active", out)
+
     def test_annalist_trade_transfer(self):
         sim = Simulation(
             SimConfig(
