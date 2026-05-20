@@ -501,7 +501,7 @@ def compute_wildfire_metrics(sim) -> Dict[str, float]:
     max_intensity = 0.0
     ash_sum = 0.0
     n_cells = 0
-    for chunk in sim.streamer.cache.values():
+    for chunk in list(sim.streamer.cache.values()):
         fi = getattr(chunk, "_fire_intensity", None)
         if fi is not None:
             mask = fi >= ACTIVE_FIRE_THRESHOLD
@@ -554,7 +554,7 @@ def save_wildfire_state(sim, world_dir: str) -> Optional[str]:
         coords: List[Tuple[int, int, int]] = []
         fires: List[np.ndarray] = []
         ashes: List[np.ndarray] = []
-        for coord, chunk in sim.streamer.cache.items():
+        for coord, chunk in list(sim.streamer.cache.items()):
             fi = getattr(chunk, "_fire_intensity", None)
             ash = getattr(chunk, "_fire_ash", None)
             if fi is None and ash is None:

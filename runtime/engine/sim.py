@@ -183,7 +183,7 @@ class Simulation:
             self.bootstrap()
         self.tick += 1
         self._stream_around_agents()
-        for chunk in self.streamer.cache.values():
+        for chunk in list(self.streamer.cache.values()):
             base_t = float(np.mean(chunk.height) * -0.0065 + 15.0)
             avg_precip = float(np.mean(chunk.food_capacity) * 3.0)
             w = weather_at(self.tick * int(self.cfg.drive_accel), base_t, avg_precip)
@@ -530,7 +530,7 @@ class Simulation:
             self.agents.injuries[row] = float(min(1.0, self.agents.injuries[row] + dmg))
             self.agents.stress[row] = float(min(1.5, self.agents.stress[row] + dmg))
             self.agents.pain[row] = float(min(1.5, self.agents.pain[row] + dmg))
-        for chunk in self.streamer.cache.values():
+        for chunk in list(self.streamer.cache.values()):
             ccx, ccy, _ = chunk.coord
             chunk_center_x = ccx * CHUNK_SIDE_M + CHUNK_SIDE_M / 2
             chunk_center_y = ccy * CHUNK_SIDE_M + CHUNK_SIDE_M / 2

@@ -69,7 +69,7 @@ def tick_physics_layer(sim) -> List[dict]:
 
     # Chunk-scale effective conductivity (proxy from dominant surface material).
     conds = []
-    for chunk in sim.streamer.cache.values():
+    for chunk in list(sim.streamer.cache.values()):
         mat = "stone"
         if float(chunk.water.max()) > 80.0:
             mat = "water"
@@ -84,7 +84,7 @@ def tick_physics_layer(sim) -> List[dict]:
 
     temps = []
     lapse_k_per_m = 0.0065
-    for chunk in sim.streamer.cache.values():
+    for chunk in list(sim.streamer.cache.values()):
         elev_m = float(np.mean(chunk.height))
         base_t = 15.0 - lapse_k_per_m * elev_m * 1000.0
         w = weather_at(int(sim.tick), base_t, 600.0)

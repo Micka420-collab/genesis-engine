@@ -35,7 +35,7 @@ Pipeline
 
     apply_climate_biome_step(sim):
         global_dT = _anomaly_for_tick(state, sim)             # linear or macro
-        for coord, chunk in sim.streamer.cache.items():
+        for coord, chunk in list(sim.streamer.cache.items()):
             dT = global_dT + per-chunk jitter
             state.current_anomaly_c[coord] = dT
             if |dT| < threshold: continue

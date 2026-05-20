@@ -219,7 +219,7 @@ def tick_atmosphere(sim) -> None:
 
     forest_cells = 0
     ocean_cells = 0
-    for chunk in sim.streamer.cache.values():
+    for chunk in list(sim.streamer.cache.values()):
         f, o = _chunk_biome_counts(chunk)
         forest_cells += f
         ocean_cells += o
@@ -245,7 +245,7 @@ def tick_atmosphere(sim) -> None:
 
     # Periodically apply climate feedback to loaded chunks.
     if sim.tick % CLIMATE_FEEDBACK_EVERY == 0 and atm.temp_anomaly_k > 0.0:
-        for chunk in sim.streamer.cache.values():
+        for chunk in list(sim.streamer.cache.values()):
             apply_climate_feedback(chunk, atm)
 
 
