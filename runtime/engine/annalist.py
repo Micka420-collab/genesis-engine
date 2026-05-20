@@ -115,6 +115,7 @@ class Annalist:
         self.cum_competitions = 0
         self.cum_groups_formed = 0
         self.cum_groups_dissolved = 0
+        self.cum_trades = 0
         self._distinct_lex_signatures = set()
         self.events_emitted = 0
         self._start_ts = time.monotonic()
@@ -228,6 +229,35 @@ class Annalist:
                                        {"group_id": gid, "reason": reason}))
             elif kind == "catastrophe":
                 out.append(self._event("catastrophe", tick, [], (0.0, 0.0, 0.0), {}))
+            elif kind == "trade_transfer":
+                a = int(raw["a"])
+                b = int(raw["b"])
+                self.cum_trades += 1
+                pos = tuple(((agents.pos[a] + agents.pos[b]) * 0.5).tolist())
+                meta = {
+                    "goods_kg": float(raw.get("goods_kg", 0)),
+                    "macro_flow": float(raw.get("macro_flow", 0)),
+                    "legs": dict(raw.get("legs") or {}),
+                }
+                out.append(self._event("trade", tick,
+                                       [str(agents.uuid[a]), str(agents.uuid[b])],
+                                       pos, meta))
+            elif kind == "trade_link_formed":
+                a = int(raw["a"])
+                b = int(raw["b"])
+                pos = tuple(((agents.pos[a] + agents.pos[b]) * 0.5).tolist())
+                out.append(self._event("trade", tick,
+                                       [str(agents.uuid[a]), str(agents.uuid[b])],
+                                       pos, {"link": True,
+                                             "distance_m": float(raw.get("distance_m", 0))}))
+            elif kind == "alliance_formed":
+                a = int(raw["a"])
+                b = int(raw["b"])
+                pos = tuple(((agents.pos[a] + agents.pos[b]) * 0.5).tolist())
+                out.append(self._event("innovation", tick,
+                                       [str(agents.uuid[a]), str(agents.uuid[b])],
+                                       pos, {"alliance": True,
+                                             "weight": float(raw.get("weight", 0))}))
 
         if self.journal:
             self.journal.append(out)
@@ -277,6 +307,7 @@ class Annalist:
             "competitions_cum": int(self.cum_competitions),
             "groups_formed_cum": int(self.cum_groups_formed),
             "groups_dissolved_cum": int(self.cum_groups_dissolved),
+            "trades_cum": int(self.cum_trades),
             "distinct_lex_signatures": len(self._distinct_lex_signatures),
             "events_emitted": int(self.events_emitted),
             "elapsed_s": time.monotonic() - self._start_ts,

@@ -83,14 +83,6 @@ def install_social_topology(sim) -> SocialTopologyState:
     _seed_from_affinity(sim, st)
     if not getattr(sim, "_social_topology_step_patched", False):
         sim._social_topology_step_patched = True
-        orig = sim.step
-
-        def wrapped():
-            stats = orig()
-            tick_social_topology(sim, st)
-            return stats
-
-        sim.step = wrapped
     return st
 
 

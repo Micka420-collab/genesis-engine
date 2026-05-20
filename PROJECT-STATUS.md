@@ -9,7 +9,7 @@
 
 Laboratoire open-source d’**artificial life** : monde physique déterministe (Terre ou procédural) + agents autonomes + civilisations émergentes, observable via smokes, dashboard et exports GIS.
 
-**Tests :** `pytest runtime/tests` — **65** tests (voir `Makefile` `test-python`).  
+**Tests :** `pytest runtime/tests` — **66** tests (voir `Makefile` `test-python`).  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
@@ -47,8 +47,8 @@ Estimation **globale ~70 %** vers une simulation « publication-grade » type Te
 |-----------|-----|------------------|
 | Climat / biomes | 76 | Köppen FAIR + bootstrap Genesis (p80) |
 | Rendu visuel | 73 | PBR-lite, Rayleigh, HG + ray-march colonne |
-| Observation IA | 78 | Vision JSONL, dashboard SSE (p82) |
-| Sociétés / agents | 70 | Épidémie R0 réseau vs SIR (exp4) |
+| Observation IA | **80** | SSE + JSONL live (`run.py --observe-jsonl`, `observation_server --jsonl`) |
+| Sociétés / agents | **76** | Journal `trade` + transferts inventaire + alliances |
 | Géologie / relief | 55 | Tectonique, stratigraphie légère |
 | Écologie / hydrologie | 65 | **`hydrology_mode`** stub/sv1d/lbm ; preset **`run.py realism`** |
 | Pont Python ↔ Rust | **74** | Tick prod (`rust_worldgraph_prod`) + `submit_intent` prefetch natif |
@@ -84,7 +84,7 @@ Depuis la racine du repo (`PYTHONPATH=runtime` implicite via `make` ou `cd runti
 ```bash
 make smoke                    # p0 — sanity
 make civilization             # pipeline émergence + manifest
-make validate-all             # pytest (58 tests) + smokes p72–p82 + SSE
+make validate-all             # pytest (65 tests) + smokes p72–p82 + SSE
 python run.py realism --ticks 500   # preset audit : genesis + biosphere + layers + sv1d
 cd runtime && python scripts/p82_civilization_pipeline_smoke.py
 ```

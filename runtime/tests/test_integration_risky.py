@@ -287,6 +287,46 @@ class IntegrationRiskyTests(unittest.TestCase):
         self.assertGreater(direct, 0.0)
         self.assertLess(direct, 50.0)
 
+    def test_annalist_trade_transfer(self):
+        sim = Simulation(
+            SimConfig(
+                founders=2,
+                max_agents=4,
+                life_emergence=False,
+                epidemic_observer=False,
+                emergence_subsystems=False,
+            )
+        )
+        sim.bootstrap()
+        journal = os.path.join(HERE, "_trade_test.jsonl")
+        sim.annalist.journal = __import__(
+            "engine.annalist", fromlist=["JsonlJournal"]
+        ).JsonlJournal(journal)
+        sim.annalist.record_tick(
+            1,
+            sim.agents,
+            births=[],
+            deaths=[],
+            raw_events=[{
+                "kind": "trade_transfer",
+                "a": 0,
+                "b": 1,
+                "goods_kg": 0.12,
+                "macro_flow": 5.0,
+                "legs": {"food_a_to_b": 0.12},
+            }],
+        )
+        self.assertEqual(sim.annalist.cum_trades, 1)
+        with open(journal, encoding="utf-8") as fh:
+            line = fh.readline()
+        self.assertIn('"trade"', line)
+        sim.annalist.journal.close()
+        sim.annalist.journal = None
+        try:
+            os.remove(journal)
+        except OSError:
+            pass
+
 
 if __name__ == "__main__":
     unittest.main()

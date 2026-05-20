@@ -32,10 +32,23 @@ if ROOT not in sys.path:
 class ObservationHandler(BaseHTTPRequestHandler):
     artifact_path: Optional[Path] = None
     observable_path: Optional[Path] = None
+    jsonl_path: Optional[Path] = None
     poll_interval_s: float = 1.0
 
     def log_message(self, fmt: str, *args) -> None:
         pass
+
+    def _read_jsonl_tail(self) -> dict:
+        path = self.jsonl_path
+        if not path or not path.is_file():
+            return {"error": "no jsonl", "ts": time.time()}
+        try:
+            lines = path.read_text(encoding="utf-8").strip().splitlines()
+            if not lines:
+                return {"error": "empty jsonl", "ts": time.time()}
+            return json.loads(lines[-1])
+        except Exception as exc:
+            return {"error": repr(exc), "ts": time.time()}
 
     def _send_json(self, obj: object, status: int = 200) -> None:
         body = json.dumps(obj).encode("utf-8")
@@ -47,6 +60,8 @@ class ObservationHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _load_payload(self) -> dict:
+        if self.jsonl_path and self.jsonl_path.is_file():
+            return self._read_jsonl_tail()
         if self.observable_path and self.observable_path.is_file():
             return json.loads(self.observable_path.read_text(encoding="utf-8"))
         if self.artifact_path and self.artifact_path.is_file():
@@ -69,7 +84,7 @@ class ObservationHandler(BaseHTTPRequestHandler):
             self.end_headers()
             last_mtime = -1.0
             while True:
-                path = self.observable_path or self.artifact_path
+                path = self.jsonl_path or self.observable_path or self.artifact_path
                 mtime = path.stat().st_mtime if path and path.is_file() else 0.0
                 if mtime != last_mtime:
                     payload = self._load_payload()
@@ -97,6 +112,8 @@ def main() -> int:
                    help="Path to summary JSON (e.g. artifacts/exp4.json)")
     p.add_argument("--observable", default=None,
                    help="Path to observable.json (live sim)")
+    p.add_argument("--jsonl", default=None,
+                   help="Tail last line of observable JSONL (live run.py --observe-jsonl)")
     p.add_argument("--interval", type=float, default=1.0,
                    help="SSE poll interval seconds")
     args = p.parse_args()
@@ -105,9 +122,13 @@ def main() -> int:
         Path(args.artifacts) if args.artifacts else None)
     ObservationHandler.observable_path = (
         Path(args.observable) if args.observable else None)
+    ObservationHandler.jsonl_path = (
+        Path(args.jsonl) if args.jsonl else None)
     ObservationHandler.poll_interval_s = float(args.interval)
 
-    if not ObservationHandler.artifact_path and not ObservationHandler.observable_path:
+    if (not ObservationHandler.artifact_path
+            and not ObservationHandler.observable_path
+            and not ObservationHandler.jsonl_path):
         default = Path(ROOT) / "artifacts" / "exp1_scarcity.json"
         if default.is_file():
             ObservationHandler.artifact_path = default

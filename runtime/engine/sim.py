@@ -255,6 +255,10 @@ class Simulation:
         if self.tick % 25 == 0:
             self._detect_groups(raw_events)
 
+        if getattr(self, "_social_topology", None) is not None:
+            from engine.social_topology import tick_social_topology
+            raw_events.extend(tick_social_topology(self, self._social_topology))
+
         self.annalist.record_tick(self.tick, self.agents, births=births, deaths=deaths,
                                   raw_events=raw_events)
 

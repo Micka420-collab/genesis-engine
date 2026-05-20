@@ -13,6 +13,7 @@ help:
 	@echo "  make test-python    # run Python unit tests"
 	@echo "  make smoke          # run baseline p0 smoke"
 	@echo "  make civilization   # Genesis bootstrap + agents + FAIR exports"
+	@echo "  make terre          # preset terre (400 ticks, live observe JSONL)"
 	@echo "  make validate-fair  # Köppen FAIR + checksums (p80)"
 	@echo "  make observe        # SSE observation server + dashboard URL"
 	@echo "  make validate-all   # pytest + smokes p72–p82"
@@ -69,6 +70,9 @@ smoke-realism:
 civilization:
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/civilization_pipeline.py --seed 0xC1A71CE0 --ticks 100
 
+terre:
+	PYTHONPATH=runtime $(PYTHON) runtime/run.py terre --ticks 400
+
 validate-fair:
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p80_koeppen_genesis_smoke.py
 
@@ -101,5 +105,5 @@ validate-all: test-python
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release
 
-.PHONY: help setup setup-earth setup-dev doctor compile-python test-python smoke smoke-realism civilization validate-fair observe validate-all maturin-dev rust-check rust-test rust-check-scaffolding rust-test-scaffolding test
+.PHONY: help setup setup-earth setup-dev doctor compile-python test-python smoke smoke-realism civilization terre validate-fair observe validate-all maturin-dev rust-check rust-test rust-check-scaffolding rust-test-scaffolding test
 

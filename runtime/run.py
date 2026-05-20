@@ -241,6 +241,9 @@ def main() -> int:
                    help="Cross-chunk hydrology model (default: stub, or from preset).")
     p.add_argument("--journal", default=None,
                    help="Override journal path (default: journals/<exp>.jsonl).")
+    p.add_argument("--observe-jsonl", default=None,
+                   help="Append live observable JSONL each emergence tick "
+                        "(default for realism/terre: artifacts/<exp>_observe.jsonl).")
     p.add_argument("--quiet", action="store_true",
                    help="Suppress per-tick progress reports.")
     args = p.parse_args()
@@ -257,6 +260,14 @@ def main() -> int:
     open(journal_path, "w").close()  # truncate
 
     sim = Simulation(cfg, journal_path=journal_path)
+
+    observe_jsonl = args.observe_jsonl
+    if observe_jsonl is None and use_full_stack:
+        observe_jsonl = os.path.join(HERE, "artifacts", f"{name}_observe.jsonl")
+    if observe_jsonl:
+        os.makedirs(os.path.dirname(observe_jsonl) or ".", exist_ok=True)
+        open(observe_jsonl, "w").close()
+        sim._observable_jsonl_path = observe_jsonl
 
     stack_status: dict = {}
     if use_full_stack:
@@ -349,9 +360,12 @@ def main() -> int:
         "cum_births": int(sim.stats.cum_births),
         "cum_deaths": int(sim.stats.cum_deaths),
         "cum_events": int(sim.stats.cum_events),
+        "cum_trades": int(getattr(sim.annalist, "cum_trades", 0)),
         "metrics": metrics,
         "journal": journal_path,
     }
+    if observe_jsonl:
+        summary["observe_jsonl"] = observe_jsonl
     if epidemic_summary:
         summary["epidemic"] = epidemic_summary
     if emergence.get("koeppen"):

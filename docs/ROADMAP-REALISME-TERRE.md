@@ -54,7 +54,18 @@ Estimation honnête du niveau de réalisme **au 19 mai 2026** après la session 
 2. **Köppen** : export NetCDF diagnostics ; valider 50 stations (Beck 2018).
 3. **WorldGraph** : 1 pass Rust depuis `genesis_bootstrap` (tectonics/ecology).
 4. **Hydrologie** : LBM 2D minimal ou D8 accumulation cross-macro.
-5. **Observation** : WebSocket `append_observable_jsonl` live.
+5. **Observation** : JSONL live branché (`append_observable_jsonl` dans le tick emergence).
+
+---
+
+## P4 livré (journal + observation live)
+
+- Événements sociaux (`trade_transfer`, `trade_link_formed`) → journal Annalist (`kind: trade`).
+- `tick_social_topology` appelé depuis `Simulation.step` (plus de wrapper tardif).
+- `run.py realism/terre` : `artifacts/<exp>_observe.jsonl` par défaut.
+- `observation_server.py --jsonl` : SSE sur la dernière ligne JSONL.
+- Commerce : flux macro **2-hop** (3 settlements intermédiaires).
+- `make terre` : run court preset Terre.
 
 ---
 

@@ -230,6 +230,13 @@ def _tick_live_observable(sim, st: EmergenceState) -> None:
     if st.koeppen_manifest:
         payload["koeppen_land_cells"] = st.koeppen_manifest.get("koeppen_land_cells")
     st.live_observable = payload
+    jsonl_path = getattr(sim, "_observable_jsonl_path", None)
+    if jsonl_path:
+        try:
+            from engine.agent_observation import append_observable_jsonl
+            append_observable_jsonl(sim, jsonl_path)
+        except Exception:
+            pass
     for listener in st.observation_listeners:
         try:
             listener(sim, payload)

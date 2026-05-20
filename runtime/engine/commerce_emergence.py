@@ -29,6 +29,7 @@ class CommerceEmergenceState:
     last_refresh_tick: int = -1
     refreshes: int = 0
     multihop_attenuation: float = 0.35
+    multihop_max: int = 2
 
 
 def install_commerce_emergence(sim, *, refresh_every: int = 400) -> CommerceEmergenceState:
@@ -115,10 +116,10 @@ def macro_trade_flow_between(st: CommerceEmergenceState, a: int, b: int) -> floa
     direct = float(flows[ia, ib])
     if direct > 0.0:
         return direct
-    # One-hop redistribution on the settlement MST (Wave 30 follow-up).
     n = int(flows.shape[0])
-    best = 0.0
     atten = float(st.multihop_attenuation)
+    best = 0.0
+    # 1-hop via intermediate settlement k.
     for k in range(n):
         if k == ia or k == ib:
             continue
@@ -128,6 +129,25 @@ def macro_trade_flow_between(st: CommerceEmergenceState, a: int, b: int) -> floa
             via = math.sqrt(leg1 * leg2) * atten
             if via > best:
                 best = via
+    if best > 0.0 or int(st.multihop_max) < 2:
+        return best
+    # 2-hop ia → j → k → ib (sparse, capped scans).
+    atten2 = atten * atten
+    for j in range(n):
+        if j == ia or j == ib:
+            continue
+        f_ij = float(flows[ia, j])
+        if f_ij <= 0.0:
+            continue
+        for k in range(n):
+            if k in (ia, ib, j):
+                continue
+            f_jk = float(flows[j, k])
+            f_kb = float(flows[k, ib])
+            if f_jk > 0.0 and f_kb > 0.0:
+                via = (f_ij * f_jk * f_kb) ** (1.0 / 3.0) * atten2
+                if via > best:
+                    best = via
     return best
 
 
