@@ -36,7 +36,8 @@ def parse_args():
     p.add_argument("--max-agents", type=int, default=500)
     p.add_argument("--bounds-km", type=float, default=1.2,
                    help="Simulation footprint (km) anchored on macro centre.")
-    p.add_argument("--genesis-resolution", type=int, default=128)
+    p.add_argument("--genesis-resolution", type=int, default=192,
+                   help="Macro grid resolution (higher = more Earth-like detail).")
     p.add_argument("--port", type=int, default=8090)
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--target-tps", type=float, default=8.0)
@@ -44,8 +45,8 @@ def parse_args():
                    help="0 = run until Ctrl+C")
     p.add_argument("--journal", default=None,
                    help="JSONL event journal (default: artifacts/earth_console.jsonl)")
-    p.add_argument("--graphcast-lite", action="store_true",
-                   help="Apply GraphCast-lite macro wind prior after Genesis.")
+    p.add_argument("--no-graphcast-lite", action="store_true",
+                   help="Disable GraphCast-lite macro climate prior.")
     return p.parse_args()
 
 
@@ -72,7 +73,7 @@ def main():
         hydrology_mode="sv1d",
         hydrology_cross_chunk=True,
         observable_every=15,
-        graphcast_lite_prior=bool(args.graphcast_lite),
+        graphcast_lite_prior=not args.no_graphcast_lite,
         autonomous_world=True,
     )
     sim = Simulation(cfg, journal_path=args.journal)

@@ -147,6 +147,9 @@ def emergent_construction_metrics(sim) -> Dict[str, Any]:
         "completed": st.completed_total,
         "structures": st.structures_total,
         "imitations": st.imitations,
+        "experiments_started": st.experiments_started,
+        "experiments_success": st.experiments_success,
+        "recipes_known": len(st.discovered),
     }
 
 

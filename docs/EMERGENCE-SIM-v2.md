@@ -58,6 +58,7 @@ Stack optionnelle **knowledge layers** (physique/chimie/architecture/social expl
 | Mémoire culturelle (mèmes) | 🟡 | `knowledge_layers`, imitation partielle |
 | Spécialisation + commerce | ✅ | `social_topology`, `trade_exchange`, `commerce_emergence` |
 | Zéro action « ramasser nourriture » hardcodée | 🟡 | Enum `ActionKind` (FORAGE, BUILD…) — **choix** par cognition, pas par script de quête |
+| Outils → construction (découverte) | 🟡 | **`tool_discovery.py`** — expériences, prérequis outils, pas de recettes au spawn |
 
 Audit actif : [`runtime/AUDIT.md`](../runtime/AUDIT.md) — pas d'outcomes scriptés sur le tick path principal.
 

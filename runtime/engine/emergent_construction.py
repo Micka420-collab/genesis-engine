@@ -6,8 +6,8 @@ Fusionne sans script civilisationnel :
   - ``construction`` (foyers, puits, ateliers — StructureKind)
   - voxels / ``building_discovery`` (blocs physiques)
 
-BUILD / SMELT → le moteur choisit la recette réalisable (T, stocks, proximité)
-et avance le chantier sur plusieurs ticks.
+BUILD / SMELT (choisi par le cerveau, pas de script) → expérimentation ou
+recettes **déjà découvertes** ; outils d'abord, puis constructions libres.
 """
 from __future__ import annotations
 
@@ -27,6 +27,13 @@ from engine.material_transform import (
     _local_temp_k,
 )
 from engine.realistic_construction import REAL_RECIPES, build_real, can_build
+from engine.tool_discovery import (
+    agent_artifact_kinds,
+    has_tool_prereqs,
+    known_recipes_for_agent,
+    pick_experiment_recipe,
+    register_discovery,
+)
 
 PIPELINE_LAYER = "Genesis-L4 Feedback"
 WORLD_MODEL_CAPABILITY = "paper-L2 Simulator"
@@ -87,12 +94,17 @@ class EmergentSite:
 
 @dataclass
 class EmergentConstructionState:
+    """Mémoire civilisationnelle — vide au départ (ZERO PRE-SCRIPT)."""
     discovered: List[str] = field(default_factory=list)
+    per_agent_discovered: Dict[int, List[str]] = field(default_factory=dict)
+    culture_discovered: Dict[int, List[str]] = field(default_factory=dict)
     sites: List[EmergentSite] = field(default_factory=list)
     completed_total: int = 0
     failed_total: int = 0
     structures_total: int = 0
     imitations: int = 0
+    experiments_started: int = 0
+    experiments_success: int = 0
 
 
 def _ensure_subsystems(sim) -> ConstructionRegistry:
@@ -154,12 +166,15 @@ def _can_emerge(sim, row: int, spec: EmergentRecipe) -> Tuple[bool, float]:
 
 
 def _score_candidates(sim, row: int, st: EmergentConstructionState) -> List[Tuple[float, str]]:
+    """Uniquement recettes **déjà découvertes** et débloquées par les outils."""
+    known = known_recipes_for_agent(st, sim, row)
+    artifacts = agent_artifact_kinds(sim, row)
     scored: List[Tuple[float, str]] = []
     curiosity = float(sim.agents.curiosity[row])
     for key, spec in CATALOG.items():
-        if key not in st.discovered and key not in (
-            "cordage_fiber", "fire_clay_ceramic", "voxel_shelter", "struct_hearth",
-        ):
+        if key not in known:
+            continue
+        if not has_tool_prereqs(key, known, artifacts):
             continue
         ok, base = _can_emerge(sim, row, spec)
         if not ok and base < 0.15:
@@ -194,8 +209,13 @@ def _complete_site(sim, site: EmergentSite, st: EmergentConstructionState) -> Li
     events: List[dict] = []
 
     if spec.channel == "transform":
-        if start_transform(sim, row, spec.key):
+        ok, _ = can_transform(sim, row, spec.key)
+        if ok and start_transform(sim, row, spec.key):
+            st.experiments_success += 1
             events.append({"kind": "emergent_transform", "recipe": spec.key, "agent": row})
+        elif not ok:
+            st.failed_total += 1
+            events.append({"kind": "emergent_experiment_fail", "recipe": spec.key, "agent": row})
     elif spec.channel == "real":
         ok, sid, reason = build_real(sim, row, spec.key)
         if ok:
@@ -233,8 +253,7 @@ def _complete_site(sim, site: EmergentSite, st: EmergentConstructionState) -> Li
             events.append(ev)
             st.structures_total += 1
 
-    if site.recipe_key not in st.discovered:
-        st.discovered.append(site.recipe_key)
+    register_discovery(st, sim, row, site.recipe_key)
     st.completed_total += 1
     _imitate_discoveries(sim, row, st)
     return events
@@ -274,20 +293,32 @@ def emergent_build_on_action(sim, row: int) -> List[dict]:
             })
         return events
 
-    if st.discovered is None or len(st.discovered) < 3:
-        for seed in ("cordage_fiber", "voxel_shelter", "struct_hearth",
-                     "fire_clay_ceramic", "stone_hut"):
-            if seed not in st.discovered:
-                st.discovered.append(seed)
-
+    known = known_recipes_for_agent(st, sim, row)
     candidates = _score_candidates(sim, row, st)
+
     if not candidates:
+        trial_key, trial_score = pick_experiment_recipe(sim, row, known)
         px = float(sim.agents.pos[row, 0])
         py = float(sim.agents.pos[row, 1])
-        if float(sim.agents.inv_stone[row]) >= 0.2 or float(sim.agents.inv_wood[row]) >= 0.2:
-            site = EmergentSite("voxel_shelter", row, 2, (px, py, 0.0))
+        if trial_key is not None:
+            spec = CATALOG[trial_key]
+            extra = 2 if trial_score < 0.5 else 0
+            site = EmergentSite(
+                trial_key, row, spec.labor_ticks + extra, (px, py, 0.0),
+            )
             st.sites.append(site)
-            events.append({"kind": "emergent_site_start", "recipe": "voxel_shelter"})
+            st.experiments_started += 1
+            events.append({
+                "kind": "emergent_experiment_start",
+                "recipe": trial_key,
+                "agent": row,
+            })
+            return events
+        if float(sim.agents.inv_stone[row]) >= 0.5 or float(sim.agents.inv_wood[row]) >= 0.5:
+            site = EmergentSite("voxel_shelter", row, 3, (px, py, 0.0))
+            st.sites.append(site)
+            st.experiments_started += 1
+            events.append({"kind": "emergent_raw_stack_start", "recipe": "voxel_shelter"})
         return events
 
     rng = prf_rng(int(sim.cfg.seed), ["emerge", "build"], [row, sim.tick])
@@ -306,7 +337,11 @@ def tick_emergent_construction(sim) -> List[dict]:
     if st is None:
         return []
     events: List[dict] = []
-    events.extend(tick_material_transform(sim))
+    mt_events = tick_material_transform(sim)
+    events.extend(mt_events)
+    for ev in mt_events:
+        if ev.get("kind") == "material_transform":
+            register_discovery(st, sim, int(ev["agent"]), str(ev["recipe"]))
     if hasattr(sim, "construction_registry"):
         from engine.sim_5cd_integration import tick_construction
         tick_construction(sim)
@@ -350,9 +385,7 @@ def install_emergent_construction(sim) -> EmergentConstructionState:
     # Réserver avant sous-systèmes : évite double patch material_transform.
     sim._emergent_construction_patched = True
     _ensure_subsystems(sim)
-    st = EmergentConstructionState(
-        discovered=["cordage_fiber", "voxel_shelter", "struct_hearth"],
-    )
+    st = EmergentConstructionState()
     sim._emergent_construction = st
     _EMERGENT_DISPATCH[id(sim.agents)] = sim
 
@@ -387,6 +420,9 @@ def emergent_construction_snapshot(sim) -> Dict[str, Any]:
     return {
         "installed": True,
         "discovered": list(st.discovered),
+        "n_cultures_with_tech": len(st.culture_discovered),
+        "experiments_started": st.experiments_started,
+        "experiments_success": st.experiments_success,
         "active_sites": len(st.sites),
         "completed_total": st.completed_total,
         "structures_total": st.structures_total,

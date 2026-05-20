@@ -110,6 +110,8 @@ def _knowledge_global_wrapper(agents, row, decision, streamer, tick):
         events = []
 
     if act == int(ActionKind.BUILD):
+        if getattr(sim, "_emergent_construction_patched", False):
+            return events
         agents.vel[row, :2] = 0.0
         ev = _maybe_build_voxel(sim, agents, row)
         if ev:
@@ -133,9 +135,12 @@ def _knowledge_decide_wrapper(agents, obs, sim=None):
     if sim is None or not getattr(sim, "_knowledge_layers_installed", False):
         return inner(agents, obs, sim)
 
+    # ZERO PRE-SCRIPT : pas de « construis un abri » scripté — le cerveau décide.
+    if getattr(sim, "_emergent_construction_patched", False):
+        return inner(agents, obs, sim)
+
     row = obs.row
     drives = obs.drives
-    # Metallurgy when ores available (after critical needs handled by inner).
     cu = float(getattr(agents, "inv_copper", [0])[row])
     sn = float(getattr(agents, "inv_tin", [0])[row])
     if (cu >= 0.1 and sn >= 0.05

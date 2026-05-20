@@ -252,40 +252,14 @@ def sample_lite_field(
         elif coord in chunk_temps:
             temp_out[mask] = float(chunk_temps[coord])
 
-    palette = np.array(
-        [BIOME_RGB.get(i, (128, 128, 128)) for i in range(12)],
-        dtype=np.float32,
+    from engine.earth_visual_tokens import compose_terrain_rgba
+    cell_m = max(span_x / out_w, span_y / out_h, VOXEL_SIZE_M)
+    rgba = compose_terrain_rgba(
+        biome_out, height_out, water_out,
+        cell_size_m=cell_m,
+        overlay=overlay or "",
+        temp_c=temp_out if overlay == "temp" else None,
     )
-    biome_clipped = np.clip(biome_out, 0, 11)
-    cols = palette[biome_clipped].copy()
-    shade = np.clip(0.42 + height_out / 3500.0, 0.28, 1.08)[..., None]
-    cols *= shade
-    water_mask = water_out > 5.0
-    cols[water_mask] = cols[water_mask] * 0.35 + np.array([25, 95, 200], np.float32) * 0.65
-
-    if overlay == "temp":
-        t_norm = np.clip((temp_out - (-10.0)) / 45.0, 0.0, 1.0)[..., None]
-        cold = np.array([60, 100, 200], np.float32)
-        hot = np.array([230, 90, 50], np.float32)
-        cols = cols * 0.45 + (cold * (1.0 - t_norm) + hot * t_norm) * 0.55
-    elif overlay == "water":
-        w_norm = np.clip(water_out / 500.0, 0.0, 1.0)[..., None]
-        cols = cols * (1.0 - w_norm * 0.6) + np.array([30, 140, 255], np.float32) * (w_norm * 0.6)
-    elif overlay == "flow":
-        gx = np.zeros_like(water_out)
-        gy = np.zeros_like(water_out)
-        gx[:, 1:-1] = water_out[:, 2:] - water_out[:, :-2]
-        gy[1:-1, :] = water_out[2:, :] - water_out[:-2, :]
-        grad = np.sqrt(gx * gx + gy * gy)
-        g_norm = np.clip(grad / (np.percentile(grad, 92) + 1e-3), 0.0, 1.0)[..., None]
-        flow_col = np.array([80, 200, 255], np.float32)
-        cols = cols * (1.0 - g_norm * 0.75) + flow_col * (g_norm * 0.75)
-        river = water_out > 80.0
-        cols[river] = cols[river] * 0.3 + np.array([40, 120, 240], np.float32) * 0.7
-
-    rgba = np.zeros((out_h, out_w, 4), dtype=np.uint8)
-    rgba[..., :3] = np.clip(cols, 0, 255).astype(np.uint8)
-    rgba[..., 3] = 255
 
     return {
         "w": out_w,

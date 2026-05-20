@@ -141,6 +141,7 @@
       image-rendering: pixelated;
     }
     #agentGpuLayer { position: absolute; inset: 0; pointer-events: none; width: 100%; height: 100%; }
+    #observerLayer { position: absolute; inset: 0; pointer-events: none; width: 100%; height: 100%; }
     #agentLayer { position: absolute; inset: 0; pointer-events: none; }
     #liteLawsHud {
       position: absolute; left: 12px; bottom: 12px;
@@ -371,6 +372,7 @@
     <button title="Globe planétaire WebGL" data-view-mode="globe">🌐</button>
     <button title="Vue isométrique 2.5D" data-view-mode="iso">◆</button>
     <button title="2D léger — agents IA sans terrain" data-view-mode="lite2d">◎</button>
+    <button title="Vue du ciel — construction & terraformation" data-view-mode="sky">🛰</button>
     <button title="Replay journal / timeline" id="btnReplayMode">⏪</button>
     <button title="God view classique" onclick="location.href='god_view_v2.html'">⚡</button>
   </nav>
@@ -381,6 +383,7 @@
       <img id="worldImg" alt="terrain">
       <canvas id="agentGpuLayer" class="view-hidden"></canvas>
       <canvas id="agentLayer"></canvas>
+      <canvas id="observerLayer" class="view-hidden"></canvas>
       <canvas id="globeCanvas" class="view-hidden"></canvas>
       <div class="globe-hud view-hidden" id="globeHud">Glisser pour tourner · clic pour te téléporter</div>
       <div class="view-hidden" id="liteLawsHud"></div>
@@ -420,6 +423,15 @@
         <button class="layer-chip" data-lite-overlay="water">Eau</button>
         <button class="layer-chip" data-lite-overlay="flow">Flux eau</button>
         <button class="layer-chip" data-lite-overlay="wind">Vent</button>
+        <button class="layer-chip active" id="chipObserver" type="button">Chantiers 🛠</button>
+      </div>
+
+      <div class="section-title view-hidden" id="observerKpiTitle">Vue du ciel</div>
+      <div class="kpi-grid view-hidden" id="observerKpis">
+        <div class="kpi"><div class="label">Chantiers</div><div class="value" id="obsSites">—</div></div>
+        <div class="kpi"><div class="label">Structures</div><div class="value" id="obsStruct">—</div></div>
+        <div class="kpi"><div class="label">Ouvriers</div><div class="value" id="obsWorkers">—</div></div>
+        <div class="kpi"><div class="label">Terraform</div><div class="value" id="obsTerraform">—</div></div>
       </div>
 
       <div class="section-title">Lois de la Terre (L0)</div>
@@ -486,6 +498,10 @@
 </div>
 
 <script src="/earth_console_webgpu.js"></script>
+<script src="/earth_console_observer.js"></script>
+<script src="/earth_console_sun_shadow.js"></script>
+<script src="/earth_console_ambient_audio.js"></script>
+<script src="/earth_console_agent_anim.js"></script>
 <script>
 const API = '';
 let overlay = '';
@@ -514,6 +530,14 @@ const WEBGPU_AGENT_MIN = 40;
 const liteTerrain = document.getElementById('liteTerrain');
 const liteTCtx = liteTerrain.getContext('2d');
 const agentGpuLayer = document.getElementById('agentGpuLayer');
+const observerLayer = document.getElementById('observerLayer');
+let observer = null;
+let observerEnabled = true;
+let lastObserverFeed = null;
+let lastSunState = null;
+let ambientAudio = null;
+let agentAnim = null;
+let consoleRafId = null;
 let popHistory = [];
 let metricsHistory = { tick: [], population: [] };
 const MAX_HISTORY = 120;
@@ -549,8 +573,59 @@ function s2w(sx, sy) {
 function resize() {
   const { w, h } = vp();
   agentLayer.width = w; agentLayer.height = h;
+  observerLayer.width = w; observerLayer.height = h;
   liteTerrain.width = w; liteTerrain.height = h;
   if (agentGpu && useWebGpuAgents) agentGpu.resize(w, h);
+}
+function initObserver() {
+  if (observer || typeof EarthConsoleObserver === 'undefined') return;
+  observer = new EarthConsoleObserver(observerLayer);
+}
+function initPresenceLayers() {
+  if (!agentAnim && typeof EarthConsoleAgentAnim !== 'undefined') {
+    agentAnim = new EarthConsoleAgentAnim();
+  }
+  if (!ambientAudio && typeof EarthConsoleAmbientAudio !== 'undefined') {
+    ambientAudio = new EarthConsoleAmbientAudio();
+  }
+}
+async function loadSunState() {
+  if (viewMode === 'globe') return;
+  try {
+    const j = await (await fetch(API + '/api/sun_state')).json();
+    lastSunState = j;
+    if (observer) observer.setSunState(j);
+  } catch (_) {}
+}
+function agentsForDisplay() {
+  if (agentAnim && camZoom < 80) return agentAnim.displayAgents();
+  return lastAgents;
+}
+function updateObserverHud(feed) {
+  if (!feed) return;
+  const c = feed.counts || {};
+  const el = (id, v) => { const n = document.getElementById(id); if (n) n.textContent = v; };
+  el('obsSites', c.sites ?? '—');
+  el('obsStruct', c.structures ?? '—');
+  el('obsWorkers', c.workers ?? '—');
+  el('obsTerraform', c.terraform ?? '—');
+}
+async function loadObserverFeed() {
+  if (!observerEnabled || viewMode === 'globe') return;
+  const b = bbox();
+  try {
+    const url = `${API}/api/observer_feed?xmin=${b.xmin.toFixed(1)}&ymin=${b.ymin.toFixed(1)}` +
+      `&xmax=${b.xmax.toFixed(1)}&ymax=${b.ymax.toFixed(1)}`;
+    const j = await (await fetch(url)).json();
+    lastObserverFeed = j;
+    if (observer) observer.setFeed(j);
+    updateObserverHud(j);
+  } catch (_) {}
+}
+function drawObserverOverlay() {
+  if (!observer || !observerEnabled || viewMode === 'globe') return;
+  const { w, h } = vp();
+  observer.draw(w2s, camZoom, w, h);
 }
 async function initAgentWebGPU() {
   if (agentGpu || typeof EarthConsoleWebGPU === 'undefined') return;
@@ -571,6 +646,8 @@ resize();
 
 viewport.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
+  initPresenceLayers();
+  if (ambientAudio) ambientAudio.unlock();
   dragging = true; dragX = e.clientX; dragY = e.clientY;
   camStartX = camCenterX; camStartY = camCenterY;
   followingRow = null;
@@ -677,6 +754,13 @@ function expandLiteAgents(lite) {
     drives: [0, 0, 0, 0, 0, 0, 0, 0],
     vx: a.vx ?? 0,
     vy: a.vy ?? 0,
+    posture: a.posture ?? 'idle',
+    activity: a.activity ?? 'observe',
+    tool: a.tool ?? null,
+    skin: a.skin ?? [235, 200, 170],
+    gait: a.gait ?? 0,
+    heading: a.heading ?? (Math.hypot(a.vx ?? 0, a.vy ?? 0) > 0.05
+      ? Math.atan2(a.vy, a.vx) : 0),
   }));
 }
 function decodePackedAgents(j) {
@@ -711,7 +795,7 @@ function pushLiteTrails(agents, tick) {
 
 let liteFieldTimer = null;
 function scheduleLiteField() {
-  if (viewMode !== 'lite2d') return;
+  if (viewMode !== 'lite2d' && viewMode !== 'sky') return;
   if (liteFieldTimer) clearTimeout(liteFieldTimer);
   liteFieldTimer = setTimeout(() => { loadLiteField(); scheduleWindField(); }, 80);
 }
@@ -821,11 +905,36 @@ function updateLiteLawsHud() {
   document.getElementById('lawEntropy').textContent = (live.entropy_proxy * 100).toFixed(0) + '%';
 }
 
+const ACTION_BUILD = 11;
+const ACTION_SMELT = 18;
+function drawLiteHumanSprite(p, a, sel) {
+  if (observer && observer._drawHuman) {
+    observer._drawHuman(aCtx, (wx, wy) => w2s(wx, wy), {
+      x: a.pos[0], y: a.pos[1], posture: a.posture, tool: a.tool,
+      skin: a.skin, culture: a.culture, heading: a.heading ?? 0,
+      gait_phase: a.gait ?? 0, action: a.action,
+    }, camZoom, observer.phase);
+    if (sel) {
+      aCtx.strokeStyle = '#3dd6c6';
+      aCtx.lineWidth = 2;
+      aCtx.beginPath();
+      aCtx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+      aCtx.stroke();
+    }
+    return;
+  }
+}
 function drawLiteAgentSprite(p, a, sel) {
+  if (observer && observer._drawHuman && (viewMode === 'sky' || camZoom < 80)) {
+    drawLiteHumanSprite(p, a, sel);
+    return;
+  }
   const col = agentColor(a);
-  const r = sel ? 10 : 6;
+  const building = (a.action === ACTION_BUILD || a.action === ACTION_SMELT);
+  const r = sel ? 10 : (building ? 8 : 6);
+  const skin = a.skin ? `rgb(${a.skin[0]},${a.skin[1]},${a.skin[2]})` : col;
   const grd = aCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2.2);
-  grd.addColorStop(0, col);
+  grd.addColorStop(0, skin);
   grd.addColorStop(0.5, col);
   grd.addColorStop(1, 'rgba(0,0,0,0)');
   aCtx.fillStyle = grd;
@@ -836,6 +945,15 @@ function drawLiteAgentSprite(p, a, sel) {
   aCtx.arc(p.x, p.y, r, 0, Math.PI * 2);
   aCtx.fillStyle = col;
   aCtx.fill();
+  if (building) {
+    aCtx.strokeStyle = 'rgba(232, 184, 109, 0.75)';
+    aCtx.lineWidth = 1.5;
+    aCtx.setLineDash([3, 4]);
+    aCtx.beginPath();
+    aCtx.arc(p.x, p.y, r + 4, 0, Math.PI * 2);
+    aCtx.stroke();
+    aCtx.setLineDash([]);
+  }
   if (sel) {
     aCtx.strokeStyle = '#3dd6c6';
     aCtx.lineWidth = 2.5;
@@ -891,24 +1009,32 @@ function drawLiteAgents() {
   const gpuBatch = [];
   const gpuOk = useWebGpuAgents && agentGpu && lastAgents.length >= WEBGPU_AGENT_MIN;
   if (gpuOk) agentGpu.clear();
-  lastAgents.forEach(a => {
+  const displayAgents = agentsForDisplay();
+  displayAgents.forEach(a => {
     const p = w2s(a.pos[0], a.pos[1]);
     if (p.x < -32 || p.y < -32 || p.x > w + 32 || p.y > h + 32) return;
     if (gpuOk) {
+      const spd = Math.hypot(a.vx ?? 0, a.vy ?? 0);
+      const heading = a.heading ?? (spd > 0.05 ? Math.atan2(a.vy, a.vx) : 0);
       gpuBatch.push({
         sx: p.x, sy: p.y,
         culture: a.culture ?? 0,
         selected: a.row === selectedRow,
+        heading,
+        action: a.action ?? 0,
+        posture: a.posture ?? 'idle',
       });
     } else {
       drawLiteAgentSprite(p, a, a.row === selectedRow);
     }
   });
   if (gpuOk && gpuBatch.length) agentGpu.drawInstances(gpuBatch);
+  drawObserverOverlay();
+  const obs = lastObserverFeed?.counts || {};
   const modeLabel = gpuOk ? 'WebGPU' : 'Canvas';
   aCtx.fillStyle = 'rgba(200, 220, 240, 0.9)';
   aCtx.font = '600 11px DM Sans, sans-serif';
-  aCtx.fillText(`◎ 2D · ${lastAgents.length} agents · ${modeLabel} · lois L0`, 12, h - 14);
+  aCtx.fillText(`◎ 2D · ${lastAgents.length} agents · ${modeLabel} · 🛠${obs.sites ?? 0} chantiers`, 12, h - 14);
   const hdrGpu = document.getElementById('hdrGpu');
   if (hdrGpu) hdrGpu.textContent = modeLabel;
   updateLiteLawsHud();
@@ -919,30 +1045,48 @@ function drawLite2d() {
 }
 
 function startLiteRaf() {
-  if (liteRafId) cancelAnimationFrame(liteRafId);
-  function frame() {
-    if (viewMode === 'lite2d') {
-      drawLiteAgents();
-      liteRafId = requestAnimationFrame(frame);
-    } else {
-      liteRafId = null;
-    }
-  }
-  liteRafId = requestAnimationFrame(frame);
+  startConsoleRaf();
 }
-
 function stopLiteRaf() {
+  stopConsoleRaf();
+}
+function startConsoleRaf() {
+  if (consoleRafId) cancelAnimationFrame(consoleRafId);
+  let lastT = performance.now();
+  function frame(now) {
+    const dt = Math.min(48, now - lastT);
+    lastT = now;
+    const animView = viewMode === 'lite2d' || viewMode === 'sky'
+      || viewMode === 'local' || viewMode === 'iso';
+    if (!animView || replayActive) {
+      consoleRafId = null;
+      return;
+    }
+    if (observer) observer.advance(dt);
+    if (agentAnim) agentAnim.advance(dt);
+    if (ambientAudio?.enabled) {
+      ambientAudio.update(lastSunState, camZoom, agentsForDisplay(), lastObserverFeed);
+    }
+    if (viewMode === 'lite2d' || viewMode === 'sky') drawLiteAgents();
+    else drawAgents();
+    consoleRafId = requestAnimationFrame(frame);
+  }
+  consoleRafId = requestAnimationFrame(frame);
+}
+function stopConsoleRaf() {
+  if (consoleRafId) { cancelAnimationFrame(consoleRafId); consoleRafId = null; }
   if (liteRafId) { cancelAnimationFrame(liteRafId); liteRafId = null; }
 }
 function drawAgents() {
-  if (viewMode === 'lite2d') { drawLite2d(); return; }
+  if (viewMode === 'lite2d' || viewMode === 'sky') { drawLite2d(); return; }
   const { w, h } = vp();
   aCtx.clearRect(0, 0, w, h);
   if (followingRow != null) {
     const a = lastAgents.find(x => x.row === followingRow);
     if (a) { camCenterX = a.pos[0]; camCenterY = a.pos[1]; updateZoom(); }
   }
-  lastAgents.forEach(a => {
+  const displayAgents = agentsForDisplay();
+  displayAgents.forEach(a => {
     const p = w2s(a.pos[0], a.pos[1]);
     if (p.x < -20 || p.y < -20 || p.x > w + 20 || p.y > h + 20) return;
     aCtx.beginPath();
@@ -955,6 +1099,7 @@ function drawAgents() {
       aCtx.stroke();
     }
   });
+  drawObserverOverlay();
 }
 const ZOOM_PRESETS = {
   macro: () => {
@@ -1164,7 +1309,7 @@ async function loadMetricsHistory() {
 async function poll() {
   if (replayActive) return;
   try {
-    const lite = viewMode === 'lite2d';
+    const lite = viewMode === 'lite2d' || viewMode === 'sky';
     const agentsUrl = lite ? API + '/api/agents?lite=1' : API + '/api/agents';
     const fetches = [
       fetch(API + '/api/state'),
@@ -1251,6 +1396,10 @@ async function poll() {
     const ev = eventsJ.events || [];
     document.getElementById('events').innerHTML = ev.slice(-20).reverse().map(e =>
       `<div class="event-line ${e.kind || ''}">t${e.tick} ${e.kind || '?'}</div>`).join('') || '—';
+    if (viewMode !== 'globe') {
+      await Promise.all([loadObserverFeed(), loadSunState()]);
+    }
+    if (agentAnim) agentAnim.setTargets(lastAgents);
     drawAgents();
   } catch (err) {
     document.getElementById('connPill').textContent = 'hors ligne';
@@ -1264,29 +1413,45 @@ document.querySelectorAll('[data-view-mode]').forEach(btn => {
 });
 function setViewMode(mode) {
   viewMode = mode;
-  pollMs = mode === 'lite2d' ? 140 : 400;
+  pollMs = mode === 'sky' ? 120 : (mode === 'lite2d' ? 140 : 400);
   document.querySelectorAll('[data-view-mode]').forEach(b => {
     b.classList.toggle('active', b.dataset.viewMode === mode);
   });
   const isGlobe = mode === 'globe';
   const isIso = mode === 'iso';
   const isLite = mode === 'lite2d';
-  viewport.classList.toggle('lite2d-mode', isLite);
-  worldImg.classList.toggle('view-hidden', isGlobe || isLite);
+  const isSky = mode === 'sky';
+  const isLiteOrSky = isLite || isSky;
+  viewport.classList.toggle('lite2d-mode', isLiteOrSky);
+  worldImg.classList.toggle('view-hidden', isGlobe || isLiteOrSky);
   agentLayer.classList.toggle('view-hidden', isGlobe || isIso);
+  observerLayer.classList.toggle('view-hidden', isGlobe || (!isLiteOrSky && mode !== 'local' && !isIso));
   globeCanvas.classList.toggle('view-hidden', !isGlobe);
   document.getElementById('globeHud').classList.toggle('view-hidden', !isGlobe);
-  document.getElementById('macroCard').classList.toggle('view-hidden', isGlobe || isLite);
+  document.getElementById('macroCard').classList.toggle('view-hidden', isGlobe || isLiteOrSky);
   document.getElementById('isoChip').style.display = isIso ? '' : 'none';
   document.getElementById('zoomPresets').classList.toggle('view-hidden', isGlobe);
-  document.getElementById('layerChips').classList.toggle('view-hidden', isLite);
-  document.getElementById('liteLayerTitle').classList.toggle('view-hidden', !isLite);
-  document.getElementById('liteLayerChips').classList.toggle('view-hidden', !isLite);
-  document.getElementById('liteLawsHud').classList.toggle('view-hidden', !isLite);
-  document.getElementById('liteTerrain').classList.toggle('view-hidden', !isLite);
-  agentGpuLayer.classList.toggle('view-hidden', !isLite);
-  document.getElementById('pillGpu')?.classList.toggle('view-hidden', !isLite);
-  if (isLite) {
+  document.getElementById('layerChips').classList.toggle('view-hidden', isLiteOrSky);
+  document.getElementById('liteLayerTitle').classList.toggle('view-hidden', !isLiteOrSky);
+  document.getElementById('liteLayerChips').classList.toggle('view-hidden', !isLiteOrSky);
+  document.getElementById('observerKpiTitle').classList.toggle('view-hidden', !isLiteOrSky);
+  document.getElementById('observerKpis').classList.toggle('view-hidden', !isLiteOrSky);
+  document.getElementById('liteLawsHud').classList.toggle('view-hidden', !isLiteOrSky);
+  document.getElementById('liteTerrain').classList.toggle('view-hidden', !isLiteOrSky);
+  agentGpuLayer.classList.toggle('view-hidden', !isLiteOrSky);
+  document.getElementById('pillGpu')?.classList.toggle('view-hidden', !isLiteOrSky);
+  if (isSky) {
+    pollMs = 120;
+    observerEnabled = true;
+    applyZoomPreset('village');
+  } else if (isLite) {
+    pollMs = 140;
+  }
+  if (isLiteOrSky || isIso || mode === 'local') {
+    initObserver();
+    initPresenceLayers();
+  }
+  if (isLiteOrSky) {
     liteFieldKey = '';
     initAgentWebGPU().then(() => {
       resize();
@@ -1294,20 +1459,25 @@ function setViewMode(mode) {
       drawLiteAgents();
     });
     scheduleLiteField();
-    startLiteRaf();
+    startConsoleRaf();
     if (!liteTrails.size) applyZoomPreset('village');
+  } else if (isIso || mode === 'local') {
+    startConsoleRaf();
+    if (isIso) applyZoomPreset('village');
   } else {
-    stopLiteRaf();
+    stopConsoleRaf();
     liteTCtx.clearRect(0, 0, liteTerrain.width, liteTerrain.height);
     if (agentGpu) agentGpu.clear();
   }
   document.getElementById('footerHelp').innerHTML = isGlobe
     ? '<kbd>drag</kbd> rotation · <kbd>clic</kbd> téléport · <kbd>G</kbd> local'
-    : isIso
-      ? 'Vue isométrique · <kbd>drag</kbd> pan · <kbd>I</kbd> local'
-      : isLite
-        ? '<kbd>2D</kbd> biomes+lois L0 · <kbd>1–4</kbd> zoom · <kbd>L</kbd> quitter'
-        : '<kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>G</kbd> globe · <kbd>◎</kbd> 2D lite';
+      : isIso
+      ? 'Iso 2.5D · chantiers qui grandissent · ombres soleil · <kbd>I</kbd> local · clic = son'
+      : isSky
+        ? '<kbd>🛰</kbd> vue du ciel · chantiers · ouvriers · terraformation · <kbd>3</kbd> village'
+        : isLite
+          ? '<kbd>2D</kbd> biomes+lois L0 · <kbd>1–4</kbd> zoom · <kbd>L</kbd> quitter'
+          : '<kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>G</kbd> globe · <kbd>◎</kbd> 2D · <kbd>🛰</kbd> ciel';
   if (isGlobe) initGlobe();
   scheduleTerrain();
   scheduleLiteField();
@@ -1328,6 +1498,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyG') setViewMode(viewMode === 'globe' ? 'local' : 'globe');
   if (e.code === 'KeyI') setViewMode(viewMode === 'iso' ? 'local' : 'iso');
   if (e.code === 'KeyL') setViewMode(viewMode === 'lite2d' ? 'local' : 'lite2d');
+  if (e.code === 'KeyV') setViewMode(viewMode === 'sky' ? 'local' : 'sky');
   if (e.code === 'Digit1') applyZoomPreset('macro');
   if (e.code === 'Digit2') applyZoomPreset('region');
   if (e.code === 'Digit3') applyZoomPreset('village');
@@ -1630,6 +1801,13 @@ document.getElementById('artifactFile').addEventListener('change', async e => {
   }
 });
 
+initObserver();
+initPresenceLayers();
+document.getElementById('chipObserver')?.addEventListener('click', () => {
+  observerEnabled = !observerEnabled;
+  document.getElementById('chipObserver')?.classList.toggle('active', observerEnabled);
+  drawObserverOverlay();
+});
 loadMacro();
 loadSession();
 loadMetricsHistory();

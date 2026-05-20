@@ -35,6 +35,11 @@ def test_earth_console_html_exists():
     assert "earth_console_webgpu.js" in text
     assert "agentGpuLayer" in text
     assert "EarthConsoleWebGPU" in text or "initAgentWebGPU" in text
+    assert "earth_console_observer.js" in text
+    assert "EarthConsoleObserver" in text
+    assert "data-view-mode=\"sky\"" in text
+    assert "/api/observer_feed" in text
+    assert "observerLayer" in text
 
 
 def test_run_earth_console_script_exists():

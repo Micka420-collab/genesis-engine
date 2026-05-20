@@ -32,7 +32,9 @@ def snapshot_positions_lite(sim) -> Dict[str, Any]:
 
 
 def snapshot_positions_lite_with_vel(sim) -> Dict[str, Any]:
-    """Lite JSON + optional velocity for wind-advected trails."""
+    """Lite JSON + vitesse + présence humaine (posture, peau, outil)."""
+    from engine.agent_presence import enrich_lite_agent
+
     out = snapshot_positions_lite(sim)
     a = sim.agents
     n = int(a.n_active)
@@ -41,8 +43,10 @@ def snapshot_positions_lite_with_vel(sim) -> Dict[str, Any]:
     rows = {ag["row"]: i for i, ag in enumerate(out["agents"])}
     for row, idx in rows.items():
         if row < n and a.alive[row]:
-            out["agents"][idx]["vx"] = round(float(a.vel[row, 0]), 3)
-            out["agents"][idx]["vy"] = round(float(a.vel[row, 1]), 3)
+            ag = out["agents"][idx]
+            ag["vx"] = round(float(a.vel[row, 0]), 3)
+            ag["vy"] = round(float(a.vel[row, 1]), 3)
+            enrich_lite_agent(sim, ag)
     return out
 
 

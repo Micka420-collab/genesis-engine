@@ -121,6 +121,7 @@ def _local_temp_k(sim, row: int) -> float:
     if chunk is None:
         return 288.0
     base_c = float(np.mean(chunk.height)) * -6.5 + 15.0
+    base_c = max(-30.0, min(50.0, base_c))
     dyn = getattr(sim, "_earth_dynamo", None)
     if dyn is not None:
         base_c += 5.0 * (dyn.mean_insolation_w_m2 / 340.0 - 0.5)

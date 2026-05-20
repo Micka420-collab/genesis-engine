@@ -626,6 +626,80 @@ def _buildings_world_blocks(sim
     return out
 
 
+def _construction_site_entries(sim) -> List[Dict[str, Any]]:
+    """Chantiers actifs avec progression 0..1 (émergent + registry)."""
+    entries: List[Dict[str, Any]] = []
+    em = getattr(sim, "_emergent_construction", None)
+    if em is not None:
+        from engine.emergent_construction import CATALOG
+        for site in em.sites:
+            spec = CATALOG.get(site.recipe_key)
+            labor = max(spec.labor_ticks, 1) if spec else 1
+            prog = 1.0 - max(0, site.ticks_remaining) / labor
+            entries.append({
+                "x": float(site.pos[0]),
+                "y": float(site.pos[1]),
+                "progress": float(np.clip(prog, 0.0, 1.0)),
+                "channel": spec.channel if spec else "build",
+            })
+    reg = getattr(sim, "construction_registry", None)
+    if reg is not None:
+        for proj in reg.projects.values():
+            total = max(proj.recipe.labor_hours, 0.01)
+            prog = min(1.0, proj.labor_committed / total)
+            entries.append({
+                "x": float(proj.pos[0]),
+                "y": float(proj.pos[1]),
+                "progress": float(prog),
+                "channel": "structure",
+            })
+    return entries
+
+
+def _draw_construction_sites(
+    draw,
+    sim,
+    canvas_xform: Tuple[float, float],
+    options: IsometricRenderOptions,
+    elevation_at_xy=None,
+) -> int:
+    """Chantiers isométriques — structures qui **grandissent** avec la progression."""
+    entries = _construction_site_entries(sim)
+    if not entries:
+        return 0
+    tx, ty = canvas_xform
+    scaffold_rgb = (190, 165, 120)
+    build_rgb = (150, 115, 75)
+    n = 0
+    sorted_entries = sorted(entries, key=lambda e: e["x"] + e["y"])
+    for e in sorted_entries:
+        wx, wy = e["x"], e["y"]
+        prog = e["progress"]
+        wz0 = 0.0
+        if elevation_at_xy is not None:
+            try:
+                wz0 = float(elevation_at_xy(wx, wy)) * options.z_compress
+            except Exception:
+                wz0 = 0.0
+        max_blocks = max(1, int(1 + prog * 10))
+        for dk in range(max_blocks):
+            t = dk / max(max_blocks - 1, 1)
+            rgb = tuple(
+                int(scaffold_rgb[i] * (1.0 - t) + build_rgb[i] * t)
+                for i in range(3)
+            )
+            wz = wz0 + dk * 0.85
+            sx, sy = _project_iso(wx, wy, wz, options)
+            _draw_voxel_cell(
+                draw, sx + tx, sy + ty, rgb,
+                shade=0.85 + 0.15 * t,
+                options=options,
+                stack_blocks=1,
+            )
+            n += 1
+    return n
+
+
 def _draw_buildings(draw,
                     sim,
                     canvas_xform: Tuple[float, float],
@@ -725,6 +799,7 @@ def render_sim_isometric(sim,
 
     if options.draw_buildings:
         _draw_buildings(draw, sim, (tx, ty), options)
+        _draw_construction_sites(draw, sim, (tx, ty), options, elevation_at_xy=elev_at)
     if options.draw_agents:
         _draw_agents(draw, sim, (tx, ty), options,
                      elevation_at_xy=elev_at)

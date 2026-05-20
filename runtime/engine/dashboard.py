@@ -417,8 +417,10 @@ def render_bbox_iso_png(sim: Simulation, xmin: float, ymin: float, xmax: float, 
     opts = IsometricRenderOptions(
         draw_agents=True,
         draw_buildings=True,
-        tile_w=8,
-        tile_h=4,
+        tile_w=12,
+        tile_h=6,
+        height_scale_px_per_m=1.2,
+        hillshade_strength=0.62,
     )
     rgb = render_sim_isometric(
         sim,
@@ -444,16 +446,12 @@ def render_macro_continental_png(sim: Simulation, out_w: int = 480, out_h: int =
     """Render Genesis continental macro grid (elevation hillshade + biomes)."""
     try:
         from engine.genesis_bootstrap import bootstrap_state
-        from engine.world_render import biome_color_map, hillshade
+        from engine.world_render import render_macro_pbr_lite
 
         st = bootstrap_state(sim)
         if st is None:
             return None
-        elev = st.world.elevation_m.astype(np.float32)
-        biome = st.world.biome
-        rgb = biome_color_map(biome).astype(np.float32)
-        hs = hillshade(elev, azimuth_deg=315.0, altitude_deg=45.0)
-        rgb = np.clip(rgb * (0.55 + 0.45 * hs[..., None]), 0, 255)
+        rgb = render_macro_pbr_lite(st.world, specular_strength=0.28)
         h, w = rgb.shape[:2]
         out_w = max(64, min(int(out_w), 1024))
         out_h = max(64, min(int(out_h), 1024))
@@ -926,8 +924,39 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/emergent_construction":
             from engine.emergent_construction import emergent_construction_snapshot
             self._json(200, emergent_construction_snapshot(self.sim_ref)); return
+        if path == "/api/sun_state":
+            from engine.earth_sun_state import sun_state_snapshot
+            self._json(200, sun_state_snapshot(self.sim_ref)); return
+        if path == "/api/observer_feed":
+            qs = self._qs()
+            try:
+                xmin = float(qs.get("xmin", -500))
+                ymin = float(qs.get("ymin", -500))
+                xmax = float(qs.get("xmax", 500))
+                ymax = float(qs.get("ymax", 500))
+            except (TypeError, ValueError):
+                self._json(400, {"error": "invalid bbox"}); return
+            from engine.observer_feed import observer_feed_snapshot
+            self._json(200, observer_feed_snapshot(
+                self.sim_ref, xmin, ymin, xmax, ymax)); return
+        if path == "/earth_console_observer.js":
+            self._serve_file("earth_console_observer.js",
+                             content_type="application/javascript; charset=utf-8")
+            return
         if path == "/earth_console_webgpu.js":
             self._serve_file("earth_console_webgpu.js",
+                             content_type="application/javascript; charset=utf-8")
+            return
+        if path == "/earth_console_sun_shadow.js":
+            self._serve_file("earth_console_sun_shadow.js",
+                             content_type="application/javascript; charset=utf-8")
+            return
+        if path == "/earth_console_ambient_audio.js":
+            self._serve_file("earth_console_ambient_audio.js",
+                             content_type="application/javascript; charset=utf-8")
+            return
+        if path == "/earth_console_agent_anim.js":
+            self._serve_file("earth_console_agent_anim.js",
                              content_type="application/javascript; charset=utf-8")
             return
         if path == "/api/wind_field":

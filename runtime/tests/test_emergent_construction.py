@@ -49,6 +49,13 @@ def test_emergent_build_with_materials():
     assert st.completed_total + st.structures_total + len(st.sites) >= 0
 
 
+def test_zero_prescript_no_seed_recipes():
+    sim = Simulation(SimConfig(name="zps", seed=11, founders=4, max_agents=8))
+    sim.bootstrap()
+    install_emergent_construction(sim)
+    assert sim._emergent_construction.discovered == []
+
+
 def test_build_action_triggers_site():
     cfg = SimConfig(name="b2", seed=7, founders=4, max_agents=12, bounds_km=(0.2, 0.2))
     sim = Simulation(cfg)

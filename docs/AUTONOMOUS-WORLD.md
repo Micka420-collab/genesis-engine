@@ -21,7 +21,9 @@ Un seul moteur sur `ActionKind.BUILD` / `SMELT` :
 2. Choix **émergent** parmi : objet (transform), bâtiment minéral (real), structure (hearth, hut…), voxel
 3. **Imitation** : les recettes réussies se propagent aux agents proches (~42 m)
 
-Recettes découvertes progressivement — pas de liste scriptée pour la civilisation.
+Recettes **vides au départ** : l'agent **expérimente** (matériaux + température), découvre
+cordage / silex / céramique, puis choisit librement quoi construire. Imitation culturelle
+(~42 m). Aucun script « construis une hutte » — seulement `ActionKind.BUILD` du cerveau.
 
 ## Transformation matériaux → objets
 

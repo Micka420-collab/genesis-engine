@@ -33,8 +33,13 @@ Ouvre **http://127.0.0.1:8090/** dans le navigateur.
 |------|------|
 | **Vue locale** | Terrain top-down (`/api/render`), pan/zoom, agents en overlay |
 | **Globe WebGL** | Sphère Three.js texturée par `/api/macro` — rotation + clic téléport |
-| **Vue isométrique** | 2.5D Age-of-Empires (`/api/render?mode=iso`) |
+| **Vue isométrique** | 2.5D avec chantiers qui grandissent (`/api/render?mode=iso`, tuiles 12×6) |
+| **Soleil / ombres** | `GET /api/sun_state` → `earth_console_sun_shadow.js` |
+| **Zoom agent** | Sons procéduraux (`earth_console_ambient_audio.js`) + interpolation (`earth_console_agent_anim.js`) |
 | **2D lite (◎)** | Terrain biomes (`/api/lite_field`), lois L0 HUD, agents glow + flèches de mouvement |
+| **Vue du ciel (🛰)** | Humains (posture, peau, outil), chantiers, terraformation (`/api/observer_feed`, **V**) |
+| **Terre réaliste** | Palette atlas unifiée, hillshade, hypsométrie (`earth_visual_tokens.py`) |
+| **Agents humains** | Posture/démarche/outil via API lite (`agent_presence.py`) |
 | **Échelles 1–4** | Macro / région / village / agent (header + clavier) |
 | **Cerveau ADN** | `wire_emergence_v2` — policy `neat_brain.py` (gènes 64–127) |
 | **Carte macro** | Mini-carte continent — clic pour ancrer la caméra |

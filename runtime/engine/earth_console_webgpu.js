@@ -25,6 +25,8 @@ struct Instance {
   @location(1) color: vec3f,
   @location(2) radius: f32,
   @location(3) selected: f32,
+  @location(4) heading: f32,
+  @location(5) action: f32,
 };
 struct VsOut {
   @builtin(position) pos: vec4f,
@@ -41,10 +43,17 @@ struct VsOut {
     vec2f(1.0, -1.0), vec2f(1.0, 1.0), vec2f(-1.0, 1.0),
   );
   let c = corners[vi];
-  let r = inst.radius * (1.0 + 0.35 * inst.selected);
+  let build = inst.action > 10.5 && inst.action < 12.5;
+  let r = inst.radius * (1.0 + 0.35 * inst.selected + select(0.2, 0.0, build));
+  let ca = cos(inst.heading);
+  let sa = sin(inst.heading);
+  let lx = c.x * r * 1.35;
+  let ly = c.y * r * 0.52;
+  let rx = lx * ca - ly * sa;
+  let ry = lx * sa + ly * ca;
   let clip = vec2f(
-    (inst.pos.x + c.x * r) / u.viewport.x * 2.0 - 1.0,
-    1.0 - (inst.pos.y + c.y * r) / u.viewport.y * 2.0,
+    (inst.pos.x + rx) / u.viewport.x * 2.0 - 1.0,
+    1.0 - (inst.pos.y + ry) / u.viewport.y * 2.0,
   );
   var o: VsOut;
   o.pos = vec4f(clip, 0.0, 1.0);
@@ -61,6 +70,9 @@ struct VsOut {
   var col = in.color * (0.35 * glow + 0.65 * core);
   if (in.selected > 0.5) {
     col = mix(col, vec3f(0.24, 0.84, 0.78), 0.35);
+  }
+  if (in.uv.y > 0.55) {
+    col = mix(col, vec3f(0.91, 0.72, 0.43), 0.25);
   }
   let alpha = glow * 0.92;
   return vec4f(col, alpha);
@@ -100,13 +112,15 @@ struct VsOut {
           module: mod,
           entryPoint: 'vs_main',
           buffers: [{
-            arrayStride: 32,
+            arrayStride: 40,
             stepMode: 'instance',
             attributes: [
               { shaderLocation: 0, offset: 0, format: 'float32x2' },
               { shaderLocation: 1, offset: 8, format: 'float32x3' },
               { shaderLocation: 2, offset: 20, format: 'float32' },
               { shaderLocation: 3, offset: 24, format: 'float32' },
+              { shaderLocation: 4, offset: 28, format: 'float32' },
+              { shaderLocation: 5, offset: 32, format: 'float32' },
             ],
           }],
         },
@@ -151,7 +165,7 @@ struct VsOut {
       if (this.instanceBuf) this.instanceBuf.destroy();
       this.capacity = need;
       this.instanceBuf = this.device.createBuffer({
-        size: need * 32,
+        size: need * 40,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
       });
     }
@@ -163,21 +177,24 @@ struct VsOut {
       if (!this.ready || !agents.length) return false;
       const n = agents.length;
       this._ensureCapacity(n);
-      const data = new Float32Array(n * 8);
+      const data = new Float32Array(n * 10);
       for (let i = 0; i < n; i++) {
         const a = agents[i];
         const c = CULTURE_RGB[(a.culture ?? 0) % CULTURE_RGB.length];
-        const base = i * 8;
+        const base = i * 10;
+        const building = (a.action === 11 || a.action === 18);
         data[base] = a.sx;
         data[base + 1] = a.sy;
         data[base + 2] = c[0];
         data[base + 3] = c[1];
         data[base + 4] = c[2];
-        data[base + 5] = a.selected ? 9.0 : 6.0;
+        data[base + 5] = a.selected ? 9.0 : (building ? 7.5 : 6.0);
         data[base + 6] = a.selected ? 1.0 : 0.0;
-        data[base + 7] = 0;
+        data[base + 7] = a.heading ?? 0;
+        data[base + 8] = a.action ?? 0;
+        data[base + 9] = 0;
       }
-      this.device.queue.writeBuffer(this.instanceBuf, 0, data.subarray(0, n * 8));
+      this.device.queue.writeBuffer(this.instanceBuf, 0, data.subarray(0, n * 10));
       const enc = this.device.createCommandEncoder();
       const view = this.ctx.getCurrentTexture().createView();
       const pass = enc.beginRenderPass({
