@@ -18,7 +18,7 @@
 [![Earth-anchored](https://img.shields.io/badge/Earth-anchored-green.svg)](#-earth-anchored-anywhere-on-earth)
 [![Deterministic](https://img.shields.io/badge/deterministic-✓-purple.svg)](#-determinism)
 [![CI](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml)
-[![Earth realism ~68%](https://img.shields.io/badge/Earth_realism-~68%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
+[![Earth realism ~76%](https://img.shields.io/badge/Earth_realism-~76%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
 
 *Build a persistent digital universe in which truly autonomous AI agents are born, evolve, reproduce, shape their own history, and enable the scientific observation of emergent artificial civilizations.*
 

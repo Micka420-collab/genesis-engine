@@ -22,10 +22,10 @@ Windows : pas de `make` requis — voir [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md).
 
 | Document | Rôle |
 |----------|------|
-| [`MASTER-SCALE-PROMPT-v2.md`](MASTER-SCALE-PROMPT-v2.md) | **Prompt master** copier-coller (identité, L0–L4, ~80 %, contraintes) |
+| [`MASTER-SCALE-PROMPT-v2.md`](MASTER-SCALE-PROMPT-v2.md) | **Prompt master** copier-coller (identité, L0–L4, réalisme **~76 %**, contraintes) |
 | [`EMERGENCE-SIM-v2.md`](EMERGENCE-SIM-v2.md) | **Manifeste** prompt architecturé + mapping code |
 | [`../PROJECT-STATUS.md`](../PROJECT-STATUS.md) | État livré, tests, presets |
-| [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md) | Grille réalisme chiffrée |
+| [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md) | **Source de vérité** réalisme (~76 % global, objectif 80 %) |
 | [`GOD-ENGINE-ARCHITECTURE.md`](GOD-ENGINE-ARCHITECTURE.md) | Rust Terre unique, GENM, mutations |
 | [`LAYERS-STACK.md`](LAYERS-STACK.md) | Physics / chemistry / architecture / social |
 | [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md) | UI observateur live |

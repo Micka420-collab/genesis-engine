@@ -38,7 +38,7 @@ Instancing GPU des agents en mode **◎ 2D lite** si le navigateur supporte WebG
 - Appels cloud DeepMind
 - Script de civilisation ou quêtes
 
-## Piste 80 %+ réalisme
+## Piste vers 80 % global (actuel **~76 %** — [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md))
 
 1. GraphCast-lite + Genesis Hadley → synoptique cohérente  
 2. Colonne 3D + sv1d hydrologie → eau + vertical  

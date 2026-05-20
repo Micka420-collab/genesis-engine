@@ -2,7 +2,7 @@
 
 **Dernière mise à jour :** 18 mai 2026 (session 34 — Waves 16 → 41 + atmosphère temporelle).
 
-> **Synthèse contributeur** (phases, réalisme ~63 %, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
+> **Synthèse contributeur** (phases, réalisme **~76 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
 

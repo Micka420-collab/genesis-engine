@@ -5,7 +5,7 @@ Ces entrées ne définissent plus la vision produit. Référence active : **[`EM
 | Ancien document | Remplacement |
 |-----------------|--------------|
 | `IMPROVEMENTS-SESSION.md` | `ROADMAP-REALISME-TERRE.md` + `EMERGENCE-SIM-v2.md` |
-| Pourcentages « ~63 % » dispersés | `ROADMAP-REALISME-TERRE.md` (mis à jour ~74 %) |
+| Pourcentages « ~63 % », « ~68 % », « ~74 % » dispersés | Unifiés dans `ROADMAP-REALISME-TERRE.md` → **~76 %** global |
 | `FUTURE-VISION.md` seul | Vision contrefactuelle **+** EMERGENCE-SIM-v2 pour l'implémentation |
 | Stack React/IndexedDB/WASM (prompt seul) | §6 EMERGENCE-SIM-v2 « vision vs dépôt » |
 | `docs/INDEX.md` ancien | `docs/README.md` (cet index remplace) |

@@ -8,7 +8,7 @@
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
-[![Earth realism ~74%](https://img.shields.io/badge/r%C3%A9alisme_Terre-~74%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
+[![Earth realism ~76%](https://img.shields.io/badge/r%C3%A9alisme_Terre-~76%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
 [![Deterministic](https://img.shields.io/badge/deterministic-PRF-purple.svg)](#déterminisme)
 [![CI](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml)
 
@@ -46,7 +46,7 @@ Implémentation : tout émerge de `Simulation.step()` + `sim_emergence.py` — p
 | Phase 4 (émergence civ.) | ✅ | Agriculture, écriture, polity, métallurgie |
 | Phase 5 (Genesis-α) | ⏳ | Long-run 10k sim-yr en cours |
 | **Waves 16–41** (monde réaliste) | ✅ | Genesis → climat → settlements → render → atmosphère → observateurs |
-| **Réalisme Terre (global)** | **~68 %** | Grille par dimension → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) |
+| **Réalisme Terre (global)** | **~76 %** | Moyenne 7 dimensions → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (objectif **80 %**) |
 
 Synthèse maintenue : **[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · file de travail : **[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**.
 
@@ -224,7 +224,7 @@ genesis-engine/
 |----------|------|
 | [`docs/README.md`](docs/README.md) | Index de toute la documentation |
 | [`docs/sprints/README.md`](docs/sprints/README.md) | Historique des sessions (Waves, phases) |
-| [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) | Grille réalisme ~63 % + commandes vérif |
+| [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) | Grille réalisme **~76 %** (source de vérité) + commandes vérif |
 | [`ROADMAP.md`](ROADMAP.md) | Phases produit 0–5 |
 | [`ETHICS.md`](ETHICS.md) · [`SECURITY.md`](SECURITY.md) | Gouvernance |
 

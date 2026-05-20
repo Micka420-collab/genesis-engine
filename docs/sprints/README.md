@@ -79,7 +79,7 @@ Consolidation : [`2026-05-18_PHASE3-CONSOLIDATION.md`](2026-05-18_PHASE3-CONSOLI
 | 2026-05-15 | `WorldBuilder` fluent API + multi-region |
 | 2026-05-16 | GIS export pipeline (GeoTIFF, PNG, OBJ) |
 | 2026-05-18 | **Waves 16–41** : pipeline monde réaliste complet + atmosphère W41 |
-| 2026-05-19 | Réalisme Terre ~63 % — Köppen, PBR, vision cones (p74–p79) |
+| 2026-05-19 | Réalisme Terre **~76 %** (grille unifiée) — Köppen, PBR, Earth Console, écoute (p74–p87) |
 
 ---
 

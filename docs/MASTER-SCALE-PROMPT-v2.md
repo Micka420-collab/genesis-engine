@@ -15,8 +15,9 @@
 | **Racine** | `F:\DEvOps\projet alpha\genesis-engine` |
 | **Runtime** | `runtime/` |
 | **Console** | http://127.0.0.1:8090/ — `.\earth-console.ps1` |
-| **Tests** | `cd runtime && python -m pytest tests/ -q` → **96 tests OK** |
-| **Score global** | **~76 %** (objectif 80 %) |
+| **Tests** | `cd runtime && python -m pytest tests/ -q` → **133 tests OK** |
+| **Score global** | **~76 %** (moyenne 7 dimensions — voir [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md)) |
+| **Objectif cible** | **80 %** (pas confondre avec le score global actuel) |
 
 ---
 
@@ -114,24 +115,27 @@ cd "F:\DEvOps\projet alpha\genesis-engine"
 ```
 
 ```bash
-cd runtime && python -m pytest tests/ -q    # 93 tests
+cd runtime && python -m pytest tests/ -q    # 133 tests
 cd runtime && python run.py realism          # preset Terre
 make earth-console                           # alt Makefile
 ```
 
 ---
 
-## État actuel honnête (74 % global)
+## État actuel honnête (**~76 %** global)
+
+> Anciens docs affichaient 68 %, 74 % ou 80 % — voir tableau « Un seul chiffre » dans [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md).
 
 | % | Dimension | Notes |
 |---|-----------|-------|
-| ✅ 82% | Rendu visuel | Earth Console globe + iso + 2D lite |
-| ✅ 86% | Observation IA | SSE, replay JSONL, observable |
-| ✅ 82% | Pont Python↔Rust | GENM bridge + mutations write-back |
-| 🟡 80% | Climat / biomes | GraphCast-lite + colonne 3D + circulation L1 ; NWP 3D manquante |
-| 🟡 74% | Sociétés / agents | NEAT proto ; `ActionKind` encore enum |
-| 🟡 65% | Écologie / hydrologie | D8 intra-chunk ; cross-chunk stub/sv1d/lbm partiel |
-| 🔲 55% | Géologie / relief | Érosion GPU manquante |
+| ✅ 82 | Rendu visuel | Earth Console globe + iso + humains + ombres |
+| ✅ 86 | Observation IA | SSE, replay, observer_feed, WebGPU |
+| ✅ 82 | Pont Python↔Rust | GENM bridge + mutations write-back |
+| 🟡 80 | Climat / biomes | GraphCast-lite + colonne 3D + circulation L1 |
+| 🟡 76 | Sociétés / agents | NEAT + construction émergente + parole `/api/audio` |
+| 🟡 68 | Écologie / hydrologie | sv1d + overlay flux ; bassins incomplets |
+| 🔲 55 | Géologie / relief | Tectonique live ; érosion GPU manquante |
+| **Σ** | **~76** | Moyenne des 7 lignes |
 
 ---
 
@@ -141,7 +145,7 @@ make earth-console                           # alt Makefile
 2. Vérifier [`runtime/AUDIT.md`](../runtime/AUDIT.md) avant tout ajout comportemental.
 3. Chaque nouveau comportement → observable dans `emergence_metrics`.
 4. Déterminisme bit-perfect : `prf_rng` partout, SHA-256 A==B.
-5. **93 tests pytest** doivent rester verts après toute modification.
+5. **133 tests pytest** doivent rester verts après toute modification.
 6. API REST existante : ne pas casser les endpoints `/api/*`.
 
 ---
@@ -167,5 +171,5 @@ make earth-console                           # alt Makefile
 ## Prompt condensé (une ligne)
 
 ```text
-Genesis Engine · ZERO PRE-SCRIPT · L0 earth_laws → L4 civilization · observer http://127.0.0.1:8090/ · wire_emergence_v2 · 93 tests · 74% realism
+Genesis Engine · ZERO PRE-SCRIPT · L0 earth_laws → L4 civilization · observer http://127.0.0.1:8090/ · wire_emergence_v2 · 133 tests · réalisme Terre ~76%
 ```

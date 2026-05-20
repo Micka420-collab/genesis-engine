@@ -4,7 +4,7 @@ Moteur natif de génération et simulation de monde pour Genesis Engine : bruit,
 
 > **Important** : ce crate **ne remplace pas** le runtime Python (`../../runtime/engine/`). Intégration incrémentale via `rust_bridge` / PyO3 ; la civilisation et les agents restent en Python pour l’instant.
 
-**Statut global** : [`../../PROJECT-STATUS.md`](../../PROJECT-STATUS.md) · **Réalisme pont Rust** : ~45 % ([`../../docs/ROADMAP-REALISME-TERRE.md`](../../docs/ROADMAP-REALISME-TERRE.md))
+**Statut global** : [`../../PROJECT-STATUS.md`](../../PROJECT-STATUS.md) · **Réalisme Terre global** : **~76 %** · **Pont Rust (dimension)** : **82 %** · chunk seul non aligné : ~45 % ([`../../docs/ROADMAP-REALISME-TERRE.md`](../../docs/ROADMAP-REALISME-TERRE.md))
 
 ---
 

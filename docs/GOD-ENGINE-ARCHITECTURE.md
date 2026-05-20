@@ -7,7 +7,7 @@
 
 ## 0. Verdict en une phrase
 
-Vous avez **deux moteurs** qui coexistent : un **continent Python** (tectonique, érosion stream-power, climat Hadley, civilisation) déjà à ~70 % réalisme, et un **monde-chunk Rust** (procgen indépendant, WorldGraph, GPU) à ~45 % intégration. Le saut « dieu qui crée la Terre » ne passe pas par plus de bruit — il passe par **une seule vérité géographique**, des **passes multi-échelles couplées**, et une **API agent déterministe avec écriture réelle**.
+Vous avez **deux moteurs** qui coexistent : un **continent Python** (Genesis, climat, civilisation, Earth Console) aligné sur le **réalisme global ~76 %** ([`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md)), et un **pont Rust** (GENM, agent-api, Köppen) à **~82 %** sur la dimension « intégration » — le **chunk procgen Rust seul** reste ~45 % tant qu’il n’est pas la vérité géographique unique. Le saut « dieu qui crée la Terre » ne passe pas par plus de bruit — il passe par **une seule vérité géographique**, des **passes multi-échelles couplées**, et une **API agent déterministe avec écriture réelle**.
 
 ---
 

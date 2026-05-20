@@ -1,66 +1,71 @@
 # Roadmap réalisme Terre — Genesis Engine
 
-Estimation honnête du niveau de réalisme **au 19 mai 2026** après la session « objectif 80 % ».
-
-## Grille de maturité (cible utilisateur ~80 %)
-
-| Dimension | % session | Justification | Gap vers 80 % |
-|-----------|-----------|---------------|---------------|
-| Climat / biomes | **80 %** | Circulation L1 + colonne 3D + GraphCast-lite prior + vent 2D | NWP 3D numérique, Beck 2018 |
-| Géologie / relief | **55 %** | Tectonique + stratigraphie légère | Érosion GPU dynamique, datation absolue |
-| Écologie / hydrologie | **68 %** | Earth Console **`sv1d`** + overlay 2D **flux** ; cross-chunk actif près des agents | Biogeochimie, bassins versants complets |
-| Sociétés / agents | **76 %** | NEAT + **latent_action** ; memetic lexique ; TRADE (`trade_exchange`) |
-| Rendu visuel | **82 %** | Earth Console globe + iso live + couches météo | Volumétrique GPU, humains photoréalistes |
-| Observation IA | **86 %** | Earth Console SSE intégré, replay JSONL, observable live | Fog-of-war mmap Rust, multi-tenant |
-| Pont Python↔Rust | **82 %** | GENM macro-bridge + mutations write-back + snapshot zstd | WorldGraph hot path prod |
-
-**Global pondéré : ~80 %** (moyenne simple des 7 dimensions, mai 2026 post GraphCast-lite + colonne 3D).
-
-> L’objectif **80 % absolu** (simulation « publication-grade » type Terre) n’est pas atteint en une session : il exigerait modèles 3D atmosphère, hydrologie physique complète, et pont Rust en production. La session a **maximisé les gains mesurables** sur chaque axe ; le chemin vers 80 % global est documenté ci-dessous.
+**Source de vérité** pour tous les pourcentages « réalisme Terre » du dépôt.  
+**Dernière mise à jour :** 19 mai 2026 (post Earth Console : écoute, iso chantiers, monde autonome).
 
 ---
 
-## Livrables session (19 mai 2026)
+## Score global officiel : **~76 %**
+
+| Ce que vous voyiez ailleurs | Signification correcte |
+|-----------------------------|------------------------|
+| **~68 %** ou **~74 %** | Anciennes estimations ou moyennes partielles — **à ne plus utiliser** |
+| **~80 %** | **Objectif cible** utilisateur, ou score **climat / biomes** seul — **pas** le global |
+| **~76 %** | **Moyenne des 7 dimensions** ci-dessous (référence unique) |
+
+**Recalcul transparent :**  
+(80 + 55 + 68 + 76 + 82 + 86 + 82) ÷ 7 = **75,6 %** → arrondi **~76 %**.
+
+> L’objectif **80 % global** (simulation « publication-grade ») reste une **cible** : il faudrait NWP 3D, hydrologie bassin complet, géologie dynamique GPU, et WorldGraph Rust en hot path production.
+
+---
+
+## Grille de maturité (7 dimensions)
+
+| Dimension | % | Justification | Gap vers 80 % |
+|-----------|---|---------------|---------------|
+| Climat / biomes | **80** | Circulation L1 + colonne 3D + GraphCast-lite prior + vent 2D | NWP 3D numérique, validation Beck 2018 |
+| Géologie / relief | **55** | Tectonique live + stratigraphie légère | Érosion GPU dynamique, datation absolue |
+| Écologie / hydrologie | **68** | Earth Console `sv1d` + overlay flux 2D ; cross-chunk près des agents | Biogeochimie, bassins versants complets |
+| Sociétés / agents | **76** | NEAT + latent_action ; memetic + lexique ; construction émergente ; parole `/api/audio` | `ActionKind` encore enum ; pas de LLM tier-2 |
+| Rendu visuel | **82** | Earth Console globe + iso 2.5D + humains + ombres soleil + 2D lite | Volumétrique GPU, photoréalisme |
+| Observation IA | **86** | Earth Console SSE + replay JSONL + observer_feed + WebGPU agents | Fog-of-war mmap Rust, multi-tenant |
+| Pont Python↔Rust | **82** | GENM macro-bridge + mutations write-back + snapshot zstd | WorldGraph hot path prod |
+
+**Moyenne (global) :** **~76 %**
+
+### Deux moteurs (ne pas confondre avec le global)
+
+| Stack | % | Note |
+|-------|---|------|
+| **Continent Python** (Genesis, climat, civ, Earth Console) | **~76** | Aligné sur la moyenne globale ci-dessus |
+| **Pont Rust** (GENM, agent-api, Köppen crates) | **82** | Dimension « Pont » — pas le score monde entier |
+| **Chunk procgen Rust seul** (sans align Genesis) | **~45** | Intégration partielle — voir [`GOD-ENGINE-ARCHITECTURE.md`](GOD-ENGINE-ARCHITECTURE.md) |
+
+---
+
+## Livrables récents (mai 2026)
 
 | Livrable | Statut | Fichiers |
 |----------|--------|----------|
-| Köppen grille macro + métriques FAIR | ✅ | `runtime/engine/koeppen_grid.py`, `p75_*` |
-| MultiRateCoupler Python → sim | ✅ | `runtime/engine/multi_rate_coupler.py`, `p76_*` |
-| Contact graph épidémie | ✅ | `runtime/engine/epidemic_observer.py`, `p77_*` |
-| Rendu PBR-lite | ✅ | `runtime/engine/world_render.py`, `p78_*` |
-| Vision cone + JSONL | ✅ | `runtime/engine/agent_observation.py`, `p79_*` |
-| Pont Rust mock | ✅ | `runtime/engine/rust_bridge.py`, `p73_*` mis à jour |
-| Cross-chunk hydrology stub | ✅ | `chunk_hydrology.cross_chunk_flow_stub` |
-| Stratigraphie légère | ✅ | `tectonic_geology.stratigraphy_layer_index` |
-| Fog altitude amélioré | ✅ | `world_atmosphere.atmospheric_fog_factor` |
-| Dashboard vision | ✅ | `runtime/dashboard.html` |
-| **Earth Console** (globe, replay, SSE, météo) | ✅ | `earth_console.html`, `run_earth_console.py`, `docs/EARTH-CONSOLE.md` |
-| Journal replay + API `/api/journal/events` | ✅ | `dashboard.py`, `annalist.py` |
-| Pont Rust GENM + align_heightmap (P0) | ✅ | `macro-bridge`, `macro_grid_export.py` |
-| Mutations agent write-back + snapshot (P5) | ✅ | `agent-api/snapshot.rs`, pybindings |
-
----
-
-## P0 — Fondations (sessions précédentes ✅)
-
-| Livrable | Fichiers |
-|----------|----------|
-| Harness Köppen–Geiger Rust + Python | `crates/biome/src/koeppen.rs`, `p74_*` |
-| MultiRateCoupler + TickDomain Rust | `crates/core/`, `crates/worldgraph/` |
-| Snapshots agents | `agent_observation.py` |
-| Atmosphère ACES / Rayleigh | `world_atmosphere.py` |
+| Earth Console (globe, iso, sky, écoute) | ✅ | `earth_console.html`, `run_earth_console.py`, `docs/EARTH-CONSOLE.md` |
+| Monde autonome (dynamo, plaques, construction émergente) | ✅ | `autonomous_world.py`, `emergent_construction.py` |
+| Parole agents → SoundField | ✅ | `speech_audio_bridge.py`, `/api/audio`, `/api/languages` |
+| GraphCast-lite + prior monde | ✅ | `deepmind_world_prior.py` |
+| Köppen FAIR + MultiRateCoupler | ✅ | `koeppen_grid.py`, `multi_rate_coupler.py` |
+| Pont Rust GENM + write-back | ✅ | `macro-bridge`, `macro_grid_export.py` |
 
 ---
 
 ## Prochain sprint (vers 80 % global)
 
-1. **CI maturin (bloquant)** : garder **`maturin-pybindings` vert** (wheel + smoke) → base pour monter le pont Rust ~70 %+.
-2. **Köppen** : export NetCDF diagnostics ; valider 50 stations (Beck 2018).
-3. **WorldGraph** : 1 pass Rust depuis `genesis_bootstrap` (tectonics/ecology).
-4. **Hydrologie** : LBM 2D minimal ou D8 accumulation cross-macro.
-5. **Observation** : ~~JSONL live~~ ✅ Earth Console + `earth_console_observable.jsonl` ; reste fog mmap Rust.
+1. **CI maturin** : wheel + smoke verts → monter WorldGraph en prod.
+2. **Köppen** : validation 50 stations (Beck 2018).
+3. **Hydrologie** : LBM 2D ou D8 accumulation cross-macro.
+4. **Géologie** : érosion GPU + datation relative.
+5. **Observation** : fog mmap Rust ; reste JSONL live ✅.
 
-**Earth Console (recommandé pour le live) :**
+**Earth Console (live) :**
 
 ```bash
 make earth-console
@@ -69,37 +74,18 @@ make earth-console
 
 ---
 
-## P4 livré (journal + observation live)
-
-- Événements sociaux (`trade_transfer`, `trade_link_formed`) → journal Annalist (`kind: trade`).
-- `tick_social_topology` appelé depuis `Simulation.step` (plus de wrapper tardif).
-- `run.py realism/terre` : `artifacts/<exp>_observe.jsonl` par défaut.
-- `observation_server.py --jsonl` : SSE sur la dernière ligne JSONL.
-- Commerce : flux macro **2-hop** (3 settlements intermédiaires).
-- `make terre` : run court preset Terre.
-
----
-
 ## Commandes de vérification
 
 ```bash
+# Python (depuis runtime/)
+python -m pytest tests/ -q          # 133 tests (mai 2026)
+python scripts/p74_koeppen_harness_smoke.py
+python scripts/p86_autonomous_world_smoke.py
+python scripts/p87_observer_sky_smoke.py
+
 # Rust (si cargo disponible)
 cd native/world-engine
 cargo test -p genesis-core -p genesis-biome -p genesis-worldgraph
-
-# Python (depuis runtime/)
-python scripts/p74_koeppen_harness_smoke.py
-python scripts/p75_koeppen_grid_smoke.py
-python scripts/p76_multi_rate_coupler_smoke.py
-python scripts/p77_epidemic_contact_smoke.py
-python scripts/p78_pbr_render_smoke.py
-python scripts/p79_vision_observation_smoke.py
-python scripts/p72_world_atmosphere_smoke.py
-python scripts/p73_agent_observation_smoke.py
-python scripts/p73_rust_worldgraph_smoke.py
-
-# Pytest
-cd runtime && python -m pytest tests/ -q
 ```
 
 ---
@@ -112,3 +98,11 @@ from engine.koeppen_grid import fair_koeppen_manifest
 world = generate_world(GenesisParams(seed=42, resolution=128))
 print(fair_koeppen_manifest(world))
 ```
+
+---
+
+## Références
+
+- Synthèse projet : [`PROJECT-STATUS.md`](../PROJECT-STATUS.md)
+- Manifeste : [`EMERGENCE-SIM-v2.md`](EMERGENCE-SIM-v2.md)
+- Console : [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md)
