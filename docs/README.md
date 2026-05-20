@@ -4,6 +4,25 @@
 
 **Onboarding agents / contributeurs :** [`MASTER-SCALE-PROMPT-v2.md`](MASTER-SCALE-PROMPT-v2.md) — prompt condensé v2.0 (mai 2026).
 
+**README multilingues (14 langues, score ~76 % aligné) :**
+
+| Fichier | Langue |
+|---------|--------|
+| [`README.md`](../README.md) | Français |
+| [`README.en.md`](../README.en.md) | English |
+| [`README.es.md`](../README.es.md) | Español |
+| [`README.de.md`](../README.de.md) | Deutsch |
+| [`README.pt.md`](../README.pt.md) | Português |
+| [`README.it.md`](../README.it.md) | Italiano |
+| [`README.zh-CN.md`](../README.zh-CN.md) | 中文 |
+| [`README.ja.md`](../README.ja.md) | 日本語 |
+| [`README.ru.md`](../README.ru.md) | Русский |
+| [`README.ko.md`](../README.ko.md) | 한국어 |
+| [`README.hi.md`](../README.hi.md) | हिन्दी |
+| [`README.nl.md`](../README.nl.md) | Nederlands |
+| [`README.pl.md`](../README.pl.md) | Polski |
+| [`README.ar.md`](../README.ar.md) | العربية |
+
 ---
 
 ## Démarrer

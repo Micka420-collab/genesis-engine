@@ -1,0 +1,133 @@
+{
+  "experiment": "realism",
+  "config": {
+    "seed": 16866363989904178927,
+    "founders": 8,
+    "max_agents": 200,
+    "bounds_km": [
+      2.0,
+      2.0
+    ],
+    "cultures": 1,
+    "drive_accel": 8000.0,
+    "hydrology_mode": "sv1d",
+    "genesis_bootstrapped": true,
+    "catastrophe_at_tick": -1,
+    "5cd_installed": true,
+    "multi_rate_coupler": true,
+    "emergence_subsystems": true
+  },
+  "ticks_run": 5,
+  "wall_clock_s": 0.8717286000028253,
+  "tps": 5.735730134337447,
+  "final_alive": 8,
+  "cum_births": 0,
+  "cum_deaths": 0,
+  "cum_events": 9,
+  "metrics": {
+    "tick": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "population": [
+      8,
+      8,
+      8,
+      8,
+      8,
+      8
+    ],
+    "births_cum": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "deaths_cum": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "avg_hunger": [
+      0.30000001192092896,
+      0.3066137731075287,
+      0.3132275342941284,
+      0.31984129548072815,
+      0.3264550566673279,
+      0.3330688178539276
+    ],
+    "avg_thirst": [
+      0.30000001192092896,
+      0.33086422085762024,
+      0.3617284297943115,
+      0.3925926387310028,
+      0.12345685064792633,
+      0.15432104468345642
+    ],
+    "avg_vitality": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "fights_cum": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "shares_cum": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "matings_cum": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "avg_generation": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "avg_affinity": [
+      0.0,
+      0.0010000000000000002,
+      0.0020000000000000005,
+      0.0030000000000000005,
+      0.004000000000000001,
+      0.005000000000000001
+    ],
+    "vocalizations_cum": 1,
+    "competitions_cum": 0,
+    "groups_formed_cum": 0,
+    "groups_dissolved_cum": 0,
+    "distinct_lex_signatures": 1,
+    "events_emitted": 9,
+    "elapsed_s": 2.573892400134355
+  },
+  "journal": "F:\\DEvOps\\projet alpha\\genesis-engine\\runtime\\journals\\realism.jsonl"
+}
