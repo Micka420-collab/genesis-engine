@@ -14,11 +14,13 @@ genesis-biome     = { path = "../biome" }
 genesis-hydrology = { path = "../hydrology" }
 genesis-ecosystem = { path = "../ecosystem" }
 genesis-persist   = { path = "../persist" }
+genesis-macro-bridge = { path = "../macro-bridge" }
 
 glam       = { workspace = true }
 tokio      = { workspace = true }
 rayon      = { workspace = true }
-dashmap    = { workspace = true }
+dashmap      = { workspace = true }
+parking_lot  = { workspace = true }
 serde      = { workspace = true }
 smallvec   = { workspace = true }
 thiserror  = { workspace = true }

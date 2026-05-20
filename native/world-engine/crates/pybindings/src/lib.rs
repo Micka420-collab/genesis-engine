@@ -11,15 +11,56 @@
 //! print(obs["biome"][0], obs["elevation"][0])
 //! ```
 
-use genesis_agent_api::WorldClient;
+use dashmap::DashMap;
+use genesis_agent_api::{EntityId, Mutation, WorldClient};
 use genesis_biome::Biome;
-use genesis_core::{ChunkCoord, WorldCoord, WorldSeed, CHUNK_SIZE_X, CHUNK_SIZE_Y};
+use genesis_core::{ChunkCoord, Voxel, WorldCoord, WorldSeed, CHUNK_SIZE_X, CHUNK_SIZE_Y};
 use genesis_intent::{AgentId, Intent, IntentBus, Plan};
 use genesis_mesh::extract_surface_nets;
+use genesis_macro_bridge::{read_binary, MacroGrid};
 use genesis_streaming::manager::ChunkManagerConfig;
 use genesis_streaming::ChunkManager;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use std::fs::File;
+use std::io::Cursor;
+use std::path::Path;
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
+
+/// L2 mesh cache key — invalidated when `mutation_version` bumps.
+#[derive(Clone, Copy, Debug, Eq)]
+struct MeshCacheKey {
+    cx: i32,
+    cy: i32,
+    step: u32,
+    version: u64,
+}
+
+impl PartialEq for MeshCacheKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.cx == other.cx
+            && self.cy == other.cy
+            && self.step == other.step
+            && self.version == other.version
+    }
+}
+
+impl Hash for MeshCacheKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.cx.hash(state);
+        self.cy.hash(state);
+        self.step.hash(state);
+        self.version.hash(state);
+    }
+}
+
+struct CachedMesh {
+    flat_vertices: Vec<f32>,
+    indices: Vec<u32>,
+    vertex_count: usize,
+    triangle_count: usize,
+}
 
 /// World handle exposed to Python.
 #[pyclass(name = "PyWorld", module = "genesis_world")]
@@ -28,6 +69,8 @@ pub struct PyWorld {
     manager: ChunkManager,
     intent_bus: IntentBus,
     runtime: tokio::runtime::Runtime,
+    /// Mesh L2 keyed by chunk + LOD step + mutation version.
+    mesh_l2: Arc<DashMap<MeshCacheKey, CachedMesh>>,
 }
 
 #[pymethods]
@@ -56,6 +99,26 @@ impl PyWorld {
             if let Some(v) = kw.get_item("cache_capacity")? {
                 cfg.cache_capacity = v.extract::<usize>()?;
             }
+            if let Some(v) = kw.get_item("macro_grid_path")? {
+                let path: String = v.extract()?;
+                let grid = load_macro_grid_path(&path).map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("macro grid: {e}"))
+                })?;
+                cfg.macro_grid = Some(Arc::new(grid));
+            }
+            if let Some(v) = kw.get_item("macro_grid_bytes")? {
+                let data: Vec<u8> = v.extract()?;
+                let grid = read_binary(Cursor::new(data)).map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("macro grid: {e}"))
+                })?;
+                cfg.macro_grid = Some(Arc::new(grid));
+            }
+            if let Some(v) = kw.get_item("chunk_side_m")? {
+                cfg.chunk_side_m = v.extract::<f32>()?;
+            }
+            if let Some(v) = kw.get_item("macro_interior_weight")? {
+                cfg.macro_interior_weight = v.extract::<f32>()?;
+            }
         }
         let mgr = ChunkManager::new(WorldSeed::from_u64(seed), cfg);
         let client = WorldClient::new(mgr.clone());
@@ -75,7 +138,46 @@ impl PyWorld {
             manager: mgr,
             intent_bus,
             runtime,
+            mesh_l2: Arc::new(DashMap::new()),
         })
+    }
+
+    /// Apply queued agent mutations (call after `set_voxel`).
+    fn apply_pending(&self) -> usize {
+        self.client.apply_pending()
+    }
+
+    /// Set one voxel (queued; call `apply_pending` or rely on next tick hook).
+    fn set_voxel(&self, x: i32, y: i32, z: i32, material: u16) -> PyResult<()> {
+        self.client
+            .submit(Mutation::SetVoxel {
+                pos: WorldCoord::new(x, y, z),
+                value: Voxel(material),
+                actor: EntityId(0),
+            })
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Zstd snapshot blob (tick + cached chunks).
+    fn save_snapshot(&self) -> PyResult<Vec<u8>> {
+        self.client
+            .snapshot_bytes()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    }
+
+    /// Restore from `save_snapshot` bytes.
+    fn restore_snapshot(&self, data: Vec<u8>) -> PyResult<()> {
+        self.client
+            .restore_snapshot_bytes(&data)
+            .map(|_| ())
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+        self.mesh_l2.clear();
+        Ok(())
+    }
+
+    /// Clear L2 mesh cache (e.g. after bulk edits).
+    fn invalidate_mesh_cache(&self) {
+        self.mesh_l2.clear();
     }
 
     /// Number of chunks currently in the in-memory cache.
@@ -147,23 +249,48 @@ impl PyWorld {
     /// Returns a dict with `vertices` (Nx9 floats: pos[3] + normal[3] + pad[3])
     /// and `indices` (list of u32 triangle indices).
     fn extract_mesh(&self, py: Python<'_>, cx: i32, cy: i32, step: u32) -> PyResult<PyObject> {
+        let step = step.max(1);
         let chunk = self
             .runtime
             .block_on(async { self.manager.get_or_generate(ChunkCoord { cx, cy }).await });
-        let mesh = extract_surface_nets(&chunk, step.max(1)).map_err(|e| {
+        let version = chunk.read().meta.mutation_version;
+        let key = MeshCacheKey {
+            cx,
+            cy,
+            step,
+            version,
+        };
+        if let Some(cached) = self.mesh_l2.get(&key) {
+            let d = PyDict::new_bound(py);
+            d.set_item("vertices", PyList::new_bound(py, &cached.flat_vertices))?;
+            d.set_item("indices", PyList::new_bound(py, &cached.indices))?;
+            d.set_item("vertex_count", cached.vertex_count)?;
+            d.set_item("triangle_count", cached.triangle_count)?;
+            d.set_item("cached", true)?;
+            return Ok(d.unbind().into());
+        }
+        let mesh = extract_surface_nets(&*chunk.read(), step).map_err(|e| {
             PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("mesh: {e}"))
         })?;
-        let d = PyDict::new_bound(py);
         let mut flat = Vec::with_capacity(mesh.vertices.len() * 7);
         for v in &mesh.vertices {
             flat.extend_from_slice(&v.pos);
             flat.extend_from_slice(&v.normal);
             flat.push(v.material as f32);
         }
+        let entry = CachedMesh {
+            flat_vertices: flat.clone(),
+            indices: mesh.indices.clone(),
+            vertex_count: mesh.vertices.len(),
+            triangle_count: mesh.tri_count(),
+        };
+        self.mesh_l2.insert(key, entry);
+        let d = PyDict::new_bound(py);
         d.set_item("vertices", PyList::new_bound(py, &flat))?;
         d.set_item("indices", PyList::new_bound(py, &mesh.indices))?;
         d.set_item("vertex_count", mesh.vertices.len())?;
         d.set_item("triangle_count", mesh.tri_count())?;
+        d.set_item("cached", false)?;
         Ok(d.unbind().into())
     }
 
@@ -176,9 +303,10 @@ impl PyWorld {
         let chunk = self
             .runtime
             .block_on(async { self.manager.get_or_generate(coord).await });
+        let guard = chunk.read();
         let lx = (x as i32).rem_euclid(CHUNK_SIZE_X as i32) as u32;
         let ly = (y as i32).rem_euclid(CHUNK_SIZE_Y as i32) as u32;
-        Ok(chunk.biome_at(lx, ly) as u8)
+        Ok(guard.biome_at(lx, ly) as u8)
     }
 
     /// Generate or fetch a chunk's surface observation as a Python dict.
@@ -226,6 +354,11 @@ impl PyWorld {
             ("AlpineRock", Biome::AlpineRock as u8),
         ]
     }
+}
+
+fn load_macro_grid_path(path: &str) -> std::io::Result<MacroGrid> {
+    let f = File::open(Path::new(path))?;
+    read_binary(f).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
 }
 
 /// Module entry point.

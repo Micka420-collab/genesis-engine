@@ -18,3 +18,8 @@ parking_lot = { workspace = true }
 crossbeam-channel = { workspace = true }
 smallvec = { workspace = true }
 tokio = { workspace = true }
+tracing = { workspace = true }
+bincode = { workspace = true }
+zstd    = { workspace = true }
+blake3  = { workspace = true }
+serde   = { workspace = true }

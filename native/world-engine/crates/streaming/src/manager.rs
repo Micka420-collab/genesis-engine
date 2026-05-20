@@ -1,19 +1,22 @@
 //! Async chunk manager — generates, caches, evicts.
 //!
 //! Concurrency model:
-//!  - `DashMap<ChunkCoord, Arc<Chunk>>` for hot cache (lock-free reads).
+//!  - `DashMap<ChunkCoord, Arc<RwLock<Chunk>>>` for hot cache (reads + agent writes).
 //!  - Generation happens on `tokio::spawn_blocking` so the async runtime
 //!    stays responsive while CPU-bound work runs on the rayon pool.
 //!  - A second map tracks in-flight generations to coalesce duplicate reqs.
 
-use crate::chunk::{Chunk, ChunkMeta};
+use crate::chunk::{Chunk, ChunkMeta, SharedChunk};
 use dashmap::DashMap;
 use genesis_biome::Biome;
+use parking_lot::RwLock;
 use genesis_climate::{Climate, ClimateParams, ClimateSample};
 use genesis_core::{
-    ChunkCoord, Material, SeedTree, Voxel, WorldSeed, CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z,
+    ChunkCoord, Material, SeedTree, Voxel, WorldCoord, WorldSeed, CHUNK_SIZE_X, CHUNK_SIZE_Y,
+    CHUNK_SIZE_Z,
 };
 use genesis_ecosystem::{fauna_for_chunk, flora_for_chunk};
+use genesis_macro_bridge::{align_heightmap, MacroGrid};
 use genesis_hydrology::compute as compute_hydro;
 use genesis_terrain::{generate as generate_heightmap, hydraulic_erode, thermal_erode, TerrainParams};
 use smallvec::smallvec;
@@ -38,6 +41,12 @@ pub struct ChunkManagerConfig {
     pub climate: ClimateParams,
     /// Max chunks cached in memory (LRU-style eviction).
     pub cache_capacity: usize,
+    /// Optional continental macro grid (Python Genesis export).
+    pub macro_grid: Option<Arc<MacroGrid>>,
+    /// Chunk side length in metres (align with Python `CHUNK_SIDE_M`, default 32).
+    pub chunk_side_m: f32,
+    /// Interior blend weight toward macro elevation (0 = procedural only).
+    pub macro_interior_weight: f32,
 }
 
 impl Default for ChunkManagerConfig {
@@ -50,6 +59,9 @@ impl Default for ChunkManagerConfig {
             terrain: TerrainParams::default(),
             climate: ClimateParams::default(),
             cache_capacity: 1024,
+            macro_grid: None,
+            chunk_side_m: 32.0,
+            macro_interior_weight: 0.45,
         }
     }
 }
@@ -59,8 +71,8 @@ impl Default for ChunkManagerConfig {
 pub struct ChunkManager {
     seed: WorldSeed,
     config: Arc<ChunkManagerConfig>,
-    cache: Arc<DashMap<ChunkCoord, Arc<Chunk>>>,
-    inflight: Arc<DashMap<ChunkCoord, Vec<oneshot::Sender<Arc<Chunk>>>>>,
+    cache: Arc<DashMap<ChunkCoord, SharedChunk>>,
+    inflight: Arc<DashMap<ChunkCoord, Vec<oneshot::Sender<SharedChunk>>>>,
     seed_tree: SeedTree,
 }
 
@@ -80,6 +92,32 @@ impl ChunkManager {
     /// Number of cached chunks.
     pub fn cached_count(&self) -> usize {
         self.cache.len()
+    }
+
+    /// Root seed as u64 (Python / snapshot interchange).
+    #[must_use]
+    pub fn seed_u64(&self) -> u64 {
+        self.seed.0 as u64
+    }
+
+    /// Visit every chunk currently in the LRU cache.
+    pub fn for_each_cached<F>(&self, mut f: F)
+    where
+        F: FnMut(ChunkCoord, &Chunk),
+    {
+        for kv in self.cache.iter() {
+            f(*kv.key(), &*kv.value().read());
+        }
+    }
+
+    /// Replace voxel buffer after snapshot restore (bumps `mutation_version`).
+    pub fn restore_chunk_voxels(&self, coord: ChunkCoord, voxels: Vec<u16>, version: u64) {
+        let shared = self.get_or_generate_blocking(coord);
+        let mut c = shared.write();
+        if voxels.len() == c.voxels.len() {
+            c.voxels = voxels;
+            c.meta.mutation_version = version;
+        }
     }
 
     /// Drop chunks if we're over capacity.
@@ -103,9 +141,9 @@ impl ChunkManager {
     /// Get a chunk, generating it asynchronously if needed.
     /// Multiple concurrent requests for the same chunk coalesce.
     #[instrument(skip(self), fields(cx = coord.cx, cy = coord.cy))]
-    pub async fn get_or_generate(&self, coord: ChunkCoord) -> Arc<Chunk> {
+    pub async fn get_or_generate(&self, coord: ChunkCoord) -> SharedChunk {
         if let Some(c) = self.cache.get(&coord) {
-            return Arc::clone(&c);
+            return Arc::clone(c.value());
         }
 
         // Coalesce duplicate concurrent requests for the same chunk.
@@ -129,16 +167,38 @@ impl ChunkManager {
         let chunk = tokio::task::spawn_blocking(move || me.generate(coord))
             .await
             .expect("generate panicked");
-        let arc = Arc::new(chunk);
-        self.cache.insert(coord, Arc::clone(&arc));
+        let shared = Arc::new(RwLock::new(chunk));
+        self.cache.insert(coord, Arc::clone(&shared));
 
         if let Some((_, waiters)) = self.inflight.remove(&coord) {
             for w in waiters {
-                let _ = w.send(Arc::clone(&arc));
+                let _ = w.send(Arc::clone(&shared));
             }
         }
         self.maybe_evict();
-        arc
+        shared
+    }
+
+    /// Synchronous fetch or generate (uses cache; required for agent write-back).
+    pub fn get_or_generate_blocking(&self, coord: ChunkCoord) -> SharedChunk {
+        if let Some(c) = self.cache.get(&coord) {
+            return Arc::clone(c.value());
+        }
+        let chunk = self.generate(coord);
+        let shared = Arc::new(RwLock::new(chunk));
+        self.cache.insert(coord, Arc::clone(&shared));
+        self.maybe_evict();
+        shared
+    }
+
+    /// Apply a voxel mutation into the cached chunk (generates if needed).
+    pub fn set_voxel(&self, pos: WorldCoord, value: Voxel) -> bool {
+        if !(0..CHUNK_SIZE_Z).contains(&pos.z) {
+            return false;
+        }
+        let coord = pos.chunk();
+        let shared = self.get_or_generate_blocking(coord);
+        shared.write().set_voxel_world(pos, value)
     }
 
     /// Synchronous chunk generation (CPU-bound).
@@ -149,6 +209,15 @@ impl ChunkManager {
 
         // 1. Heightmap
         let mut hm = generate_heightmap(prf_terrain, coord.cx, coord.cy, self.config.terrain);
+        if let Some(ref grid) = self.config.macro_grid {
+            align_heightmap(
+                &mut hm,
+                coord,
+                grid,
+                self.config.chunk_side_m,
+                self.config.macro_interior_weight,
+            );
+        }
         // 2. Erode
         let erode_seed = prf_terrain.hash(0xE00D_E000, coord.cx, coord.cy, 0, 0);
         hydraulic_erode(
@@ -252,6 +321,7 @@ impl ChunkManager {
             coord,
             generated_at_tick: 0,
             content_hash: [0; 32], // filled by persist if needed
+            mutation_version: 0,
         };
 
         Chunk {
@@ -371,6 +441,58 @@ mod tests {
         assert_eq!(
             c.voxels.len(),
             (CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z) as usize
+        );
+    }
+
+    #[test]
+    fn set_voxel_persists_in_cache() {
+        use genesis_core::{Material, Voxel, WorldCoord};
+
+        let mgr = ChunkManager::new(
+            WorldSeed::from_u64(11),
+            ChunkManagerConfig {
+                erosion_droplets: 8,
+                erosion_passes: 0,
+                cache_capacity: 4,
+                ..Default::default()
+            },
+        );
+        let pos = WorldCoord::new(3, 4, 5);
+        let stone = Voxel(Material::Stone as u16);
+        assert!(mgr.set_voxel(pos, stone));
+        let shared = mgr.get_or_generate_blocking(pos.chunk());
+        assert_eq!(shared.read().voxel_at(pos.local()), stone);
+        assert!(shared.read().meta.mutation_version >= 1);
+    }
+
+    #[test]
+    fn macro_grid_pins_border_elevation() {
+        let grid = Arc::new(
+            MacroGrid::from_buffers(
+                32,
+                32,
+                50.0,
+                (0.0, 0.0),
+                vec![420.0; 32 * 32],
+                vec![0u8; 32 * 32],
+            )
+            .unwrap(),
+        );
+        let cfg = ChunkManagerConfig {
+            erosion_droplets: 8,
+            erosion_passes: 0,
+            cache_capacity: 4,
+            macro_grid: Some(grid),
+            chunk_side_m: 32.0,
+            macro_interior_weight: 0.0,
+            ..Default::default()
+        };
+        let mgr = ChunkManager::new(WorldSeed::from_u64(99), cfg);
+        let c = mgr.generate(ChunkCoord { cx: 0, cy: 0 });
+        let mean: f32 = c.elevation.iter().sum::<f32>() / c.elevation.len() as f32;
+        assert!(
+            (mean - 420.0).abs() < 80.0,
+            "macro-aligned chunk mean {mean} should track flat 420m grid"
         );
     }
 }

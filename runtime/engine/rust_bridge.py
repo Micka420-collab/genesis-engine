@@ -95,6 +95,23 @@ def try_import_genesis_world() -> Tuple[Any, bool]:
         return MockPyWorld, False
 
 
+def _macro_kwargs(genesis_world: Any = None, **kwargs: Any) -> Dict[str, Any]:
+    """Attach GENM bytes to native PyWorld when a Genesis world is available."""
+    if genesis_world is None:
+        return dict(kwargs)
+    try:
+        from engine.macro_grid_export import export_macro_grid_bytes
+
+        kwargs = dict(kwargs)
+        kwargs["macro_grid_bytes"] = export_macro_grid_bytes(genesis_world)
+        from engine.world import CHUNK_SIDE_M
+
+        kwargs.setdefault("chunk_side_m", float(CHUNK_SIDE_M))
+    except Exception:
+        pass
+    return kwargs
+
+
 def create_py_world(seed: int = 42, *,
                     genesis_world: Any = None,
                     genesis_anchor: Any = None,
@@ -108,7 +125,8 @@ def create_py_world(seed: int = 42, *,
     """
     gw, native = try_import_genesis_world()
     if native:
-        return gw.PyWorld(seed=seed, **kwargs)
+        kw = _macro_kwargs(genesis_world, **kwargs)
+        return gw.PyWorld(seed=seed, **kw)
     if synthetic_only and genesis_world is None:
         return MockPyWorld(seed=seed, **kwargs)
     return MockPyWorld(
@@ -139,7 +157,9 @@ def create_py_world_from_sim(sim, *,
             anchor = getattr(getattr(sim, "streamer", None), "genesis", None)
     gw, native = try_import_genesis_world()
     if native:
-        return gw.PyWorld(seed=seed, **kwargs)
+        world = world or getattr(anchor, "world", None) if anchor else world
+        kw = _macro_kwargs(world, **kwargs)
+        return gw.PyWorld(seed=seed, **kw)
     return MockPyWorld(
         seed=seed,
         genesis_world=world,

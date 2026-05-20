@@ -51,7 +51,7 @@ flowchart TB
 | Hydrologie | 🟡 sv1d/lbm cross-chunk Python | Rust D8 **par chunk** | `chunk_hydrology.py`, `hydrology/` |
 | Biosphère / agents | ✅ Python (life_emergence, cognition) | Rust ecosystem = **seeds only** | `animal_evolution.py`, `ecosystem/` |
 | API agents lecture | ✅ Python + Rust `WorldView` | — | `agent_observation.py`, `agent-api/` |
-| API agents **écriture** | ✅ Python (BUILD, terrain) | Rust `apply_pending` = **stub** | `agent-api/src/lib.rs:139-151` |
+| API agents **écriture** | ✅ Python (BUILD, terrain) | Rust `apply_pending` → **write-back** `RwLock<Chunk>` | `streaming` + `agent-api` |
 | WorldGraph prod | ✅ DAG + scheduler | **Bypass** par `ChunkManager::generate` | `streaming/manager.rs` |
 | Déterminisme | ✅ PRF / seed | **Deux pipelines ≠ même relief** | `rust_bridge.py` |
 | 10k entités @ 60fps | 🟡 Python ~200 agents | Rust pas sur boucle gameplay | `sim.py`, benchmarks |
@@ -60,12 +60,12 @@ flowchart TB
 
 | # | Bottleneck | Impact | Preuve |
 |---|------------|--------|--------|
-| **B0** | **Double vérité monde** (Python macro ≠ Rust chunk) | Tout RL / replay / « Terre identique » cassé en natif | `world_genesis.py` vs `ChunkManager::generate` |
+| **B0** | ~~Double vérité monde~~ → **P0.2–0.3 livré** (GENM + `align_heightmap`) | Rust chunks pinent la macro Python aux bordures | `macro_grid_export.py`, `macro-bridge`, `streaming/manager.rs` |
 | **B1** | Tectonique sans cinématique temporelle | Pas de cycle Wilson, subduction | `tectonics.rs` — `motion` jamais intégré |
 | **B2** | Érosion / rivières coupées aux frontières chunk | Artefacts « rivière fantôme » | `erosion.rs` break border |
 | **B3** | Climat analytique, pas de LOD météo | Saisons / tempêtes impossibles en Rust | `climate/src/lib.rs` |
 | **B4** | Écosystème = placement, pas simulation | Pas de chaîne alimentaire native | `ecosystem/src/lib.rs` |
-| **B5** | Mutations agent Rust non appliquées | Pas de creuser/construire côté natif | `apply_pending` stub |
+| **B5** | ~~Mutations stub~~ → **P5 livré** (write-back + snapshot + mesh L2) | RL checkpoints OK | `SharedChunk`, `WorldSnapshot` |
 | **B6** | WorldGraph hors hot path | Cache lineage inutilisé en prod | `worldgraph_demo.rs` only |
 | **B7** | GPU erosion isolée | Perf x3–x5 non récupérée | `gpu/` feature non default |
 | **B8** | `bevy_ecs` déclaré, **jamais utilisé** | 10k entités non structurées en Rust | `Cargo.toml` workspace |
@@ -93,8 +93,8 @@ flowchart TB
 | ID | Livrable | Type | Fichiers |
 |----|----------|------|----------|
 | P0.1 | Crate **`genesis-macro-bridge`** (échantillonnage grille continentale) | ✅ **livré** | `crates/macro-bridge/` |
-| P0.2 | Export FAIR Python → zstd → `MacroGrid::load` | Quick win | `world_genesis.py`, `persist/` |
-| P0.3 | `ChunkManager` : bordures depuis macro, détail PRF intérieur | Refactor | `streaming/manager.rs` |
+| P0.2 | ✅ Export GENM v1 Python → `read_binary` Rust | Livré | `macro_grid_export.py`, `macro-bridge/binary.rs` |
+| P0.3 | ✅ `align_heightmap` + `ChunkManagerConfig.macro_grid` | Livré | `macro-bridge/align.rs`, `streaming/manager.rs` |
 | P0.4 | Tests bit-identiques MockPyWorld ≡ macro-bridge | Test | `streaming/tests/` |
 
 ### Phase 1 — Axe 1 Géologie (6–10 semaines)
@@ -137,8 +137,8 @@ flowchart TB
 
 | ID | Livrable | Transport recommandé |
 |----|----------|----------------------|
-| P5.1 | `apply_pending` réel + version chunk | `proposals/axis5_agent_api/mutation_apply.rs` |
-| P5.2 | Snapshot / restore `WorldSnapshot` | `proposals/axis5_agent_api/snapshot.rs` |
+| P5.1 | ✅ `apply_pending` write-back + `mutation_version` | `streaming/chunk.rs`, `agent-api` |
+| P5.2 | ✅ `WorldSnapshot` zstd + restore + mesh L2 invalidation | `agent-api/snapshot.rs`, `pybindings` |
 | P5.3 | Fog of war par agent | `proposals/axis5_agent_api/fog_of_war.rs` |
 | P5.4 | IPC **shared memory** (mmap) + schema versionné | voir §5 |
 
@@ -329,7 +329,7 @@ cd native/world-engine
 cargo test -p genesis-macro-bridge
 ```
 
-**Intégration suivante (P0.2–P0.3) :** brancher `ChunkMacroSampler` dans `ChunkManager::generate` pour les 2 px de bordure, garder PRF pour l'intérieur.
+**P0.2–0.3 (livré) :** `rust_bridge` passe `macro_grid_bytes` à `PyWorld` ; `ChunkManager::generate` appelle `align_heightmap` après procgen.
 
 ---
 

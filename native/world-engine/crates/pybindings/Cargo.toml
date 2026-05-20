@@ -10,12 +10,14 @@ name       = "genesis_world"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-genesis-core      = { path = "../core" }
 genesis-biome     = { path = "../biome" }
 genesis-streaming = { path = "../streaming" }
 genesis-agent-api = { path = "../agent-api" }
 genesis-intent    = { path = "../intent" }
-genesis-mesh      = { path = "../mesh" }
+genesis-mesh          = { path = "../mesh" }
+genesis-macro-bridge  = { path = "../macro-bridge" }
 
-pyo3   = { workspace = true }
-tokio  = { workspace = true }
+pyo3      = { workspace = true }
+tokio     = { workspace = true }
+dashmap   = { workspace = true }
+genesis-core = { path = "../core" }

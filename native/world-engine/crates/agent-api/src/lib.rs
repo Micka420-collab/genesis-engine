@@ -12,11 +12,20 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+mod snapshot;
+
+pub use snapshot::{
+    load as load_snapshot, save as save_snapshot, hash_snapshot, ChunkSnapshot, SnapshotError,
+    WorldSnapshot,
+};
+
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use genesis_biome::Biome;
 use genesis_climate::ClimateSample;
-use genesis_core::{ChunkCoord, Tick, Voxel, WorldCoord, CHUNK_SIZE_X, CHUNK_SIZE_Y};
-use genesis_streaming::{Chunk, ChunkManager};
+use genesis_core::{
+    ChunkCoord, Tick, Voxel, WorldCoord, CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_VOXEL_COUNT,
+};
+use genesis_streaming::{ChunkManager, SharedChunk};
 use glam::Vec3;
 use parking_lot::RwLock;
 use smallvec::SmallVec;
@@ -112,6 +121,8 @@ struct WorldClientInner {
     manager: ChunkManager,
     write_tx: Sender<Mutation>,
     write_rx: Receiver<Mutation>,
+    /// Spawn records applied at tick boundary (entity index = Python layer).
+    spawns: RwLock<Vec<(WorldCoord, u64, EntityId)>>,
 }
 
 impl WorldClient {
@@ -125,6 +136,7 @@ impl WorldClient {
                 manager,
                 write_tx: tx,
                 write_rx: rx,
+                spawns: RwLock::new(Vec::new()),
             }),
         }
     }
@@ -137,15 +149,29 @@ impl WorldClient {
     /// Drain all queued mutations and apply them. Called by the simulation
     /// tick coordinator — agents do not call this directly.
     pub fn apply_pending(&self) -> usize {
-        let mut applied = 0;
+        let mut batch = Vec::new();
         while let Ok(m) = self.inner.write_rx.try_recv() {
-            // Mutations need write access to the loaded chunk. The current
-            // streaming layer hands out `Arc<Chunk>` for read; full write
-            // support is part of phase 2 (see roadmap). For now, count and
-            // log without actually mutating — a deterministic stub keeps
-            // the API surface stable for downstream callers.
-            tracing::debug!(?m, "mutation queued (write-back stub)");
-            applied += 1;
+            batch.push(m);
+        }
+        batch.sort_by_key(|m| match m {
+            Mutation::SetVoxel { pos, actor, .. } => (pos.x, pos.y, pos.z, actor.0, 0u8),
+            Mutation::SpawnEntity { pos, actor, .. } => (pos.x, pos.y, pos.z, actor.0, 1u8),
+        });
+        let mut applied = 0;
+        for m in batch {
+            match m {
+                Mutation::SetVoxel { pos, value, actor } => {
+                    if self.inner.manager.set_voxel(pos, value) {
+                        tracing::debug!(?pos, ?value, ?actor, "voxel write-back");
+                        applied += 1;
+                    }
+                }
+                Mutation::SpawnEntity { pos, blueprint, actor } => {
+                    self.inner.spawns.write().push((pos, blueprint, actor));
+                    tracing::debug!(?pos, blueprint, ?actor, "spawn recorded");
+                    applied += 1;
+                }
+            }
         }
         applied
     }
@@ -158,14 +184,83 @@ impl WorldClient {
     }
 
     /// Force-generate (or fetch from cache) a chunk.
-    pub async fn ensure_chunk(&self, coord: ChunkCoord) -> Arc<Chunk> {
+    pub async fn ensure_chunk(&self, coord: ChunkCoord) -> SharedChunk {
         self.inner.manager.get_or_generate(coord).await
     }
 
-    /// Fetch a chunk synchronously (blocks on the generation if not cached).
-    pub fn ensure_chunk_blocking(&self, coord: ChunkCoord) -> Arc<Chunk> {
-        // The streaming manager's blocking generator.
-        Arc::new(self.inner.manager.generate(coord))
+    /// Fetch a chunk synchronously (cache-aware; preserves mutations).
+    pub fn ensure_chunk_blocking(&self, coord: ChunkCoord) -> SharedChunk {
+        self.inner.manager.get_or_generate_blocking(coord)
+    }
+
+    /// Spawns recorded since construction (cleared only on new client).
+    pub fn pending_spawns(&self) -> Vec<(WorldCoord, u64, EntityId)> {
+        self.inner.spawns.read().clone()
+    }
+
+    /// Capture tick + all cached chunks (including mutations).
+    pub fn capture_snapshot(&self) -> WorldSnapshot {
+        let tick = self.inner.tick.read().0;
+        let seed = self.inner.manager.seed_u64();
+        let spawns: Vec<(WorldCoord, u64, u64)> = self
+            .inner
+            .spawns
+            .read()
+            .iter()
+            .map(|(p, bp, a)| (*p, *bp, a.0))
+            .collect();
+        let mut chunks = Vec::new();
+        self.inner.manager.for_each_cached(|coord, chunk| {
+            chunks.push(ChunkSnapshot::from_chunk(
+                coord,
+                chunk.meta.mutation_version,
+                chunk.voxels.clone(),
+                &spawns,
+            ));
+        });
+        WorldSnapshot { seed, tick, chunks }
+    }
+
+    /// Serialize snapshot (zstd level 3).
+    pub fn snapshot_bytes(&self) -> Result<Vec<u8>, SnapshotError> {
+        save_snapshot(&self.capture_snapshot(), 3)
+    }
+
+    /// Restore voxel buffers and tick from a snapshot.
+    pub fn restore_snapshot(&self, snap: &WorldSnapshot) -> Result<(), SnapshotError> {
+        *self.inner.tick.write() = Tick(snap.tick);
+        for cs in &snap.chunks {
+            if cs.voxels.len() != CHUNK_VOXEL_COUNT {
+                return Err(SnapshotError::VoxelLenMismatch {
+                    cx: cs.cx,
+                    cy: cs.cy,
+                });
+            }
+            let coord = ChunkCoord {
+                cx: cs.cx,
+                cy: cs.cy,
+            };
+            self.inner
+                .manager
+                .restore_chunk_voxels(coord, cs.voxels.clone(), cs.version);
+            let mut spawns = self.inner.spawns.write();
+            spawns.retain(|(p, _, _)| p.chunk() != coord);
+            for &(x, y, z, blueprint, actor) in &cs.spawned {
+                spawns.push((
+                    WorldCoord::new(x, y, z),
+                    blueprint,
+                    EntityId(actor),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Load snapshot from compressed bytes and apply.
+    pub fn restore_snapshot_bytes(&self, bytes: &[u8]) -> Result<WorldSnapshot, SnapshotError> {
+        let snap = load_snapshot(bytes)?;
+        self.restore_snapshot(&snap)?;
+        Ok(snap)
     }
 }
 
@@ -175,38 +270,29 @@ impl WorldView for WorldClient {
     }
 
     fn voxel(&self, p: WorldCoord) -> Option<Voxel> {
-        let coord = p.chunk();
-        // We DO NOT auto-generate from a sync read path — that would couple
-        // pure reads to CPU-bound work. Callers should `ensure_chunk(...)`
-        // before reading.
-        if self.inner.manager.cached_count() == 0 {
-            return None;
-        }
-        let local = p.local();
-        // Cheap path: build the chunk synchronously if not cached. Acceptable
-        // for tests and Python integration; production runtime should warm
-        // chunks beforehand.
-        let chunk = self.ensure_chunk_blocking(coord);
-        Some(chunk.voxel_at(local))
+        let shared = self.ensure_chunk_blocking(p.chunk());
+        Some(shared.read().voxel_at(p.local()))
     }
 
     fn biome(&self, p: WorldCoord) -> Option<Biome> {
-        let coord = p.chunk();
-        let chunk = self.ensure_chunk_blocking(coord);
+        let shared = self.ensure_chunk_blocking(p.chunk());
+        let chunk = shared.read();
         let local = p.local();
         Some(chunk.biome_at(local.x as u32, local.y as u32))
     }
 
     fn elevation(&self, x: i32, y: i32) -> Option<f32> {
         let p = WorldCoord::new(x, y, 0);
-        let chunk = self.ensure_chunk_blocking(p.chunk());
+        let shared = self.ensure_chunk_blocking(p.chunk());
+        let chunk = shared.read();
         let local = p.local();
         Some(chunk.elevation_at(local.x as u32, local.y as u32))
     }
 
     fn climate(&self, x: i32, y: i32) -> Option<ClimateSample> {
         let p = WorldCoord::new(x, y, 0);
-        let chunk = self.ensure_chunk_blocking(p.chunk());
+        let shared = self.ensure_chunk_blocking(p.chunk());
+        let chunk = shared.read();
         let local = p.local();
         let idx = (local.y as usize) * (CHUNK_SIZE_X as usize) + (local.x as usize);
         Some(chunk.climate[idx])
@@ -263,7 +349,8 @@ pub struct AreaObservation {
 impl WorldClient {
     /// Build a complete area observation for one chunk. Generates if needed.
     pub async fn observe_area(&self, coord: ChunkCoord) -> AreaObservation {
-        let chunk = self.ensure_chunk(coord).await;
+        let shared = self.ensure_chunk(coord).await;
+        let chunk = shared.read();
         AreaObservation {
             chunk: coord,
             elevation: chunk.elevation.clone(),
@@ -299,5 +386,53 @@ mod tests {
         let obs = client.observe_area(ChunkCoord { cx: 0, cy: 0 }).await;
         assert_eq!(obs.elevation.len(), SURFACE_CELLS_PER_CHUNK);
         assert_eq!(obs.biome.len(), SURFACE_CELLS_PER_CHUNK);
+    }
+
+    #[test]
+    fn set_voxel_writeback_in_chunk_buffer() {
+        use genesis_core::{Material, Voxel};
+
+        let mgr = ChunkManager::new(WorldSeed::from_u64(7), fast_cfg());
+        let client = WorldClient::new(mgr.clone());
+        let pos = WorldCoord::new(1, 1, 2);
+        let stone = Voxel(Material::Stone as u16);
+        client
+            .submit(Mutation::SetVoxel {
+                pos,
+                value: stone,
+                actor: EntityId(1),
+            })
+            .unwrap();
+        assert_eq!(client.apply_pending(), 1);
+        let read = client.voxel(pos).expect("voxel after write-back");
+        assert_eq!(read, stone);
+        let shared = mgr.get_or_generate_blocking(pos.chunk());
+        assert_eq!(shared.read().voxel_at(pos.local()), stone);
+        assert!(shared.read().meta.mutation_version >= 1);
+    }
+
+    #[test]
+    fn snapshot_roundtrip_preserves_voxel() {
+        use genesis_core::{Material, Voxel, WorldSeed};
+
+        let mgr = ChunkManager::new(WorldSeed::from_u64(99), fast_cfg());
+        let client = WorldClient::new(mgr);
+        let pos = WorldCoord::new(2, 3, 4);
+        let stone = Voxel(Material::Stone as u16);
+        client
+            .submit(Mutation::SetVoxel {
+                pos,
+                value: stone,
+                actor: EntityId(1),
+            })
+            .unwrap();
+        client.apply_pending();
+        let bytes = client.snapshot_bytes().unwrap();
+        assert!(client.voxel(pos).unwrap() == stone);
+        // Fresh client + restore
+        let mgr2 = ChunkManager::new(WorldSeed::from_u64(99), fast_cfg());
+        let client2 = WorldClient::new(mgr2);
+        client2.restore_snapshot_bytes(&bytes).unwrap();
+        assert_eq!(client2.voxel(pos), Some(stone));
     }
 }

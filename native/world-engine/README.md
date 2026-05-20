@@ -20,7 +20,8 @@ Moteur natif de génération et simulation de monde pour Genesis Engine : bruit,
 | `genesis-streaming` | ChunkManager, LOD | ✅ exemples |
 | `genesis-worldgraph` | Pipeline DAG, scheduler, lineage | 🟡 prod path |
 | `genesis-gpu` | Érosion WGSL (feature `gpu`) | 🟡 |
-| `genesis-pybindings` | Module `genesis_world` | 🟡 CI maturin |
+| `genesis-macro-bridge` | GENM + align_heightmap (P0 Terre unique) | ✅ |
+| `genesis-pybindings` | `PyWorld` GENM + mutations + snapshot | 🟡 maturin |
 | `genesis-studio` | CLI scénarios YAML | ✅ |
 
 ---
@@ -114,9 +115,28 @@ maturin develop --release
 ```
 
 ```python
-import genesis_world
-w = genesis_world.World(seed=42)
-chunk = w.generate_chunk(0, 0)
+import genesis_world as gw
+from engine.macro_grid_export import export_macro_grid_bytes
+
+w = gw.PyWorld(seed=42, macro_grid_bytes=export_macro_grid_bytes(world))
+obs = w.observe_chunk(0, 0)
+w.set_voxel(1, 1, 2, 2)  # Stone
+w.apply_pending()
+snap = w.save_snapshot()
+mesh = w.extract_mesh(0, 0, 1)  # L2 cache keyed on mutation_version
+w.restore_snapshot(snap)
+```
+
+Depuis la racine du repo (PowerShell) :
+
+```powershell
+cd native/world-engine/crates/pybindings
+pip install maturin
+$env:Path = "$env:USERPROFILE\.cargo\bin;" + $env:Path
+maturin develop --release
+cd ../../../../runtime
+$env:PYTHONPATH = "."
+pytest tests/test_native_genesis_world.py -q
 ```
 
 ---

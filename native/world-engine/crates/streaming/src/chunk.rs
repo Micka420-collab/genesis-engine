@@ -2,10 +2,15 @@
 
 use genesis_biome::Biome;
 use genesis_climate::ClimateSample;
-use genesis_core::{ChunkCoord, LocalCoord, Voxel, CHUNK_SIZE_X, CHUNK_SIZE_Y};
+use genesis_core::{ChunkCoord, LocalCoord, Voxel, WorldCoord, CHUNK_SIZE_X, CHUNK_SIZE_Y};
 use genesis_ecosystem::{FaunaSeed, FloraInstance};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+use std::sync::Arc;
+
+/// Thread-safe shared chunk (cache + agent mutations).
+pub type SharedChunk = Arc<RwLock<Chunk>>;
 
 /// Per-chunk metadata.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -16,6 +21,8 @@ pub struct ChunkMeta {
     pub generated_at_tick: u64,
     /// 32-byte content hash (BLAKE3 over the serialized data).
     pub content_hash: [u8; 32],
+    /// Bumped on each agent voxel write (cache key invalidation hook).
+    pub mutation_version: u64,
 }
 
 /// A generated chunk.
@@ -48,6 +55,22 @@ impl Chunk {
     #[must_use]
     pub fn voxel_at(&self, local: LocalCoord) -> Voxel {
         Voxel(self.voxels[local.index()])
+    }
+
+    /// Replace a voxel in-place; returns `false` if index is out of range.
+    pub fn set_voxel_at(&mut self, local: LocalCoord, value: Voxel) -> bool {
+        let idx = local.index();
+        if idx >= self.voxels.len() {
+            return false;
+        }
+        self.voxels[idx] = value.0;
+        self.meta.mutation_version = self.meta.mutation_version.wrapping_add(1);
+        true
+    }
+
+    /// Replace a voxel at world coordinates (chunk-local mapping).
+    pub fn set_voxel_world(&mut self, pos: WorldCoord, value: Voxel) -> bool {
+        self.set_voxel_at(pos.local(), value)
     }
 
     /// Surface elevation at column `(i, j)` in chunk-local coords.

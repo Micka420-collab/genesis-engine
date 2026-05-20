@@ -4,14 +4,15 @@
 //! a precomputed macro grid (elevation, biome) instead of running an
 //! independent procedural pipeline. Same seed + same grid bytes ⇒ identical
 //! mesoscale relief at chunk boundaries.
-//!
-//! Integration path:
-//! 1. Python exports `elevation_m` + `biome` as FAIR manifest (zstd).
-//! 2. `MacroGrid::load` → `ChunkMacroSampler::sample_chunk_border`.
-//! 3. `ChunkManager` uses sampler for border cells; interior from PRF detail.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
+
+mod align;
+mod binary;
+
+pub use align::align_heightmap;
+pub use binary::{read_binary, write_binary, MAGIC, VERSION};
 
 use genesis_biome::Biome;
 use genesis_core::ChunkCoord;
@@ -20,6 +21,12 @@ use thiserror::Error;
 /// Errors loading or sampling a macro grid.
 #[derive(Error, Debug)]
 pub enum MacroBridgeError {
+    /// File magic is not `GENM`.
+    #[error("invalid macro grid magic")]
+    BadMagic,
+    /// Unsupported file version.
+    #[error("unsupported macro grid version")]
+    UnsupportedVersion,
     /// Buffer length does not match width × height.
     #[error("grid size mismatch: expected {expected} cells, got {got}")]
     SizeMismatch {

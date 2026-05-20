@@ -9,6 +9,7 @@ description = "Sample continental Genesis macro grids into Rust chunks (single s
 [dependencies]
 genesis-core = { path = "../core" }
 genesis-biome = { path = "../biome" }
+genesis-terrain = { path = "../terrain" }
 thiserror.workspace = true
 
 [dev-dependencies]

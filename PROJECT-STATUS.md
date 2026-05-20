@@ -9,7 +9,7 @@
 
 Laboratoire open-source d’**artificial life** : monde physique déterministe (Terre ou procédural) + agents autonomes + civilisations émergentes, observable via smokes, dashboard et exports GIS.
 
-**Tests :** `pytest runtime/tests` — **68** tests · smoke **p83** dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **73** tests · smoke **p83** dans `validate-all`.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
@@ -51,11 +51,11 @@ Estimation **globale ~70 %** vers une simulation « publication-grade » type Te
 | Sociétés / agents | **76** | Journal `trade` + transferts inventaire + alliances |
 | Géologie / relief | 55 | Tectonique, stratigraphie légère |
 | Écologie / hydrologie | 65 | **`hydrology_mode`** stub/sv1d/lbm ; preset **`run.py realism`** |
-| Pont Python ↔ Rust | **74** | Tick prod (`rust_worldgraph_prod`) + `submit_intent` prefetch natif |
+| Pont Python ↔ Rust | **82** | GENM + mutations write-back + snapshot + mesh L2 (`maturin develop`) |
 | Économie macro ↔ agents | **75** | Transferts food/stone/water/wood + rapport `run_report` |
 
 **Référence complète :** [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
-**Architecture God-Engine (audit next-level) :** [`docs/GOD-ENGINE-ARCHITECTURE.md`](docs/GOD-ENGINE-ARCHITECTURE.md) · crate `genesis-macro-bridge`  
+**Architecture God-Engine (audit next-level) :** [`docs/GOD-ENGINE-ARCHITECTURE.md`](docs/GOD-ENGINE-ARCHITECTURE.md) · P0 **GENM + align_heightmap** livré (`macro_grid_export.py`, `genesis-macro-bridge`)  
 **Prochain sprint réalisme :** section « Prochain sprint » dans ce fichier roadmap.
 
 ---
@@ -85,7 +85,7 @@ Depuis la racine du repo (`PYTHONPATH=runtime` implicite via `make` ou `cd runti
 ```bash
 make smoke                    # p0 — sanity
 make civilization             # pipeline émergence + manifest
-make validate-all             # pytest (68 tests) + smokes p72–p83 + SSE
+make validate-all             # pytest (73 tests) + smokes p72–p83 + SSE
 make terre-long               # preset terre 2000 ticks + artifact enrichi
 python run.py terre --ticks 500
 cd runtime && python scripts/p82_civilization_pipeline_smoke.py
