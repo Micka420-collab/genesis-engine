@@ -134,7 +134,27 @@
       pointer-events: none;
       user-select: none;
     }
+    #liteTerrain {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      image-rendering: pixelated;
+    }
+    #agentGpuLayer { position: absolute; inset: 0; pointer-events: none; width: 100%; height: 100%; }
     #agentLayer { position: absolute; inset: 0; pointer-events: none; }
+    #liteLawsHud {
+      position: absolute; left: 12px; bottom: 12px;
+      font-family: var(--mono); font-size: 10px; line-height: 1.45;
+      color: var(--muted);
+      background: rgba(8, 12, 20, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      pointer-events: none;
+      max-width: 280px;
+    }
+    #liteLawsHud strong { color: var(--accent); font-weight: 500; }
+    #liteLawsHud .law-row { display: flex; justify-content: space-between; gap: 8px; }
     .hud-bl {
       position: absolute;
       left: 16px; bottom: 16px;
@@ -305,6 +325,12 @@
     }
     .agent-detail strong { color: var(--text); }
     .sse-on { color: var(--success) !important; border-color: var(--success) !important; }
+    .zoom-presets { display: flex; gap: 4px; flex-wrap: wrap; }
+    .zoom-presets .btn { font-size: 10px; padding: 4px 8px; font-family: var(--mono); }
+    .zoom-presets .btn.active { border-color: var(--accent-warm); color: var(--accent-warm); }
+    #viewport.lite2d-mode { background: #060a10; }
+    #viewport.lite2d-mode #worldImg { display: none !important; }
+    #viewport.lite2d-mode #liteTerrain { display: block !important; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 </head>
@@ -321,6 +347,7 @@
       <span class="pill view-hidden" id="pillTemp">🌡 <strong id="hdrTemp">—</strong></span>
       <span class="pill view-hidden" id="pillClouds">☁ <strong id="hdrClouds">—</strong></span>
       <span class="pill view-hidden" id="pillWind">💨 <strong id="hdrWind">—</strong></span>
+      <span class="pill view-hidden" id="pillGpu">⚡ <strong id="hdrGpu">2D</strong></span>
     </div>
     <div class="transport">
       <button class="btn primary" id="btnPause">⏸ Pause</button>
@@ -330,6 +357,12 @@
       <button class="btn icon" data-speed="2">2×</button>
       <button class="btn icon" data-speed="5">5×</button>
       <button class="btn" id="btnRecenter">⊙ Agents</button>
+      <div class="zoom-presets view-hidden" id="zoomPresets" title="Échelles (1–4)">
+        <button class="btn" type="button" data-zoom="macro">1 Macro</button>
+        <button class="btn" type="button" data-zoom="region">2 Région</button>
+        <button class="btn" type="button" data-zoom="village">3 Village</button>
+        <button class="btn" type="button" data-zoom="agent">4 Agent</button>
+      </div>
     </div>
   </header>
 
@@ -337,16 +370,20 @@
     <button class="active" title="Vue locale top-down" data-view-mode="local">🗺</button>
     <button title="Globe planétaire WebGL" data-view-mode="globe">🌐</button>
     <button title="Vue isométrique 2.5D" data-view-mode="iso">◆</button>
+    <button title="2D léger — agents IA sans terrain" data-view-mode="lite2d">◎</button>
     <button title="Replay journal / timeline" id="btnReplayMode">⏪</button>
     <button title="God view classique" onclick="location.href='god_view_v2.html'">⚡</button>
   </nav>
 
   <div class="viewport-wrap">
     <div id="viewport">
+      <canvas id="liteTerrain" class="view-hidden"></canvas>
       <img id="worldImg" alt="terrain">
+      <canvas id="agentGpuLayer" class="view-hidden"></canvas>
       <canvas id="agentLayer"></canvas>
       <canvas id="globeCanvas" class="view-hidden"></canvas>
       <div class="globe-hud view-hidden" id="globeHud">Glisser pour tourner · clic pour te téléporter</div>
+      <div class="view-hidden" id="liteLawsHud"></div>
     </div>
     <div class="hud-bl" id="macroCard">
       <div class="card">
@@ -372,6 +409,25 @@
         <div class="kpi"><div class="label">H comm.</div><div class="value" id="emComm">—</div></div>
         <div class="kpi"><div class="label">Tech</div><div class="value" id="emTech">—</div></div>
         <div class="kpi"><div class="label">Gini</div><div class="value" id="emGini">—</div></div>
+        <div class="kpi"><div class="label">Mèmes</div><div class="value" id="emMemetic">—</div></div>
+        <div class="kpi"><div class="label">Hydro</div><div class="value" id="emHydro">—</div></div>
+      </div>
+
+      <div class="section-title view-hidden" id="liteLayerTitle">2D — couche monde</div>
+      <div class="layers view-hidden" id="liteLayerChips">
+        <button class="layer-chip active" data-lite-overlay="">Biomes</button>
+        <button class="layer-chip" data-lite-overlay="temp">Température</button>
+        <button class="layer-chip" data-lite-overlay="water">Eau</button>
+        <button class="layer-chip" data-lite-overlay="flow">Flux eau</button>
+        <button class="layer-chip" data-lite-overlay="wind">Vent</button>
+      </div>
+
+      <div class="section-title">Lois de la Terre (L0)</div>
+      <div class="kpi-grid" id="lawsKpis">
+        <div class="kpi"><div class="label">∇T lapse</div><div class="value" id="lawLapse">—</div></div>
+        <div class="kpi"><div class="label">Charge N</div><div class="value" id="lawLoad">—</div></div>
+        <div class="kpi"><div class="label">T surface</div><div class="value" id="lawTemp">—</div></div>
+        <div class="kpi"><div class="label">Entropie</div><div class="value" id="lawEntropy">—</div></div>
       </div>
 
       <div class="section-title">Couche terrain</div>
@@ -429,6 +485,7 @@
   </footer>
 </div>
 
+<script src="/earth_console_webgpu.js"></script>
 <script>
 const API = '';
 let overlay = '';
@@ -440,6 +497,23 @@ let imgLoading = false, lastImgUrl = '';
 let macroMeta = { available: false, map_size_km: 4000, origin_km: [2000, 2000] };
 let pollStart = performance.now(), lastTick = 0, tpsEma = 0;
 let viewMode = 'local';
+let pollMs = 400;
+let liteTrails = new Map();
+const LITE_TRAIL_LEN = 32;
+let liteOverlay = '';
+let liteFieldKey = '';
+let windFieldKey = '';
+let liteFieldLoading = false;
+let lastCirculation = null;
+const AGENT_PACK_SIZE = 24;
+let liteRafId = null;
+let lastEarthLaws = null;
+let agentGpu = null;
+let useWebGpuAgents = false;
+const WEBGPU_AGENT_MIN = 40;
+const liteTerrain = document.getElementById('liteTerrain');
+const liteTCtx = liteTerrain.getContext('2d');
+const agentGpuLayer = document.getElementById('agentGpuLayer');
 let popHistory = [];
 let metricsHistory = { tick: [], population: [] };
 const MAX_HISTORY = 120;
@@ -475,8 +549,24 @@ function s2w(sx, sy) {
 function resize() {
   const { w, h } = vp();
   agentLayer.width = w; agentLayer.height = h;
+  liteTerrain.width = w; liteTerrain.height = h;
+  if (agentGpu && useWebGpuAgents) agentGpu.resize(w, h);
 }
-window.addEventListener('resize', () => { resize(); scheduleTerrain(); drawAgents(); });
+async function initAgentWebGPU() {
+  if (agentGpu || typeof EarthConsoleWebGPU === 'undefined') return;
+  agentGpu = new EarthConsoleWebGPU(agentGpuLayer);
+  useWebGpuAgents = await agentGpu.init();
+  const pill = document.getElementById('pillGpu');
+  const hdr = document.getElementById('hdrGpu');
+  if (pill) pill.classList.toggle('view-hidden', viewMode !== 'lite2d');
+  if (hdr) hdr.textContent = useWebGpuAgents ? 'WebGPU' : 'Canvas';
+}
+window.addEventListener('resize', () => {
+  resize();
+  scheduleTerrain();
+  scheduleLiteField();
+  drawAgents();
+});
 resize();
 
 viewport.addEventListener('mousedown', e => {
@@ -490,7 +580,7 @@ window.addEventListener('mousemove', e => {
   if (!dragging) return;
   camCenterX = camStartX - (e.clientX - dragX) * camZoom;
   camCenterY = camStartY - (e.clientY - dragY) * camZoom;
-  updateZoom(); scheduleTerrain(); drawAgents();
+  updateZoom(); scheduleTerrain(); scheduleLiteField(); drawAgents();
 });
 window.addEventListener('mouseup', () => viewport.classList.remove('grabbing'));
 viewport.addEventListener('wheel', e => {
@@ -501,7 +591,7 @@ viewport.addEventListener('wheel', e => {
   const after = s2w(e.clientX - r.left, e.clientY - r.top);
   camCenterX += before.x - after.x;
   camCenterY += before.y - after.y;
-  updateZoom(); scheduleTerrain(); drawAgents();
+  updateZoom(); scheduleTerrain(); scheduleLiteField(); drawAgents();
 }, { passive: false });
 
 document.getElementById('layerChips').addEventListener('click', e => {
@@ -515,6 +605,17 @@ document.getElementById('layerChips').addEventListener('click', e => {
   if (viewMode === 'iso') setViewMode('local');
   scheduleTerrain();
 });
+document.getElementById('liteLayerChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-lite-overlay]');
+  if (!b) return;
+  document.querySelectorAll('#liteLayerChips .layer-chip').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  liteOverlay = b.dataset.liteOverlay || '';
+  liteFieldKey = '';
+  windFieldKey = '';
+  scheduleLiteField();
+});
+
 document.getElementById('agentViewChips').addEventListener('click', e => {
   const b = e.target.closest('[data-view]');
   if (!b) return;
@@ -526,11 +627,12 @@ document.getElementById('agentViewChips').addEventListener('click', e => {
 
 let terrainTimer = null;
 function scheduleTerrain() {
+  if (viewMode === 'lite2d' || viewMode === 'globe') return;
   if (terrainTimer) clearTimeout(terrainTimer);
   terrainTimer = setTimeout(loadTerrain, 60);
 }
 function loadTerrain() {
-  if (imgLoading || viewMode === 'globe') return;
+  if (imgLoading || viewMode === 'globe' || viewMode === 'lite2d') return;
   const { w, h } = vp();
   const b = bbox();
   const ow = Math.min(w, 960), oh = Math.min(h, 640);
@@ -564,7 +666,276 @@ function agentColor(a) {
   }
   return '#e8eef6';
 }
+function expandLiteAgents(lite) {
+  return (lite || []).map(a => ({
+    row: a.row,
+    pos: [a.x, a.y],
+    culture: a.c ?? 0,
+    action: a.a ?? 0,
+    gen: a.g ?? 0,
+    group_id: 0,
+    drives: [0, 0, 0, 0, 0, 0, 0, 0],
+    vx: a.vx ?? 0,
+    vy: a.vy ?? 0,
+  }));
+}
+function decodePackedAgents(j) {
+  if (!j.data_b64) return [];
+  const bin = atob(j.data_b64);
+  const n = Math.floor(bin.length / AGENT_PACK_SIZE);
+  const out = [];
+  const dv = new DataView(new ArrayBuffer(AGENT_PACK_SIZE));
+  for (let i = 0; i < n; i++) {
+    for (let b = 0; b < AGENT_PACK_SIZE; b++) {
+      dv.setUint8(b, bin.charCodeAt(i * AGENT_PACK_SIZE + b));
+    }
+    out.push({
+      row: dv.getUint32(0, true),
+      x: dv.getFloat32(4, true),
+      y: dv.getFloat32(8, true),
+      c: dv.getUint32(12, true),
+      a: dv.getUint32(16, true),
+      g: dv.getUint32(20, true),
+    });
+  }
+  return expandLiteAgents(out);
+}
+function pushLiteTrails(agents, tick) {
+  agents.forEach(a => {
+    const trail = liteTrails.get(a.row) || [];
+    trail.push({ x: a.pos[0], y: a.pos[1], t: tick });
+    while (trail.length > LITE_TRAIL_LEN) trail.shift();
+    liteTrails.set(a.row, trail);
+  });
+}
+
+let liteFieldTimer = null;
+function scheduleLiteField() {
+  if (viewMode !== 'lite2d') return;
+  if (liteFieldTimer) clearTimeout(liteFieldTimer);
+  liteFieldTimer = setTimeout(() => { loadLiteField(); scheduleWindField(); }, 80);
+}
+
+function scheduleWindField() {
+  if (viewMode !== 'lite2d' || liteOverlay !== 'wind') return;
+  loadWindArrows();
+}
+
+async function loadWindArrows() {
+  if (viewMode !== 'lite2d') return;
+  const { w, h } = vp();
+  const b = bbox();
+  const fw = Math.min(128, Math.max(64, Math.floor(w / 6)));
+  const fh = Math.min(96, Math.max(48, Math.floor(h / 6)));
+  const key = `w_${b.xmin}_${fw}_${fh}`;
+  if (key === windFieldKey) return;
+  try {
+    const url = `${API}/api/wind_field?xmin=${b.xmin.toFixed(1)}&ymin=${b.ymin.toFixed(1)}` +
+      `&xmax=${b.xmax.toFixed(1)}&ymax=${b.ymax.toFixed(1)}&w=${fw}&h=${fh}`;
+    const j = await (await fetch(url)).json();
+    if (!j.rgba_b64) return;
+    const bin = atob(j.rgba_b64);
+    const raw = new Uint8ClampedArray(bin.length);
+    for (let i = 0; i < bin.length; i++) raw[i] = bin.charCodeAt(i);
+    const step = Math.max(12, Math.floor(Math.min(w, h) / 16));
+    liteTCtx.save();
+    for (let gy = step / 2; gy < h; gy += step) {
+      for (let gx = step / 2; gx < w; gx += step) {
+        const wx = b.xmin + (gx / w) * (b.xmax - b.xmin);
+        const wy = b.ymin + (gy / h) * (b.ymax - b.ymin);
+        const fi = Math.min(fw - 1, Math.max(0, Math.floor((wx - b.xmin) / (b.xmax - b.xmin) * fw)));
+        const fj = Math.min(fh - 1, Math.max(0, Math.floor((wy - b.ymin) / (b.ymax - b.ymin) * fh)));
+        const idx = (fj * fw + fi) * 4;
+        const u = (raw[idx] / 127.5 - 1.0) * (j.max_speed_ms || 8);
+        const v = (raw[idx + 1] / 127.5 - 1.0) * (j.max_speed_ms || 8);
+        const spd = Math.hypot(u, v);
+        if (spd < 0.3) continue;
+        const p = w2s(wx, wy);
+        const len = Math.min(step * 0.9, spd * 2.5);
+        const ex = p.x + (u / spd) * len;
+        const ey = p.y + (v / spd) * len;
+        liteTCtx.strokeStyle = `rgba(120, 220, 255, ${0.35 + Math.min(0.5, spd / 15)})`;
+        liteTCtx.lineWidth = 1.2;
+        liteTCtx.beginPath();
+        liteTCtx.moveTo(p.x, p.y);
+        liteTCtx.lineTo(ex, ey);
+        liteTCtx.stroke();
+      }
+    }
+    liteTCtx.restore();
+    windFieldKey = key;
+  } catch (_) {}
+  drawLiteAgents();
+}
+
+async function loadLiteField() {
+  if (viewMode !== 'lite2d' || liteFieldLoading) return;
+  const { w, h } = vp();
+  const b = bbox();
+  const fw = Math.min(256, Math.max(96, Math.floor(w / 4)));
+  const fh = Math.min(192, Math.max(72, Math.floor(h / 4)));
+  const key = `${b.xmin.toFixed(0)}_${b.ymin.toFixed(0)}_${fw}_${fh}_${liteOverlay}`;
+  if (key === liteFieldKey) return;
+  liteFieldLoading = true;
+  try {
+    const ov = (liteOverlay && liteOverlay !== 'wind') ? liteOverlay : '';
+    const url = `${API}/api/lite_field?xmin=${b.xmin.toFixed(1)}&ymin=${b.ymin.toFixed(1)}` +
+      `&xmax=${b.xmax.toFixed(1)}&ymax=${b.ymax.toFixed(1)}&w=${fw}&h=${fh}` +
+      (ov ? `&overlay=${encodeURIComponent(ov)}` : '');
+    const j = await (await fetch(url)).json();
+    if (!j.rgba_b64) return;
+    const bin = atob(j.rgba_b64);
+    const raw = new Uint8ClampedArray(bin.length);
+    for (let i = 0; i < bin.length; i++) raw[i] = bin.charCodeAt(i);
+    const img = new ImageData(raw, j.w, j.h);
+    liteTCtx.clearRect(0, 0, w, h);
+    const tmp = document.createElement('canvas');
+    tmp.width = j.w; tmp.height = j.h;
+    tmp.getContext('2d').putImageData(img, 0, 0);
+    liteTCtx.drawImage(tmp, 0, 0, j.w, j.h, 0, 0, w, h);
+    liteFieldKey = key;
+    windFieldKey = '';
+    if (liteOverlay === 'wind') await loadWindArrows();
+  } catch (_) { /* terrain cache miss */ }
+  liteFieldLoading = false;
+  drawLiteAgents();
+}
+
+function updateLiteLawsHud() {
+  const el = document.getElementById('liteLawsHud');
+  const live = lastEarthLaws?.live;
+  if (!live) {
+    el.innerHTML = '<strong>L0</strong> lois Terre · chargement…';
+    return;
+  }
+  el.innerHTML =
+    `<strong>Lois Terre</strong> · g=${lastEarthLaws.constants?.g_earth_ms2 ?? 9.81} m/s²<br>` +
+    `<div class="law-row"><span>∇T lapse</span><span>${live.mean_lapse_c_per_km} K/km</span></div>` +
+    `<div class="law-row"><span>T̄ surface</span><span>${live.mean_surface_temp_c} °C</span></div>` +
+    `<div class="law-row"><span>Charge</span><span>${live.mean_agent_load_n} N</span></div>` +
+    `<div class="law-row"><span>E métab.</span><span>${live.metabolism_j_per_tick} J/t</span></div>` +
+    `<div class="law-row"><span>Entropie</span><span>${(live.entropy_proxy * 100).toFixed(1)}%</span></div>`;
+  document.getElementById('lawLapse').textContent = live.mean_lapse_c_per_km;
+  document.getElementById('lawLoad').textContent = live.mean_agent_load_n;
+  document.getElementById('lawTemp').textContent = live.mean_surface_temp_c;
+  document.getElementById('lawEntropy').textContent = (live.entropy_proxy * 100).toFixed(0) + '%';
+}
+
+function drawLiteAgentSprite(p, a, sel) {
+  const col = agentColor(a);
+  const r = sel ? 10 : 6;
+  const grd = aCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2.2);
+  grd.addColorStop(0, col);
+  grd.addColorStop(0.5, col);
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  aCtx.fillStyle = grd;
+  aCtx.beginPath();
+  aCtx.arc(p.x, p.y, r * 2.2, 0, Math.PI * 2);
+  aCtx.fill();
+  aCtx.beginPath();
+  aCtx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  aCtx.fillStyle = col;
+  aCtx.fill();
+  if (sel) {
+    aCtx.strokeStyle = '#3dd6c6';
+    aCtx.lineWidth = 2.5;
+    aCtx.stroke();
+    aCtx.beginPath();
+    aCtx.arc(p.x, p.y, r + 5, 0, Math.PI * 2);
+    aCtx.strokeStyle = 'rgba(61, 214, 198, 0.35)';
+    aCtx.lineWidth = 1;
+    aCtx.stroke();
+  }
+  const trail = liteTrails.get(a.row);
+  if (trail && trail.length > 2) {
+    const prev = trail[trail.length - 2];
+    const pp = w2s(prev.x, prev.y);
+    const dx = p.x - pp.x, dy = p.y - pp.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 2) {
+      aCtx.strokeStyle = col;
+      aCtx.lineWidth = 1.5;
+      aCtx.beginPath();
+      aCtx.moveTo(pp.x, pp.y);
+      aCtx.lineTo(p.x, p.y);
+      aCtx.lineTo(p.x - (dy / len) * 5 + (dx / len) * 8, p.y + (dx / len) * 5 + (dy / len) * 8);
+      aCtx.stroke();
+    }
+  }
+}
+
+function drawLiteAgents() {
+  const { w, h } = vp();
+  aCtx.clearRect(0, 0, w, h);
+  if (followingRow != null) {
+    const a = lastAgents.find(x => x.row === followingRow);
+    if (a) { camCenterX = a.pos[0]; camCenterY = a.pos[1]; updateZoom(); }
+  }
+  lastAgents.forEach(a => {
+    const trail = liteTrails.get(a.row);
+    if (trail && trail.length > 1) {
+      aCtx.strokeStyle = agentColor(a);
+      for (let i = 1; i < trail.length; i++) {
+        const p0 = w2s(trail[i - 1].x, trail[i - 1].y);
+        const p1 = w2s(trail[i].x, trail[i].y);
+        aCtx.globalAlpha = (i / trail.length) * 0.65;
+        aCtx.lineWidth = 0.8 + (i / trail.length) * 2;
+        aCtx.beginPath();
+        aCtx.moveTo(p0.x, p0.y);
+        aCtx.lineTo(p1.x, p1.y);
+        aCtx.stroke();
+      }
+      aCtx.globalAlpha = 1;
+    }
+  });
+  const gpuBatch = [];
+  const gpuOk = useWebGpuAgents && agentGpu && lastAgents.length >= WEBGPU_AGENT_MIN;
+  if (gpuOk) agentGpu.clear();
+  lastAgents.forEach(a => {
+    const p = w2s(a.pos[0], a.pos[1]);
+    if (p.x < -32 || p.y < -32 || p.x > w + 32 || p.y > h + 32) return;
+    if (gpuOk) {
+      gpuBatch.push({
+        sx: p.x, sy: p.y,
+        culture: a.culture ?? 0,
+        selected: a.row === selectedRow,
+      });
+    } else {
+      drawLiteAgentSprite(p, a, a.row === selectedRow);
+    }
+  });
+  if (gpuOk && gpuBatch.length) agentGpu.drawInstances(gpuBatch);
+  const modeLabel = gpuOk ? 'WebGPU' : 'Canvas';
+  aCtx.fillStyle = 'rgba(200, 220, 240, 0.9)';
+  aCtx.font = '600 11px DM Sans, sans-serif';
+  aCtx.fillText(`◎ 2D · ${lastAgents.length} agents · ${modeLabel} · lois L0`, 12, h - 14);
+  const hdrGpu = document.getElementById('hdrGpu');
+  if (hdrGpu) hdrGpu.textContent = modeLabel;
+  updateLiteLawsHud();
+}
+
+function drawLite2d() {
+  drawLiteAgents();
+}
+
+function startLiteRaf() {
+  if (liteRafId) cancelAnimationFrame(liteRafId);
+  function frame() {
+    if (viewMode === 'lite2d') {
+      drawLiteAgents();
+      liteRafId = requestAnimationFrame(frame);
+    } else {
+      liteRafId = null;
+    }
+  }
+  liteRafId = requestAnimationFrame(frame);
+}
+
+function stopLiteRaf() {
+  if (liteRafId) { cancelAnimationFrame(liteRafId); liteRafId = null; }
+}
 function drawAgents() {
+  if (viewMode === 'lite2d') { drawLite2d(); return; }
   const { w, h } = vp();
   aCtx.clearRect(0, 0, w, h);
   if (followingRow != null) {
@@ -584,6 +955,35 @@ function drawAgents() {
       aCtx.stroke();
     }
   });
+}
+const ZOOM_PRESETS = {
+  macro: () => {
+    const km = macroMeta.map_size_km || 4000;
+    camZoom = Math.max(km * 6, 2000);
+    if (macroMeta.origin_km) {
+      camCenterX = (macroMeta.origin_km[0] - km / 2) * 1000;
+      camCenterY = (macroMeta.origin_km[1] - km / 2) * 1000;
+    }
+  },
+  region: () => { camZoom = 650; },
+  village: () => { camZoom = 55; },
+  agent: () => {
+    camZoom = 12;
+    const row = selectedRow ?? lastAgents[0]?.row;
+    if (row != null) followingRow = row;
+  },
+};
+function applyZoomPreset(name) {
+  const fn = ZOOM_PRESETS[name];
+  if (!fn) return;
+  fn();
+  document.querySelectorAll('#zoomPresets [data-zoom]').forEach(b => {
+    b.classList.toggle('active', b.dataset.zoom === name);
+  });
+  updateZoom();
+  scheduleTerrain();
+  scheduleLiteField();
+  drawAgents();
 }
 
 function updateZoom() {
@@ -682,7 +1082,10 @@ async function loadAgentDetail(row) {
       `<strong>#${d.row}</strong> gen ${d.generation} · vitalité ${(d.vitality ?? 0).toFixed(2)}<br>` +
       `pos (${d.pos?.[0]?.toFixed?.(0) ?? '?'}, ${d.pos?.[1]?.toFixed?.(0) ?? '?'}) m<br>` +
       `faim ${(d.drives?.hunger ?? 0).toFixed(2)} · soif ${(d.drives?.thirst ?? 0).toFixed(2)}<br>` +
-      `inv eau ${(inv.water ?? 0).toFixed(0)} · nourriture ${(inv.food ?? 0).toFixed(0)} · bois ${(inv.wood ?? 0).toFixed(0)}`;
+      `inv eau ${(inv.water ?? 0).toFixed(0)} · nourriture ${(inv.food ?? 0).toFixed(0)} · bois ${(inv.wood ?? 0).toFixed(0)}` +
+      (d.genome_brain
+        ? `<br>cerveau ADN eff ${(d.genome_brain.cognitive_efficiency ?? 0).toFixed(2)} · actions ${(d.genome_brain.actions_top3 || []).join(',')}`
+        : '');
   } catch (e) {
     el.textContent = 'détail indisponible';
   }
@@ -761,25 +1164,43 @@ async function loadMetricsHistory() {
 async function poll() {
   if (replayActive) return;
   try {
-    const [snap, agentsR, metricsR, eventsR, meteoR, emR] = await Promise.all([
+    const lite = viewMode === 'lite2d';
+    const agentsUrl = lite ? API + '/api/agents?lite=1' : API + '/api/agents';
+    const fetches = [
       fetch(API + '/api/state'),
-      fetch(API + '/api/agents'),
+      fetch(agentsUrl),
       fetch(API + '/api/metrics'),
       fetch(API + '/api/events/recent?n=30'),
-      fetch(API + '/api/meteorology_state'),
       fetch(API + '/api/emergence_metrics'),
-    ]);
-    const snapJ = await snap.json();
-    const agentsJ = await agentsR.json();
-    const metricsJ = await metricsR.json();
-    const eventsJ = await eventsR.json();
-    const meteoJ = await meteoR.json();
-    const emJ = await emR.json();
+      fetch(API + '/api/earth_laws'),
+      fetch(API + '/api/circulation_state'),
+    ];
+    if (!lite) fetches.push(fetch(API + '/api/meteorology_state'));
+    const results = await Promise.all(fetches);
+    const snapJ = await results[0].json();
+    const agentsJ = await results[1].json();
+    const usePacked = lite && (snapJ.alive ?? agentsJ.agents?.length ?? 0) > 120;
+    const metricsJ = await results[2].json();
+    const eventsJ = await results[3].json();
+    const emJ = await results[4].json();
+    lastEarthLaws = await results[5].json();
+    lastCirculation = await results[6].json();
+    const meteoJ = lite ? {} : await results[7].json();
     if (emJ && emJ.philosophy) {
       document.getElementById('emGenome').textContent = emJ.genetic_complexity_mean ?? '—';
       document.getElementById('emComm').textContent = emJ.communication_entropy ?? '—';
       document.getElementById('emTech').textContent = emJ.technologies_discovered ?? '—';
       document.getElementById('emGini').textContent = emJ.wealth_gini ?? '—';
+      document.getElementById('emMemetic').textContent = emJ.memetic_imitations ?? '—';
+      const hm = emJ.hydrology?.mode;
+      document.getElementById('emHydro').textContent = hm
+        ? `${hm} · ${emJ.hydrology.pairs_exchanged ?? 0}`
+        : '—';
+    }
+    if (lastCirculation?.live) {
+      const cw = lastCirculation.live.mean_wind_speed_ms;
+      const hdrWind = document.getElementById('hdrWind');
+      if (hdrWind) hdrWind.textContent = `${cw} m/s`;
     }
     if (meteoJ && Object.keys(meteoJ).length) updateAtmosphereHud(meteoJ);
     document.getElementById('statusDot').classList.add('live');
@@ -799,7 +1220,25 @@ async function poll() {
     document.getElementById('kpiAlive').textContent = alive;
     document.getElementById('kpiBirths').textContent = metricsJ.cum_births ?? '—';
     document.getElementById('kpiDeaths').textContent = metricsJ.cum_deaths ?? '—';
-    lastAgents = agentsJ.agents || [];
+    if (lite) {
+      let liteList = agentsJ.agents || [];
+      if (usePacked) {
+        try {
+          const packed = await (await fetch(API + '/api/agents?packed=1')).json();
+          liteList = decodePackedAgents(packed);
+        } catch (_) {}
+      }
+      if (liteList.length && liteList[0].pos) {
+        lastAgents = liteList;
+      } else if (liteList.length && liteList[0].x != null) {
+        lastAgents = expandLiteAgents(liteList);
+      } else {
+        lastAgents = [];
+      }
+      pushLiteTrails(lastAgents, tick);
+    } else {
+      lastAgents = agentsJ.agents || [];
+    }
     popHistory.push(alive);
     if (popHistory.length > MAX_HISTORY) popHistory.shift();
     if (metricsHistory.tick.length && metricsHistory.tick[metricsHistory.tick.length - 1] !== tick) {
@@ -825,26 +1264,61 @@ document.querySelectorAll('[data-view-mode]').forEach(btn => {
 });
 function setViewMode(mode) {
   viewMode = mode;
+  pollMs = mode === 'lite2d' ? 140 : 400;
   document.querySelectorAll('[data-view-mode]').forEach(b => {
     b.classList.toggle('active', b.dataset.viewMode === mode);
   });
   const isGlobe = mode === 'globe';
   const isIso = mode === 'iso';
-  worldImg.classList.toggle('view-hidden', isGlobe);
+  const isLite = mode === 'lite2d';
+  viewport.classList.toggle('lite2d-mode', isLite);
+  worldImg.classList.toggle('view-hidden', isGlobe || isLite);
   agentLayer.classList.toggle('view-hidden', isGlobe || isIso);
   globeCanvas.classList.toggle('view-hidden', !isGlobe);
   document.getElementById('globeHud').classList.toggle('view-hidden', !isGlobe);
-  document.getElementById('macroCard').classList.toggle('view-hidden', isGlobe);
+  document.getElementById('macroCard').classList.toggle('view-hidden', isGlobe || isLite);
   document.getElementById('isoChip').style.display = isIso ? '' : 'none';
+  document.getElementById('zoomPresets').classList.toggle('view-hidden', isGlobe);
+  document.getElementById('layerChips').classList.toggle('view-hidden', isLite);
+  document.getElementById('liteLayerTitle').classList.toggle('view-hidden', !isLite);
+  document.getElementById('liteLayerChips').classList.toggle('view-hidden', !isLite);
+  document.getElementById('liteLawsHud').classList.toggle('view-hidden', !isLite);
+  document.getElementById('liteTerrain').classList.toggle('view-hidden', !isLite);
+  agentGpuLayer.classList.toggle('view-hidden', !isLite);
+  document.getElementById('pillGpu')?.classList.toggle('view-hidden', !isLite);
+  if (isLite) {
+    liteFieldKey = '';
+    initAgentWebGPU().then(() => {
+      resize();
+      scheduleLiteField();
+      drawLiteAgents();
+    });
+    scheduleLiteField();
+    startLiteRaf();
+    if (!liteTrails.size) applyZoomPreset('village');
+  } else {
+    stopLiteRaf();
+    liteTCtx.clearRect(0, 0, liteTerrain.width, liteTerrain.height);
+    if (agentGpu) agentGpu.clear();
+  }
   document.getElementById('footerHelp').innerHTML = isGlobe
     ? '<kbd>drag</kbd> rotation · <kbd>clic</kbd> téléport · <kbd>G</kbd> local'
     : isIso
       ? 'Vue isométrique · <kbd>drag</kbd> pan · <kbd>I</kbd> local'
-      : '<kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>G</kbd> globe';
+      : isLite
+        ? '<kbd>2D</kbd> biomes+lois L0 · <kbd>1–4</kbd> zoom · <kbd>L</kbd> quitter'
+        : '<kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>G</kbd> globe · <kbd>◎</kbd> 2D lite';
   if (isGlobe) initGlobe();
   scheduleTerrain();
+  scheduleLiteField();
   drawAgents();
   if (isGlobe) globeAnimate();
+  schedulePoll();
+}
+let pollTimer = null;
+function schedulePoll() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(poll, pollMs);
 }
 window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
@@ -853,7 +1327,16 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyR') recenterAgents();
   if (e.code === 'KeyG') setViewMode(viewMode === 'globe' ? 'local' : 'globe');
   if (e.code === 'KeyI') setViewMode(viewMode === 'iso' ? 'local' : 'iso');
+  if (e.code === 'KeyL') setViewMode(viewMode === 'lite2d' ? 'local' : 'lite2d');
+  if (e.code === 'Digit1') applyZoomPreset('macro');
+  if (e.code === 'Digit2') applyZoomPreset('region');
+  if (e.code === 'Digit3') applyZoomPreset('village');
+  if (e.code === 'Digit4') applyZoomPreset('agent');
   if (e.code === 'KeyP') setReplayMode(!replayActive);
+});
+document.getElementById('zoomPresets').addEventListener('click', e => {
+  const b = e.target.closest('[data-zoom]');
+  if (b) applyZoomPreset(b.dataset.zoom);
 });
 
 // --- Globe WebGL (Three.js) ---
@@ -1151,7 +1634,7 @@ loadMacro();
 loadSession();
 loadMetricsHistory();
 scheduleTerrain();
-setInterval(poll, 400);
+schedulePoll();
 poll();
 </script>
 </body>

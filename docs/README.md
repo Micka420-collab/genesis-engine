@@ -2,6 +2,8 @@
 
 **Source de vérité vision :** [`EMERGENCE-SIM-v2.md`](EMERGENCE-SIM-v2.md) — ZERO PRE-SCRIPT · layers L0–L4 · observateur dieu silencieux.
 
+**Onboarding agents / contributeurs :** [`MASTER-SCALE-PROMPT-v2.md`](MASTER-SCALE-PROMPT-v2.md) — prompt condensé v2.0 (mai 2026).
+
 ---
 
 ## Démarrer
@@ -20,12 +22,16 @@ Windows : pas de `make` requis — voir [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md).
 
 | Document | Rôle |
 |----------|------|
+| [`MASTER-SCALE-PROMPT-v2.md`](MASTER-SCALE-PROMPT-v2.md) | **Prompt master** copier-coller (identité, L0–L4, ~80 %, contraintes) |
 | [`EMERGENCE-SIM-v2.md`](EMERGENCE-SIM-v2.md) | **Manifeste** prompt architecturé + mapping code |
 | [`../PROJECT-STATUS.md`](../PROJECT-STATUS.md) | État livré, tests, presets |
 | [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md) | Grille réalisme chiffrée |
 | [`GOD-ENGINE-ARCHITECTURE.md`](GOD-ENGINE-ARCHITECTURE.md) | Rust Terre unique, GENM, mutations |
 | [`LAYERS-STACK.md`](LAYERS-STACK.md) | Physics / chemistry / architecture / social |
 | [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md) | UI observateur live |
+| [`DEEPMIND-WORLD-PRIOR.md`](DEEPMIND-WORLD-PRIOR.md) | GraphCast-lite + NCA + colonne 3D (CPU, sans API) |
+| [`ALGORITHM-EVOLUTION-LAB.md`](ALGORITHM-EVOLUTION-LAB.md) | Générer → tester → sélectionner → améliorer (4 opérateurs nouveaux) |
+| [`AUTONOMOUS-WORLD.md`](AUTONOMOUS-WORLD.md) | Noyau Terre, plaques mobiles, transform matériaux → objets |
 | [`BIOSPHERE-EMERGENCE.md`](BIOSPHERE-EMERGENCE.md) | Protocellules → sapients |
 | [`../runtime/README.md`](../runtime/README.md) | Smokes, API, modules |
 
@@ -37,7 +43,7 @@ Windows : pas de `make` requis — voir [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md).
 L0 PHYSICS  → thermo, gravité, hydrologie, érosion
 L1 WORLD    → genesis, climat, biomes, ressources
 L2 BIOLOGY  → genome 256-D, physiologie, vie
-L3 COGNITION → drives, cognition, plasticité (NEAT = cible)
+L3 COGNITION → neat_brain, emergent_action, wire_emergence_v2
 L4 CIVILIZATION → commerce, polity, construction, langage
 ```
 

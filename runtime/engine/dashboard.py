@@ -754,6 +754,13 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/api/state":
             self._json(200, self.sim_ref.snapshot()); return
         if path == "/api/agents":
+            qs = self._qs()
+            if qs.get("lite", "").lower() in ("1", "true", "yes"):
+                from engine.agent_batch import snapshot_positions_lite_with_vel
+                self._json(200, snapshot_positions_lite_with_vel(self.sim_ref)); return
+            if qs.get("packed", "").lower() in ("1", "true", "yes"):
+                from engine.agent_ecs_batch import snapshot_agents_packed
+                self._json(200, snapshot_agents_packed(self.sim_ref)); return
             self._json(200, {"agents": self.sim_ref.snapshot_agents()}); return
         if path == "/api/metrics":
             self._json(200, self.sim_ref.annalist.metrics_to_dict()); return
@@ -863,6 +870,95 @@ class _Handler(BaseHTTPRequestHandler):
                 jpath = self.sim_ref.annalist.journal.path
             tail = merge_journal_events(self.ctl_ref.last_event_tail or [], jpath, 500)
             self._json(200, compute_emergence_metrics(self.sim_ref, journal_tail=tail)); return
+        if path == "/api/earth_laws":
+            from engine.earth_laws import earth_laws_snapshot
+            self._json(200, earth_laws_snapshot(self.sim_ref)); return
+        if path == "/api/hydrology_state":
+            from engine.hydrology_state import hydrology_snapshot
+            self._json(200, hydrology_snapshot(self.sim_ref)); return
+        if path == "/api/circulation_state":
+            from engine.atmospheric_circulation import circulation_snapshot
+            self._json(200, circulation_snapshot(self.sim_ref)); return
+        if path == "/api/world_prior":
+            from engine.deepmind_world_prior import world_prior_snapshot
+            self._json(200, world_prior_snapshot(self.sim_ref)); return
+        if path == "/api/algorithm_lab":
+            from engine.algorithm_lab import algorithm_lab_snapshot
+            self._json(200, algorithm_lab_snapshot(self.sim_ref)); return
+        if path == "/api/algorithm_lab/discover":
+            from engine.algorithm_lab import run_discovery_lab
+            qs = self._qs()
+            plateau = qs.get("plateau", "1").lower() not in ("0", "false", "no")
+            gens = int(qs.get("generations", 8))
+            pop = int(qs.get("population", 16))
+            from engine.algorithm_evolution import EvolutionConfig
+            result = run_discovery_lab(
+                self.sim_ref,
+                cfg=EvolutionConfig(generations=gens, population_size=pop),
+                plateau=plateau,
+            )
+            best = result.best
+            self._json(200, {
+                "operator_id": best.operator_id,
+                "params": best.params,
+                "fitness": round(best.fitness, 6),
+                "history": [round(x, 6) for x in result.history_best_fitness],
+            })
+            return
+        if path == "/api/algorithm_lab/install":
+            from engine.algorithm_lab import install_best_operator
+            self._json(200, install_best_operator(self.sim_ref)); return
+        if path == "/api/autonomous_world":
+            from engine.autonomous_world import autonomous_world_snapshot
+            self._json(200, autonomous_world_snapshot(self.sim_ref)); return
+        if path == "/api/world_physics":
+            from engine.world_physics_registry import registry_snapshot
+            self._json(200, registry_snapshot()); return
+        if path == "/api/earth_dynamo":
+            from engine.earth_dynamo import dynamo_snapshot
+            self._json(200, dynamo_snapshot(self.sim_ref)); return
+        if path == "/api/plate_tectonics":
+            from engine.plate_tectonics_live import plate_tectonics_snapshot
+            self._json(200, plate_tectonics_snapshot(self.sim_ref)); return
+        if path == "/api/material_transform":
+            from engine.material_transform import material_transform_snapshot
+            self._json(200, material_transform_snapshot(self.sim_ref)); return
+        if path == "/api/emergent_construction":
+            from engine.emergent_construction import emergent_construction_snapshot
+            self._json(200, emergent_construction_snapshot(self.sim_ref)); return
+        if path == "/earth_console_webgpu.js":
+            self._serve_file("earth_console_webgpu.js",
+                             content_type="application/javascript; charset=utf-8")
+            return
+        if path == "/api/wind_field":
+            qs = self._qs()
+            try:
+                xmin = float(qs.get("xmin", -500))
+                ymin = float(qs.get("ymin", -500))
+                xmax = float(qs.get("xmax", 500))
+                ymax = float(qs.get("ymax", 500))
+                w = int(qs.get("w", 128))
+                h = int(qs.get("h", 96))
+            except (TypeError, ValueError):
+                self._json(400, {"error": "bad_bbox"}); return
+            from engine.atmospheric_circulation import sample_wind_lite_field
+            self._json(200, sample_wind_lite_field(
+                self.sim_ref, xmin, ymin, xmax, ymax, w, h)); return
+        if path == "/api/lite_field":
+            qs = self._qs()
+            try:
+                xmin = float(qs.get("xmin", -500))
+                ymin = float(qs.get("ymin", -500))
+                xmax = float(qs.get("xmax", 500))
+                ymax = float(qs.get("ymax", 500))
+                w = int(qs.get("w", 160))
+                h = int(qs.get("h", 120))
+                overlay = qs.get("overlay", "")
+            except (TypeError, ValueError):
+                self._json(400, {"error": "bad_bbox"}); return
+            from engine.earth_laws import sample_lite_field
+            self._json(200, sample_lite_field(
+                self.sim_ref, xmin, ymin, xmax, ymax, w, h, overlay=overlay)); return
         if path == "/api/events/stream":
             self._handle_sse_stream(); return
         if path == "/api/journal/download":
@@ -975,7 +1071,7 @@ class _Handler(BaseHTTPRequestHandler):
         a = self.sim_ref.agents
         if row < 0 or row >= a.n_active:
             return {"error": "out of range"}
-        return {
+        out = {
             "row": row, "uuid": str(a.uuid[row]),
             "alive": bool(a.alive[row]),
             "generation": int(a.generation[row]),
@@ -1006,6 +1102,25 @@ class _Handler(BaseHTTPRequestHandler):
             "relations_count": len(a.relations[row].affinity),
             "parents": [int(p) if p is not None else None for p in a.parents[row]],
         }
+        if getattr(a, "_genome_attached", False):
+            try:
+                from engine.neat_brain import forward_policy, _obs_features, CORE_ACTIONS
+                from engine.cognition import perceive
+                from engine.genome import cognitive_efficiency_for_row
+                obs = perceive(a, row, self.sim_ref.streamer, grid=self.sim_ref._grid,
+                               tick=self.sim_ref.tick)
+                feats = _obs_features(obs)
+                logits = forward_policy(a.genome[row], feats)
+                top = [int(x) for x in np.argsort(logits)[-3:][::-1]]
+                out["genome_brain"] = {
+                    "logits_top3": top,
+                    "actions_top3": [int(CORE_ACTIONS[i]) for i in top],
+                    "cognitive_efficiency": float(
+                        cognitive_efficiency_for_row(a, row, self.sim_ref)),
+                }
+            except Exception:
+                pass
+        return out
 
     def _demography(self) -> Dict:
         """Snapshot of lineage + generations + culture distribution."""

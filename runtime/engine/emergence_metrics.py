@@ -49,9 +49,8 @@ def genetic_complexity_mean(sim) -> float:
     if alive.size == 0:
         return 0.0
     norms = []
-    G = genome.values
     for row in alive:
-        norms.append(float(np.linalg.norm(G[int(row)])))
+        norms.append(float(np.linalg.norm(genome[int(row)])))
     return float(np.mean(norms)) if norms else 0.0
 
 
@@ -128,12 +127,55 @@ def population_alive(sim) -> int:
     return int(sim.agents.alive[: sim.agents.n_active].sum())
 
 
+def memetic_imitations(sim) -> int:
+    st = getattr(sim, "_memetic", None)
+    return int(st.imitations_total) if st is not None else 0
+
+
+def lexicon_drift_mean(sim) -> float:
+    st = getattr(sim, "_memetic", None)
+    return float(st.mean_lexicon_drift) if st is not None else 0.0
+
+
+def emergent_construction_metrics(sim) -> Dict[str, Any]:
+    st = getattr(sim, "_emergent_construction", None)
+    if st is None:
+        return {}
+    return {
+        "discovered": len(st.discovered),
+        "active_sites": len(st.sites),
+        "completed": st.completed_total,
+        "structures": st.structures_total,
+        "imitations": st.imitations,
+    }
+
+
+def circulation_metrics(sim) -> Dict[str, Any]:
+    st = getattr(sim, "_circulation", None)
+    if st is None:
+        return {}
+    return {
+        "mean_wind_speed_ms": round(st.mean_wind_speed_ms, 3),
+        "mean_vertical_omega": round(st.mean_vertical_omega, 5),
+        "jet_streak_chunks": int(st.jet_streak_chunks),
+        "chunks_tracked": len(st.chunk_wind),
+    }
+
+
 def compute_emergence_metrics(
     sim,
     *,
     journal_tail: Optional[List[dict]] = None,
 ) -> Dict[str, Any]:
     """Full emergence KPI block for API / Earth Console (read-only observables)."""
+    em = getattr(sim, "_emergence", None)
+    hydrology = {}
+    if em is not None:
+        hydrology = {
+            "mode": em.hydrology_mode,
+            "ticks_active": int(em.hydrology_ticks),
+            "pairs_exchanged": int(em.hydrology_pairs_exchanged),
+        }
     return {
         "tick": int(sim.tick),
         "population_alive": population_alive(sim),
@@ -143,6 +185,11 @@ def compute_emergence_metrics(
         "terraformed_ratio": round(terraformed_ratio(sim), 4),
         "technologies_discovered": technologies_discovered(sim),
         "wealth_gini": round(wealth_gini(sim), 4),
+        "memetic_imitations": memetic_imitations(sim),
+        "lexicon_drift_mean": round(lexicon_drift_mean(sim), 5),
+        "hydrology": hydrology,
+        "circulation": circulation_metrics(sim),
+        "construction": emergent_construction_metrics(sim),
         "philosophy": "ZERO_PRE_SCRIPT",
         "layers": ["L0_PHYSICS", "L1_WORLD", "L2_BIOLOGY", "L3_COGNITION", "L4_CIVILIZATION"],
     }

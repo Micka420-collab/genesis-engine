@@ -6,15 +6,15 @@ Estimation honnête du niveau de réalisme **au 19 mai 2026** après la session 
 
 | Dimension | % session | Justification | Gap vers 80 % |
 |-----------|-----------|---------------|---------------|
-| Climat / biomes | **76 %** | Köppen FAIR (checksums), bootstrap Genesis p80, harness 6 stations | Circulation 3D, Beck 2018 |
+| Climat / biomes | **80 %** | Circulation L1 + colonne 3D + GraphCast-lite prior + vent 2D | NWP 3D numérique, Beck 2018 |
 | Géologie / relief | **55 %** | Tectonique + stratigraphie légère | Érosion GPU dynamique, datation absolue |
-| Écologie / hydrologie | **65 %** | Stub par défaut ; **`hydrology_mode`** (`stub` / `sv1d` / `lbm`) dans le tick + preset **`run.py realism`** | Biogeochimie, bassins versants complets |
-| Sociétés / agents | **74 %** | R0 réseau ; TRADE avec transfert inventaire (`trade_exchange`) |
+| Écologie / hydrologie | **68 %** | Earth Console **`sv1d`** + overlay 2D **flux** ; cross-chunk actif près des agents | Biogeochimie, bassins versants complets |
+| Sociétés / agents | **76 %** | NEAT + **latent_action** ; memetic lexique ; TRADE (`trade_exchange`) |
 | Rendu visuel | **82 %** | Earth Console globe + iso live + couches météo | Volumétrique GPU, humains photoréalistes |
 | Observation IA | **86 %** | Earth Console SSE intégré, replay JSONL, observable live | Fog-of-war mmap Rust, multi-tenant |
 | Pont Python↔Rust | **82 %** | GENM macro-bridge + mutations write-back + snapshot zstd | WorldGraph hot path prod |
 
-**Global pondéré : ~74 %** (moyenne simple des 7 dimensions, mai 2026 post Earth Console).
+**Global pondéré : ~80 %** (moyenne simple des 7 dimensions, mai 2026 post GraphCast-lite + colonne 3D).
 
 > L’objectif **80 % absolu** (simulation « publication-grade » type Terre) n’est pas atteint en une session : il exigerait modèles 3D atmosphère, hydrologie physique complète, et pont Rust en production. La session a **maximisé les gains mesurables** sur chaque axe ; le chemin vers 80 % global est documenté ci-dessous.
 

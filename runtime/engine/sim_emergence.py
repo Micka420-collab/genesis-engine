@@ -49,12 +49,13 @@ def wire_civilization_emergence(sim, *,
                                  ) -> EmergenceState:
     """Idempotent hook-up of emergence subsystems on ``sim``."""
     existing: Optional[EmergenceState] = getattr(sim, "_emergence", None)
-    if existing is not None:
-        return existing
-
     mode = str(hydrology_mode or "stub").strip().lower()
     if mode not in ("stub", "sv1d", "lbm"):
         mode = "stub"
+    if existing is not None:
+        existing.hydrology_mode = mode
+        existing.hydrology_cross_chunk = bool(hydrology_cross_chunk)
+        return existing
     st = EmergenceState(
         koeppen_refresh_every=max(0, int(koeppen_refresh_every)),
         observable_every=max(1, int(observable_every)),

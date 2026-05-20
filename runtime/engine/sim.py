@@ -67,6 +67,17 @@ class SimConfig:
     macro_commerce: bool = False
     # Observe all agent chunks each tick when native genesis_world is loaded.
     rust_worldgraph_prod: bool = False
+    # EMERGENCE SIM v2: genome-encoded policy (NEAT-inspired), not heuristic decide().
+    emergent_cognition: bool = False
+    # L1 circulation: passive drift from macro/meteo wind field (physical, not AI goal).
+    wind_advect_agents: bool = True
+    # GraphCast-lite macro wind prior (DeepMind-inspired message passing, CPU numpy).
+    graphcast_lite_prior: bool = False
+    # Evolve novel world operators (generate → test → select → improve).
+    algorithm_lab: bool = False
+    # Terre autonome : noyau, plaques, transform matériaux (sans script civilisation).
+    autonomous_world: bool = False
+    emergent_construction: bool = True
 
 
 @dataclass

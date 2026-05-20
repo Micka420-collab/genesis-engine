@@ -8,11 +8,11 @@
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
-[![Earth realism ~68%](https://img.shields.io/badge/r%C3%A9alisme_Terre-~68%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
+[![Earth realism ~74%](https://img.shields.io/badge/r%C3%A9alisme_Terre-~74%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
 [![Deterministic](https://img.shields.io/badge/deterministic-PRF-purple.svg)](#déterminisme)
 [![CI](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml)
 
-[EMERGENCE SIM v2](docs/EMERGENCE-SIM-v2.md) · [État du projet](PROJECT-STATUS.md) · [Earth Console](docs/EARTH-CONSOLE.md) · [Runtime](runtime/README.md) · [Rust](native/world-engine/README.md)
+[EMERGENCE SIM v2](docs/EMERGENCE-SIM-v2.md) · [Master prompt](docs/MASTER-SCALE-PROMPT-v2.md) · [État du projet](PROJECT-STATUS.md) · [Earth Console](docs/EARTH-CONSOLE.md) · [Runtime](runtime/README.md) · [Rust](native/world-engine/README.md)
 
 </div>
 

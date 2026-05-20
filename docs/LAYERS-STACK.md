@@ -10,6 +10,7 @@ Stack optionnelle branchée via `install_knowledge_layers(sim)` ou
 
 | Module | Rôle |
 |--------|------|
+| `engine/earth_laws.py` | Axiomes L0 (E, ∇T, entropie…) — tick agrégé, `/api/earth_laws`, raster `lite_field` |
 | `engine/physics.py` | CODATA, mécanique, thermodynamique (conduction, radiation, Gibbs, Arrhenius) |
 | `engine/statics.py` | Stabilité voxel : support, compression, porte-à-faux, basculement |
 | `engine/physics_layer.py` | Tick : charge pesanteur, thermo chunks (lapse + météo), `check_voxel_structure_stable` |

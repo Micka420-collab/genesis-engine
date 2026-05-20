@@ -18,7 +18,7 @@ help:
 	@echo "  make validate-fair  # Köppen FAIR + checksums (p80)"
 	@echo "  make observe        # SSE observation server + dashboard URL"
 	@echo "  make earth-console  # live Terre UI (Genesis macro + god view)"
-	@echo "  make validate-all   # pytest + smokes p72–p82"
+	@echo "  make validate-all   # pytest + smokes p72–p84"
 	@echo "  make rust-check     # cargo check Rust workspace"
 	@echo "  make rust-test      # cargo test Rust workspace"
 	@echo "  make test           # compile + Python tests + Rust check if cargo exists"
@@ -110,6 +110,9 @@ validate-all: test-python
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p82_civilization_pipeline_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p82_observation_sse_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p83_terre_report_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p84_earth_console_lite_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p85_algorithm_evolution_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p86_autonomous_world_smoke.py
 
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release

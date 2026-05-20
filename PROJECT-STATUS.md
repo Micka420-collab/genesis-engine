@@ -9,14 +9,14 @@
 
 **EMERGENCE SIM v2** — laboratoire ZERO PRE-SCRIPT : lois physiques L0–L4, agents autonomes, civilisation **non scriptée**, observable via Earth Console et métriques d'émergence.
 
-**Tests :** `pytest runtime/tests` — **83+** tests · smoke **p83** dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **110** tests · smokes **p83–p86** dans `validate-all`.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
 
 Les phénomènes (climat Köppen, hydrologie, épidémies, commerce, culture, observation) **émergent du cycle `Simulation.step()`** et des interactions agents ↔ monde — pas d’un orchestrateur de scripts qui enchaîne des étapes. Les smokes (`scripts/p*.py`) et `make smoke` **valident** le comportement ; le cœur exécutable est `python runtime/run.py` ou une boucle `sim.step()`.
 
-**Manifeste (source de vérité) :** [`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md) · KPIs : `engine/emergence_metrics.py` · `/api/emergence_metrics`
+**Manifeste (source de vérité) :** [`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md) · **Master prompt agents :** [`docs/MASTER-SCALE-PROMPT-v2.md`](docs/MASTER-SCALE-PROMPT-v2.md) · KPIs : `engine/emergence_metrics.py` · `/api/emergence_metrics`
 
 **Presets :**
 - **`python runtime/run.py realism`** — biosphère + knowledge layers + hydrologie sv1d + genesis + rust WorldGraph tick + 5cd (`engine/full_stack.py`).
@@ -43,13 +43,13 @@ Détail des **Waves 16–41** (genesis, tectonique, climat, NCA, settlements, ro
 
 ## Réalisme Terre (grille scientifique)
 
-Estimation **globale ~70 %** vers une simulation « publication-grade » type Terre.
+Estimation **globale ~80 %** vers une simulation « publication-grade » type Terre.
 
 | Dimension | ~% | Piste principale |
 |-----------|-----|------------------|
-| Climat / biomes | 76 | Köppen FAIR + bootstrap Genesis (p80) |
+| Climat / biomes | 80 | GraphCast-lite prior + colonne 3D + circulation L1 + vent 2D |
 | Rendu visuel | **82** | Earth Console globe WebGL + atmosphère + iso live + PBR batch |
-| Observation IA | **86** | **Earth Console** + SSE intégré + replay + JSONL observable |
+| Observation IA | **92** | WebGPU instancing + pack binaire + vent ; memetic + NEAT + sv1d |
 | Sociétés / agents | **76** | Journal `trade` + transferts inventaire + alliances |
 | Géologie / relief | 55 | Tectonique, stratigraphie légère |
 | Écologie / hydrologie | 65 | **`hydrology_mode`** stub/sv1d/lbm ; preset **`run.py realism`** |

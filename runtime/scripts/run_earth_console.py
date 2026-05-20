@@ -44,6 +44,8 @@ def parse_args():
                    help="0 = run until Ctrl+C")
     p.add_argument("--journal", default=None,
                    help="JSONL event journal (default: artifacts/earth_console.jsonl)")
+    p.add_argument("--graphcast-lite", action="store_true",
+                   help="Apply GraphCast-lite macro wind prior after Genesis.")
     return p.parse_args()
 
 
@@ -66,6 +68,12 @@ def main():
         rust_worldgraph_prod=False,
         life_emergence=True,
         emergence_subsystems=True,
+        emergent_cognition=True,
+        hydrology_mode="sv1d",
+        hydrology_cross_chunk=True,
+        observable_every=15,
+        graphcast_lite_prior=bool(args.graphcast_lite),
+        autonomous_world=True,
     )
     sim = Simulation(cfg, journal_path=args.journal)
     gp = GenesisParams(
@@ -92,6 +100,14 @@ def main():
     sim._observable_jsonl_path = os.path.join(
         os.path.dirname(args.journal), "earth_console_observable.jsonl")
     sim.bootstrap()
+    from engine.emergence_stack import wire_emergence_v2
+    ev2 = wire_emergence_v2(
+        sim,
+        genome_brain=bool(cfg.emergent_cognition),
+        graphcast_lite=bool(cfg.graphcast_lite_prior),
+        autonomous_world=bool(cfg.autonomous_world),
+    )
+    print(f"[earth-console] emergence_v2  {ev2}")
 
     ctl = SimController(target_tps=args.target_tps)
     srv, god, _ = start_god_server(sim, ctl, host=args.host, port=args.port)

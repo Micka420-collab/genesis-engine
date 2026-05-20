@@ -34,6 +34,9 @@ Ouvre **http://127.0.0.1:8090/** dans le navigateur.
 | **Vue locale** | Terrain top-down (`/api/render`), pan/zoom, agents en overlay |
 | **Globe WebGL** | Sphère Three.js texturée par `/api/macro` — rotation + clic téléport |
 | **Vue isométrique** | 2.5D Age-of-Empires (`/api/render?mode=iso`) |
+| **2D lite (◎)** | Terrain biomes (`/api/lite_field`), lois L0 HUD, agents glow + flèches de mouvement |
+| **Échelles 1–4** | Macro / région / village / agent (header + clavier) |
+| **Cerveau ADN** | `wire_emergence_v2` — policy `neat_brain.py` (gènes 64–127) |
 | **Carte macro** | Mini-carte continent — clic pour ancrer la caméra |
 | **Timeline** | Sparkline population (footer) — clic pour scrubber l’historique |
 | **Replay** | Barre ⏪ : lecture du journal JSONL + événements live (**P** raccourci) |
@@ -53,6 +56,10 @@ Ouvre **http://127.0.0.1:8090/** dans le navigateur.
 - `GET /api/metrics/history` — séries temporelles Annalist (population, etc.)
 - `GET /api/session` — seed, chemin journal, tick courant
 - `GET /api/observable` — snapshot agents compact (émergence)
+- `GET /api/agents?lite=1` — positions minimales (mode 2D lite)
+- `GET /api/lite_field` — raster RGBA léger (biomes / temp / eau)
+- `GET /api/earth_laws` — axiomes L0 + métriques live (lapse, entropie, charge)
+- `GET /api/emergence_metrics` — KPIs ZERO PRE-SCRIPT
 - `GET /api/events/stream` — SSE tick / métriques / météo
 - `GET /api/journal/download` — téléchargement du JSONL journal
 - `/` → `earth_console.html` (god view legacy : `/god_view_v2.html`)
@@ -85,6 +92,8 @@ Sans wheel, la sim tourne en mode Python pur (mock macro + rendu bbox).
 | S | Un pas |
 | G | Globe WebGL / local |
 | I | Isométrique / local |
+| L | 2D lite / local |
+| 1–4 | Zoom macro → agent |
 | P | Replay journal on/off |
 | R | Recentrer sur les agents |
 | Drag | Pan (local) ou rotation (globe) |
