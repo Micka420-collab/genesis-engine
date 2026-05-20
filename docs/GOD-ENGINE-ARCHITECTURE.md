@@ -377,6 +377,7 @@ Guide utilisateur : [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md).
 
 ## 8. Liens projet
 
+- Manifeste émergence (prompt v2) : [`EMERGENCE-SIM-v2.md`](EMERGENCE-SIM-v2.md)
 - État civilisation Python : [`PROJECT-STATUS.md`](../PROJECT-STATUS.md)
 - Réalisme chiffré : [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md)
 - Couches physics/social : [`LAYERS-STACK.md`](LAYERS-STACK.md)

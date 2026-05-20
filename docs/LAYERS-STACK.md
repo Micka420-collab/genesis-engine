@@ -1,5 +1,8 @@
 # Quatre couches de connaissance — Physics · Chemistry · Architecture · Social
 
+> Vision complète **EMERGENCE SIM v2** (layers 0–4, zéro pré-script, métriques) :  
+> [`EMERGENCE-SIM-v2.md`](EMERGENCE-SIM-v2.md)
+
 Stack optionnelle branchée via `install_knowledge_layers(sim)` ou
 `SimConfig.knowledge_layers=True`.
 
@@ -112,8 +115,10 @@ python run.py origins --ticks 8000   # émergence seule ; ajouter --realism pour
 | `engine/dashboard.py` | API `/api/journal/*`, `/api/events/stream`, `/api/observable`, render bbox |
 | `engine/annalist.py` | Journal JSONL + `_last_batch` pour tail événements |
 
-```bash
-make earth-console
+```powershell
+# Windows
+.\earth-console.ps1
+# Linux/macOS: make earth-console
 # → http://127.0.0.1:8090/
 ```
 
