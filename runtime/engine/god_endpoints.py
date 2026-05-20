@@ -259,6 +259,8 @@ def register_god_endpoints(handler_class, god, log):
     """
     handler_class.god_ref = god
     handler_class.god_log_ref = log
+    if getattr(handler_class, "_god_patched", False):
+        return handler_class
 
     orig_get = handler_class.do_GET
     orig_post = handler_class.do_POST
@@ -283,4 +285,5 @@ def register_god_endpoints(handler_class, god, log):
 
     handler_class.do_GET = do_GET
     handler_class.do_POST = do_POST
+    handler_class._god_patched = True
     return handler_class

@@ -6,3 +6,13 @@ Contenu fusionné dans :
 - [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md)
 
 Voir [`OBSOLETE.md`](OBSOLETE.md).
+
+## Pont Rust — mock actif
+
+`genesis_world` non importable ; smokes utilisent `engine.rust_bridge.MockPyWorld`. Compiler pour le natif :
+
+```bash
+cd native/world-engine
+maturin develop -m crates/pybindings/Cargo.toml
+```
+

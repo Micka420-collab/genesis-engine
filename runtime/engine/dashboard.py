@@ -759,21 +759,18 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(200, macro_continental_meta(self.sim_ref))
             return True
         if path == "/api/state":
-            self._json(200, self._sim_read(self.sim_ref.snapshot)); return True
+            self._json(200, self.sim_ref.snapshot()); return True
         if path == "/api/agents":
             qs = self._qs()
             if qs.get("lite", "").lower() in ("1", "true", "yes"):
                 from engine.agent_batch import snapshot_positions_lite_with_vel
-                self._json(200, self._sim_read(
-                    lambda: snapshot_positions_lite_with_vel(self.sim_ref))); return True
+                self._json(200, snapshot_positions_lite_with_vel(self.sim_ref)); return True
             if qs.get("packed", "").lower() in ("1", "true", "yes"):
                 from engine.agent_ecs_batch import snapshot_agents_packed
-                self._json(200, self._sim_read(
-                    lambda: snapshot_agents_packed(self.sim_ref))); return True
-            self._json(200, self._sim_read(
-                lambda: {"agents": self.sim_ref.snapshot_agents()})); return True
+                self._json(200, snapshot_agents_packed(self.sim_ref)); return True
+            self._json(200, {"agents": self.sim_ref.snapshot_agents()}); return True
         if path == "/api/metrics":
-            self._json(200, self._sim_read(self.sim_ref.annalist.metrics_to_dict)); return True
+            self._json(200, self.sim_ref.annalist.metrics_to_dict()); return True
         if path == "/api/lift_state":
             self._json(200, lift_state(self.sim_ref)); return True
         if path == "/api/realism_state":
@@ -1258,8 +1255,24 @@ class _Handler(BaseHTTPRequestHandler):
         return out
 
 
+# Core handlers saved before any monkey-patch (audio/god). Reset on each boot.
+_Handler._core_do_GET = _Handler.do_GET
+_Handler._core_do_POST = _Handler.do_POST
+
+
+def _reset_handler_http_core() -> None:
+    """Prevent stacked do_GET/do_POST wrappers across repeated server starts."""
+    _Handler.do_GET = _Handler._core_do_GET
+    _Handler.do_POST = _Handler._core_do_POST
+    _Handler._audio_patched = False
+    _Handler._god_patched = False
+
+
 def start_server(sim: Simulation, ctl: SimController, host: str = "0.0.0.0",
-                 port: int = 8080, static_dir: str = "") -> ThreadingHTTPServer:
+                 port: int = 8080, static_dir: str = "",
+                 *, _skip_reset: bool = False) -> ThreadingHTTPServer:
+    if not _skip_reset:
+        _reset_handler_http_core()
     _Handler.sim_ref = sim
     _Handler.ctl_ref = ctl
     # One lock for pause/speed control and concurrent HTTP reads vs sim.step().
@@ -1329,11 +1342,11 @@ def start_god_server(sim: "Simulation", ctl: "SimController",
     god = GodObserver()
     log = GodInterventionLog()
 
-    # Attach a tick-getter shim if needed — god_endpoints may try to read
-    # the current tick off the handler's sim_ref for intervention metadata.
+    _reset_handler_http_core()
     register_god_endpoints(_Handler, god, log)
 
-    srv = start_server(sim, ctl, host=host, port=port, static_dir=static_dir)
+    srv = start_server(sim, ctl, host=host, port=port, static_dir=static_dir,
+                       _skip_reset=True)
     return srv, god, log
 
 
