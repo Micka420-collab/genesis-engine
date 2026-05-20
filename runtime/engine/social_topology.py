@@ -61,6 +61,8 @@ class SocialTopologyState:
     edges: Dict[Tuple[int, int], SocialEdge] = field(default_factory=dict)
     topologies: Dict[int, NamedTopology] = field(default_factory=dict)
     trade_volume: float = 0.0
+    trade_transfers: int = 0
+    trade_goods_kg: float = 0.0
     alliances_formed: int = 0
     _next_topology_id: int = 1
 
@@ -275,12 +277,16 @@ def tick_social_topology(sim, st: SocialTopologyState) -> List[dict]:
             continue
         members = [m for m in topo.members if m < n and sim.agents.alive[m]]
         if len(members) >= 3 and sim.tick % 100 == 0:
-            events.append({
-                "kind": "topology_cohesion",
-                "topology_id": topo.topology_id,
-                "name": topo.name,
-                "size": len(members),
-            })
+                    events.append({
+                        "kind": "topology_cohesion",
+                        "topology_id": topo.topology_id,
+                        "name": topo.name,
+                        "size": len(members),
+                    })
+
+    from engine.trade_exchange import tick_trade_exchanges
+    events.extend(tick_trade_exchanges(sim, st))
+
     return events
 
 
@@ -297,6 +303,8 @@ def social_topology_snapshot(sim) -> Dict[str, object]:
         "edges_by_kind": kinds,
         "topology_names": [t.name for t in st.topologies.values()],
         "trade_volume": round(st.trade_volume, 4),
+        "trade_transfers": int(getattr(st, "trade_transfers", 0)),
+        "trade_goods_kg": round(float(getattr(st, "trade_goods_kg", 0.0)), 4),
         "alliances_formed": st.alliances_formed,
     }
 

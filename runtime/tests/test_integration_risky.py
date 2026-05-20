@@ -245,6 +245,48 @@ class IntegrationRiskyTests(unittest.TestCase):
         self.assertTrue(terre.get("macro_commerce"))
         self.assertTrue(terre.get("rust_worldgraph_prod"))
 
+    def test_bilateral_trade_transfers_food(self):
+        sim = Simulation(
+            SimConfig(
+                founders=2,
+                max_agents=4,
+                knowledge_layers=True,
+                life_emergence=False,
+                epidemic_observer=False,
+            )
+        )
+        sim.bootstrap()
+        sim.agents.inv_food[0] = 1.5
+        sim.agents.inv_stone[1] = 0.8
+        sim.agents.inv_food[1] = 0.05
+        sim.agents.pos[0, 0] = sim.agents.pos[1, 0] = 0.0
+        sim.agents.pos[0, 1] = sim.agents.pos[1, 1] = 0.0
+        from engine.trade_exchange import execute_bilateral_trade
+
+        food_before = float(sim.agents.inv_food[1])
+        xfer = execute_bilateral_trade(sim, 0, 1, edge_weight=0.9, macro_flow=20.0)
+        self.assertIsNotNone(xfer)
+        self.assertGreater(float(sim.agents.inv_food[1]), food_before)
+
+    def test_macro_trade_multihop(self):
+        import numpy as np
+        from engine.commerce_emergence import CommerceEmergenceState, macro_trade_flow_between
+        from engine.trade_flow import TradeNetwork
+
+        st = CommerceEmergenceState()
+        flows = np.zeros((3, 3), dtype=np.float32)
+        flows[0, 1] = flows[1, 0] = 50.0
+        flows[1, 2] = flows[2, 1] = 40.0
+        st.trade = TradeNetwork(
+            weights=np.ones(3, dtype=np.float32),
+            flows=flows,
+            n_settlements=3,
+        )
+        st.agent_to_settlement = {0: 0, 1: 2}
+        direct = macro_trade_flow_between(st, 0, 1)
+        self.assertGreater(direct, 0.0)
+        self.assertLess(direct, 50.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -29,6 +29,7 @@ class RustWorldgraphState:
     cached_chunks: int = -1
     last_chunk: Optional[Tuple[int, int, int]] = None
     last_observation: Optional[Dict[str, Any]] = None
+    last_mesh_triangles: int = 0
     _seen_coords: Set[Tuple[int, int, int]] = field(default_factory=set)
 
 
@@ -118,6 +119,13 @@ def tick_rust_worldgraph(sim) -> None:
         except Exception:
             pass
 
+    if st.prod_mode and sim.tick % 200 == 0 and hasattr(st.py_world, "extract_mesh"):
+        try:
+            mesh = st.py_world.extract_mesh(0, 0, 1)
+            st.last_mesh_triangles = int(mesh.get("triangle_count", 0))
+        except Exception:
+            pass
+
 
 def rust_worldgraph_snapshot(sim) -> Dict[str, object]:
     st: Optional[RustWorldgraphState] = getattr(sim, "_rust_worldgraph", None)
@@ -133,6 +141,7 @@ def rust_worldgraph_snapshot(sim) -> Dict[str, object]:
         "chunks_sampled": st.chunks_sampled,
         "intents_submitted": st.intents_submitted,
         "cached_chunks": st.cached_chunks,
+        "last_mesh_triangles": st.last_mesh_triangles,
         "unique_chunks": len(st._seen_coords),
         "last_chunk": list(st.last_chunk) if st.last_chunk else None,
         "last_mock": bool((st.last_observation or {}).get("mock", True)),

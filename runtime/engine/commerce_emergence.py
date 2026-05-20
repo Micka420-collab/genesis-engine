@@ -28,6 +28,7 @@ class CommerceEmergenceState:
     refresh_every: int = 400
     last_refresh_tick: int = -1
     refreshes: int = 0
+    multihop_attenuation: float = 0.35
 
 
 def install_commerce_emergence(sim, *, refresh_every: int = 400) -> CommerceEmergenceState:
@@ -110,7 +111,24 @@ def macro_trade_flow_between(st: CommerceEmergenceState, a: int, b: int) -> floa
     ib = st.agent_to_settlement.get(b)
     if ia is None or ib is None or ia == ib:
         return 0.0
-    return float(st.trade.flows[ia, ib])
+    flows = st.trade.flows
+    direct = float(flows[ia, ib])
+    if direct > 0.0:
+        return direct
+    # One-hop redistribution on the settlement MST (Wave 30 follow-up).
+    n = int(flows.shape[0])
+    best = 0.0
+    atten = float(st.multihop_attenuation)
+    for k in range(n):
+        if k == ia or k == ib:
+            continue
+        leg1 = float(flows[ia, k])
+        leg2 = float(flows[k, ib])
+        if leg1 > 0.0 and leg2 > 0.0:
+            via = math.sqrt(leg1 * leg2) * atten
+            if via > best:
+                best = via
+    return best
 
 
 def tick_commerce_emergence(sim) -> None:
@@ -134,6 +152,7 @@ def commerce_emergence_snapshot(sim) -> Dict[str, object]:
         "agents_mapped": len(st.agent_to_settlement),
         "refreshes": st.refreshes,
         "last_refresh_tick": st.last_refresh_tick,
+        "multihop_attenuation": st.multihop_attenuation,
         "trade": summary,
     }
 
