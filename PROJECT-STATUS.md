@@ -55,6 +55,7 @@ Estimation **globale ~70 %** vers une simulation « publication-grade » type Te
 | Économie macro ↔ agents | **75** | Transferts food/stone/water/wood + rapport `run_report` |
 
 **Référence complète :** [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
+**Architecture God-Engine (audit next-level) :** [`docs/GOD-ENGINE-ARCHITECTURE.md`](docs/GOD-ENGINE-ARCHITECTURE.md) · crate `genesis-macro-bridge`  
 **Prochain sprint réalisme :** section « Prochain sprint » dans ce fichier roadmap.
 
 ---

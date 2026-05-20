@@ -66,7 +66,8 @@ crates/
 └── studio/        Binaire genesis-studio
 ```
 
-Propositions expérimentales : [`proposals/README.md`](proposals/README.md).
+Propositions expérimentales : [`proposals/README.md`](proposals/README.md).  
+Architecture cible « God-Engine » : [`../../docs/GOD-ENGINE-ARCHITECTURE.md`](../../docs/GOD-ENGINE-ARCHITECTURE.md).
 
 ---
 

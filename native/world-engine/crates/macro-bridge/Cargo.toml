@@ -1,0 +1,15 @@
+[package]
+name = "genesis-macro-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Sample continental Genesis macro grids into Rust chunks (single source of truth bridge)"
+
+[dependencies]
+genesis-core = { path = "../core" }
+genesis-biome = { path = "../biome" }
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

@@ -22,6 +22,7 @@ members = [
     "crates/laws",
     "crates/scenario",
     "crates/studio",
+    "crates/macro-bridge",
 ]
 
 [workspace.package]
