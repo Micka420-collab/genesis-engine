@@ -4,9 +4,25 @@ Console unifiée pour **contrôler** la simulation et **voir** le monde Terre (m
 
 ## Lancer
 
+**Windows (sans `make`) :**
+
 ```powershell
-cd "f:\DEvOps\projet alpha\genesis-engine\runtime"
-python scripts/run_earth_console.py
+cd "f:\DEvOps\projet alpha\genesis-engine"
+.\earth-console.ps1
+```
+
+**Linux / macOS :**
+
+```bash
+make earth-console
+```
+
+**Équivalent manuel :**
+
+```powershell
+cd "f:\DEvOps\projet alpha\genesis-engine"
+$env:PYTHONPATH = "runtime"
+python runtime\scripts\run_earth_console.py
 ```
 
 Ouvre **http://127.0.0.1:8090/** dans le navigateur.

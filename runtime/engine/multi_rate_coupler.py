@@ -107,7 +107,7 @@ def _tick_weather_domain(sim) -> None:
     if st is None:
         st = {"n_updates": 0, "last_mean_temp": 15.0}
         sim._coupler_weather = st
-    for chunk in sim.streamer.cache.values():
+    for chunk in list(sim.streamer.cache.values()):
         base_t = float(chunk.height.mean() * -0.0065 + 15.0)
         avg_p = float(chunk.food_capacity.mean() * 3.0)
         w = weather_at(sim.tick * int(accel), base_t, avg_p)
