@@ -23,7 +23,7 @@ if RUNTIME not in sys.path:
     sys.path.insert(0, RUNTIME)
 
 from engine.sim import Simulation, SimConfig
-from engine.dashboard import SimController, start_god_server
+from engine.dashboard import SimController, feed_event_tail, start_god_server
 from engine.genesis_bootstrap import bootstrap_genesis_sim
 from engine.full_stack import wire_full_stack
 from engine.world_genesis import GenesisParams
@@ -42,12 +42,17 @@ def parse_args():
     p.add_argument("--target-tps", type=float, default=8.0)
     p.add_argument("--ticks", type=int, default=0,
                    help="0 = run until Ctrl+C")
-    p.add_argument("--journal", default=None)
+    p.add_argument("--journal", default=None,
+                   help="JSONL event journal (default: artifacts/earth_console.jsonl)")
     return p.parse_args()
 
 
 def main():
     args = parse_args()
+    if args.journal is None:
+        art = os.path.abspath(os.path.join(RUNTIME, "..", "artifacts"))
+        os.makedirs(art, exist_ok=True)
+        args.journal = os.path.join(art, "earth_console.jsonl")
     cfg = SimConfig(
         name="earth_console",
         seed=args.seed,
@@ -78,6 +83,14 @@ def main():
         five_cd=True,
         macro_commerce=bool(cfg.macro_commerce),
     )
+    try:
+        from engine.meteorology import install_meteorology
+
+        install_meteorology(sim)
+    except Exception as exc:
+        print(f"[earth-console] meteorology skipped: {exc}")
+    sim._observable_jsonl_path = os.path.join(
+        os.path.dirname(args.journal), "earth_console_observable.jsonl")
     sim.bootstrap()
 
     ctl = SimController(target_tps=args.target_tps)
@@ -88,6 +101,7 @@ def main():
     print(f"[earth-console] seed=0x{cfg.seed:X}  bounds={cfg.bounds_km[0]:.2f} km  "
           f"genesis={args.genesis_resolution}px")
     print(f"[earth-console] open  {url}")
+    print(f"[earth-console] journal  {args.journal}")
     print(f"[earth-console] legacy god view: {url}god_view_v2.html")
     print("[earth-console] Ctrl+C to stop")
 
@@ -107,6 +121,7 @@ def main():
                 continue
             t0 = time.monotonic()
             stats = sim.step()
+            feed_event_tail(ctl, sim.annalist)
             target_dt = 1.0 / max(0.01, ctl.target_tps * speed)
             elapsed = time.monotonic() - t0
             if elapsed < target_dt and not step_req:

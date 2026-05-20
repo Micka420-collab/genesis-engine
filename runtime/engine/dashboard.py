@@ -496,6 +496,130 @@ def macro_continental_meta(sim: Simulation) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Journal / replay helpers
+# ---------------------------------------------------------------------------
+
+EVENT_TAIL_CAP = 500
+
+
+def feed_event_tail(ctl: "SimController", annalist) -> None:
+    """Append the last annalist batch to the dashboard event tail (capped)."""
+    batch = getattr(annalist, "_last_batch", None) or []
+    if not batch:
+        return
+    tail = ctl.last_event_tail
+    tail.extend(batch)
+    if len(tail) > EVENT_TAIL_CAP:
+        ctl.last_event_tail = tail[-EVENT_TAIL_CAP:]
+
+
+def enrich_event_for_replay(event: dict) -> dict:
+    """Add a ``positions`` map (uuid → [x,y]) for replay scrubbing in the UI."""
+    loc = event.get("location")
+    if not loc or len(loc) < 2:
+        return event
+    participants = event.get("participants") or []
+    if not participants:
+        return event
+    out = dict(event)
+    xy = [float(loc[0]), float(loc[1])]
+    out["positions"] = {str(pid): xy for pid in participants}
+    return out
+
+
+def merge_journal_events(live_tail: List[dict], journal_path: Optional[str], n: int) -> List[dict]:
+    """Merge live tail with on-disk JSONL, dedupe by event_id, sort by tick."""
+    from engine.annalist import Annalist
+
+    seen: set = set()
+    merged: List[dict] = []
+    for src in (Annalist.read_jsonl_tail(journal_path, n) if journal_path else [], live_tail):
+        for ev in src:
+            eid = ev.get("event_id")
+            if eid and eid in seen:
+                continue
+            if eid:
+                seen.add(eid)
+            merged.append(enrich_event_for_replay(ev))
+    merged.sort(key=lambda e: (int(e.get("tick", 0)), str(e.get("event_id", ""))))
+    return merged[-n:]
+
+
+def session_info(sim: Simulation) -> dict:
+    """Session metadata for Earth Console (seed, journal path, tick)."""
+    j = sim.annalist.journal
+    jpath = j.path if j else None
+    obs_path = getattr(sim, "_observable_jsonl_path", None)
+    st = getattr(sim, "_emergence", None)
+    return {
+        "sim_id": sim.sim_id,
+        "tick": int(sim.tick),
+        "seed": int(sim.cfg.seed) & 0xFFFFFFFFFFFFFFFF,
+        "journal_path": jpath,
+        "journal_exists": bool(jpath and os.path.isfile(jpath)),
+        "observable_jsonl": obs_path,
+        "observable_exists": bool(obs_path and os.path.isfile(obs_path)),
+        "meteorology": getattr(sim, "_meteo_state", None) is not None,
+        "live_observable_tick": (st.live_observable or {}).get("tick") if st else None,
+        "bounds_km": list(sim.cfg.bounds_km),
+    }
+
+
+def live_observable_payload(sim: Simulation) -> dict:
+    """In-memory observable from civilization emergence (may be empty)."""
+    st = getattr(sim, "_emergence", None)
+    if st is None or not st.live_observable:
+        snap = sim.snapshot()
+        return {
+            "tick": int(snap.get("tick", sim.tick)),
+            "n_alive": int(snap.get("alive", 0)),
+            "agents_compact": [],
+            "source": "snapshot",
+        }
+    out = dict(st.live_observable)
+    out["source"] = "emergence"
+    return out
+
+
+def live_stream_payload(sim: Simulation) -> dict:
+    """Compact bundle for SSE / observation dashboards."""
+    snap = sim.snapshot()
+    m = sim.annalist.metrics
+    metrics_point = {}
+    if m.tick:
+        metrics_point = {
+            "tick": int(m.tick[-1]),
+            "population": int(m.population[-1]) if m.population else 0,
+            "births_cum": int(m.births_cum[-1]) if m.births_cum else 0,
+            "deaths_cum": int(m.deaths_cum[-1]) if m.deaths_cum else 0,
+        }
+    payload: dict = {
+        "ts": time.time(),
+        "tick": int(snap.get("tick", sim.tick)),
+        "alive": int(snap.get("alive", 0)),
+        "metrics": metrics_point,
+        "observable": live_observable_payload(sim),
+    }
+    if meteorology_state is not None:
+        try:
+            met = meteorology_state(sim)
+            if met:
+                payload["meteorology"] = {
+                    "global_temp_c": met.get("global_temp_c"),
+                    "global_cloud_cover": met.get("global_cloud_cover"),
+                    "global_precip_mm_h": met.get("global_precip_mm_h"),
+                    "global_wind_ms": met.get("global_wind_ms"),
+                    "active_storms": met.get("active_storms"),
+                }
+        except Exception:
+            pass
+    st = getattr(sim, "_emergence", None)
+    if st and st.epidemic_summary:
+        payload["epidemic"] = st.epidemic_summary
+    return payload
+
+
+# ---------------------------------------------------------------------------
 # Sim control shared state
 # ---------------------------------------------------------------------------
 
@@ -716,6 +840,24 @@ class _Handler(BaseHTTPRequestHandler):
             qs = self._qs()
             n = int(qs.get("n", 50))
             self._json(200, {"events": (self.ctl_ref.last_event_tail or [])[-n:]}); return
+        if path == "/api/journal/events":
+            qs = self._qs()
+            n = min(int(qs.get("n", 2000)), 10000)
+            jpath = None
+            if self.sim_ref.annalist.journal:
+                jpath = self.sim_ref.annalist.journal.path
+            events = merge_journal_events(self.ctl_ref.last_event_tail or [], jpath, n)
+            self._json(200, {"events": events, "count": len(events)}); return
+        if path == "/api/metrics/history":
+            self._json(200, self.sim_ref.annalist.metrics_to_dict()); return
+        if path == "/api/session":
+            self._json(200, session_info(self.sim_ref)); return
+        if path == "/api/observable":
+            self._json(200, live_observable_payload(self.sim_ref)); return
+        if path == "/api/events/stream":
+            self._handle_sse_stream(); return
+        if path == "/api/journal/download":
+            self._serve_journal_file(); return
         if path == "/api/world":
             qs = self._qs()
             cx = int(qs.get("cx", 0)); cy = int(qs.get("cy", 0))
@@ -781,6 +923,44 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(png)
+
+    def _handle_sse_stream(self, interval_s: float = 0.8) -> None:
+        """Server-Sent Events: live tick/metrics/observable (Earth Console)."""
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        last_tick = -1
+        try:
+            while not self.ctl_ref.stop:
+                payload = live_stream_payload(self.sim_ref)
+                tick = int(payload.get("tick", 0))
+                if tick != last_tick:
+                    data = json.dumps(payload, default=_json_default)
+                    self.wfile.write(f"event: tick\ndata: {data}\n\n".encode())
+                    self.wfile.flush()
+                    last_tick = tick
+                time.sleep(interval_s)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+
+    def _serve_journal_file(self) -> None:
+        j = self.sim_ref.annalist.journal
+        jpath = j.path if j else None
+        if not jpath or not os.path.isfile(jpath):
+            self._json(404, {"error": "journal_not_found"}); return
+        with open(jpath, "rb") as f:
+            body = f.read()
+        name = os.path.basename(jpath)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", f'attachment; filename="{name}"')
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
 
     def _agent_detail(self, row: int) -> dict:
         a = self.sim_ref.agents

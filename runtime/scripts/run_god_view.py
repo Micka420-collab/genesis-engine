@@ -79,18 +79,8 @@ def main():
                 time.sleep(0.05); continue
             t0 = time.monotonic()
             stats = sim.step()
-            # capture event tail for the dashboard
-            try:
-                # Use the metrics' tick list to bound how many events to keep
-                tail = []
-                # We re-read the journal-less event sink directly from
-                # annalist.lineage / counters is heavy; instead we keep a
-                # short tail of synthetic event records.
-                tail.append({"tick": sim.tick, "kind": "tick",
-                             "participants": [], "metadata": {}})
-                ctl.last_event_tail.extend([])  # no-op placeholder
-            except Exception:
-                pass
+            from engine.dashboard import feed_event_tail
+            feed_event_tail(ctl, sim.annalist)
             # Pace
             target_dt = 1.0 / max(0.01, ctl.target_tps * speed)
             actual_dt = time.monotonic() - t0

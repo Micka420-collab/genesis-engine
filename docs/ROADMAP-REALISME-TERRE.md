@@ -10,11 +10,11 @@ Estimation honnête du niveau de réalisme **au 19 mai 2026** après la session 
 | Géologie / relief | **55 %** | Tectonique + stratigraphie légère | Érosion GPU dynamique, datation absolue |
 | Écologie / hydrologie | **65 %** | Stub par défaut ; **`hydrology_mode`** (`stub` / `sv1d` / `lbm`) dans le tick + preset **`run.py realism`** | Biogeochimie, bassins versants complets |
 | Sociétés / agents | **74 %** | R0 réseau ; TRADE avec transfert inventaire (`trade_exchange`) |
-| Rendu visuel | **73 %** | PBR-lite, HG phase + ray-march colonne | Volumétrique GPU, humains photoréalistes |
-| Observation IA | **78 %** | SSE `observation_server.py`, dashboard auto-refresh | Fog-of-war, multi-tenant |
-| Pont Python↔Rust | **74 %** | maturin CI bloquant ; tick prod `rust_worldgraph_prod` + prefetch intents |
+| Rendu visuel | **82 %** | Earth Console globe + iso live + couches météo | Volumétrique GPU, humains photoréalistes |
+| Observation IA | **86 %** | Earth Console SSE intégré, replay JSONL, observable live | Fog-of-war mmap Rust, multi-tenant |
+| Pont Python↔Rust | **82 %** | GENM macro-bridge + mutations write-back + snapshot zstd | WorldGraph hot path prod |
 
-**Global pondéré : ~70 %** (moyenne simple des 7 dimensions).
+**Global pondéré : ~74 %** (moyenne simple des 7 dimensions, mai 2026 post Earth Console).
 
 > L’objectif **80 % absolu** (simulation « publication-grade » type Terre) n’est pas atteint en une session : il exigerait modèles 3D atmosphère, hydrologie physique complète, et pont Rust en production. La session a **maximisé les gains mesurables** sur chaque axe ; le chemin vers 80 % global est documenté ci-dessous.
 
@@ -34,6 +34,10 @@ Estimation honnête du niveau de réalisme **au 19 mai 2026** après la session 
 | Stratigraphie légère | ✅ | `tectonic_geology.stratigraphy_layer_index` |
 | Fog altitude amélioré | ✅ | `world_atmosphere.atmospheric_fog_factor` |
 | Dashboard vision | ✅ | `runtime/dashboard.html` |
+| **Earth Console** (globe, replay, SSE, météo) | ✅ | `earth_console.html`, `run_earth_console.py`, `docs/EARTH-CONSOLE.md` |
+| Journal replay + API `/api/journal/events` | ✅ | `dashboard.py`, `annalist.py` |
+| Pont Rust GENM + align_heightmap (P0) | ✅ | `macro-bridge`, `macro_grid_export.py` |
+| Mutations agent write-back + snapshot (P5) | ✅ | `agent-api/snapshot.rs`, pybindings |
 
 ---
 
@@ -54,7 +58,14 @@ Estimation honnête du niveau de réalisme **au 19 mai 2026** après la session 
 2. **Köppen** : export NetCDF diagnostics ; valider 50 stations (Beck 2018).
 3. **WorldGraph** : 1 pass Rust depuis `genesis_bootstrap` (tectonics/ecology).
 4. **Hydrologie** : LBM 2D minimal ou D8 accumulation cross-macro.
-5. **Observation** : JSONL live branché (`append_observable_jsonl` dans le tick emergence).
+5. **Observation** : ~~JSONL live~~ ✅ Earth Console + `earth_console_observable.jsonl` ; reste fog mmap Rust.
+
+**Earth Console (recommandé pour le live) :**
+
+```bash
+make earth-console
+# http://127.0.0.1:8090/ — SSE: GET /api/events/stream
+```
 
 ---
 

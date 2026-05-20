@@ -155,7 +155,16 @@ Produit sous `runtime/artifacts/` :
 | `koeppen_fair.json` | Köppen + checksums SHA-256 du **monde simulé** |
 | `epidemic_contact.json` | SIR + R0 réseau vs SIR populationnel |
 
-Observation live : `make observe` (ouvre `dashboard.html` + SSE sur le port 8765).
+**Earth Console (recommandé, live Terre + Genesis macro) :**
+
+```bash
+make earth-console
+# http://127.0.0.1:8090/ — journal artifacts/earth_console.jsonl
+```
+
+Voir [`docs/EARTH-CONSOLE.md`](../docs/EARTH-CONSOLE.md).
+
+Observation artifacts post-run : `make observe` (ouvre `dashboard.html` + SSE sur le port 8765).
 
 Inventaire partiel : [`../TESTS_INVENTORY.md`](../TESTS_INVENTORY.md).
 

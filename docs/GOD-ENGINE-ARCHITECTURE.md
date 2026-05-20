@@ -314,22 +314,52 @@ flowchart TB
 
 ---
 
-## 6. Code livré dans cette session
+## 6. Code livré (Rust + observation Terre)
 
 | Module | Rôle | Chemin |
 |--------|------|--------|
 | **genesis-macro-bridge** | Échantillonnage bilinéaire elevation/biome depuis grille continentale | `native/world-engine/crates/macro-bridge/` |
+| **P5 agent-api** | `SharedChunk` write-back, `WorldSnapshot` zstd, mesh L2 | `crates/agent-api/`, `crates/pybindings/` |
+| **Earth Console** | UI Terre live : globe, iso, replay, SSE, météo | `runtime/engine/earth_console.html`, `run_earth_console.py` |
 | Proposals (stubs testables) | 6 axes, hors workspace | `native/world-engine/proposals/` |
 | Audit interne | Détail failles F1–F6 | `native/world-engine/NEXT-LEVEL-AUDIT.md` |
 
-**Tests :**
+**Tests Rust :**
 
 ```bash
 cd native/world-engine
 cargo test -p genesis-macro-bridge
+# wheel native (local) :
+cd crates/pybindings && maturin develop --release
 ```
 
 **P0.2–0.3 (livré) :** `rust_bridge` passe `macro_grid_bytes` à `PyWorld` ; `ChunkManager::generate` appelle `align_heightmap` après procgen.
+
+**P5.1–5.2 (livré) :** `set_voxel` → write-back ; `save_snapshot` / `restore_snapshot` côté PyO3.
+
+### 6.1 Earth Console — plan d’observation unifié
+
+Console HTTP unique (`make earth-console`, port **8090**) qui remplace le duo dashboard + serveur SSE séparé pour le **live** :
+
+| Endpoint | Rôle |
+|----------|------|
+| `GET /api/macro` | Carte continent Genesis (PNG) |
+| `GET /api/render` | Vue locale / `?mode=iso` |
+| `GET /api/journal/events` | Replay JSONL + tail live |
+| `GET /api/metrics/history` | Séries Annalist (population, etc.) |
+| `GET /api/events/stream` | **SSE** tick + météo + observable |
+| `GET /api/observable` | Snapshot agents compact (émergence) |
+| `GET /api/meteorology_state` | Wave 7 (nuages, vent, température) |
+| `GET /api/session` | Seed, chemins journal / observable |
+
+**Artefacts par défaut :**
+
+- `artifacts/earth_console.jsonl` — journal Annalist (naissances, morts, trades…)
+- `artifacts/earth_console_observable.jsonl` — observable agents (tous les 25 ticks)
+
+**Post-run :** `observation_server.py` + `dashboard.html` restent valides pour artifacts statiques (`--artifacts`, `--jsonl`).
+
+Guide utilisateur : [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md).
 
 ---
 
@@ -350,4 +380,5 @@ cargo test -p genesis-macro-bridge
 - État civilisation Python : [`PROJECT-STATUS.md`](../PROJECT-STATUS.md)
 - Réalisme chiffré : [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md)
 - Couches physics/social : [`LAYERS-STACK.md`](LAYERS-STACK.md)
+- **Earth Console** : [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md) · `make earth-console`
 - Preset Terre : `python run.py terre` · `make terre-long`

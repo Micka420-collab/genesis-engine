@@ -266,6 +266,45 @@
       border: 1px solid var(--border);
     }
     #timelineCanvas { width: 100%; height: 100%; display: block; }
+    #replayBar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-panel);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    #replayBar.active { display: flex; }
+    #replayBar input[type=range] { flex: 1; accent-color: var(--accent-warm); }
+    #replayBar button {
+      font: inherit; font-size: 11px;
+      padding: 4px 10px; border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated); color: var(--text); cursor: pointer;
+    }
+    .artifact-kpi { padding: 4px 0; color: var(--muted); }
+    .artifact-kpi strong { color: var(--text); }
+    .link-muted { font-size: 11px; color: var(--accent); text-decoration: none; }
+    .link-muted:hover { text-decoration: underline; }
+    footer.footer-stack { flex-direction: column; align-items: stretch; padding: 6px 0 0; gap: 6px; }
+    .footer-row { display: flex; align-items: center; gap: 12px; padding: 0 16px 6px; width: 100%; }
+    .agent-detail {
+      font-family: var(--mono);
+      font-size: 10px;
+      line-height: 1.5;
+      color: var(--muted);
+      padding: 8px;
+      border-radius: 8px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      margin-bottom: 12px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+    .agent-detail strong { color: var(--text); }
+    .sse-on { color: var(--success) !important; border-color: var(--success) !important; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 </head>
@@ -279,6 +318,9 @@
       <span class="pill">tick <strong id="hdrTick">—</strong></span>
       <span class="pill">vivants <strong id="hdrAlive">—</strong></span>
       <span class="pill">TPS <strong id="hdrTps">—</strong></span>
+      <span class="pill view-hidden" id="pillTemp">🌡 <strong id="hdrTemp">—</strong></span>
+      <span class="pill view-hidden" id="pillClouds">☁ <strong id="hdrClouds">—</strong></span>
+      <span class="pill view-hidden" id="pillWind">💨 <strong id="hdrWind">—</strong></span>
     </div>
     <div class="transport">
       <button class="btn primary" id="btnPause">⏸ Pause</button>
@@ -295,6 +337,7 @@
     <button class="active" title="Vue locale top-down" data-view-mode="local">🗺</button>
     <button title="Globe planétaire WebGL" data-view-mode="globe">🌐</button>
     <button title="Vue isométrique 2.5D" data-view-mode="iso">◆</button>
+    <button title="Replay journal / timeline" id="btnReplayMode">⏪</button>
     <button title="God view classique" onclick="location.href='god_view_v2.html'">⚡</button>
   </nav>
 
@@ -332,7 +375,11 @@
         <button class="layer-chip" data-overlay="ndvi">Végétation</button>
         <button class="layer-chip" data-overlay="marine">Marin</button>
         <button class="layer-chip" data-overlay="clouds">Nuages</button>
+        <button class="layer-chip" data-overlay="wind">Vent</button>
       </div>
+
+      <div class="section-title">Agent sélectionné</div>
+      <div class="agent-detail" id="agentDetail">Clique un agent dans la liste.</div>
 
       <div class="section-title">Coloration agents</div>
       <div class="layers" id="agentViewChips">
@@ -347,13 +394,30 @@
 
       <div class="section-title">Événements</div>
       <div class="events" id="events">—</div>
+
+      <div class="section-title">Artifacts post-run</div>
+      <input type="file" id="artifactFile" accept=".json,.jsonl" style="font-size:11px;width:100%">
+      <div class="events" id="artifactKpis"><span class="artifact-kpi">Charge un snapshot JSON (run.py) ou JSONL journal.</span></div>
+      <a class="link-muted" href="dashboard.html" target="_blank" rel="noopener">Dashboard classique ↗</a>
+      <button class="btn" type="button" id="btnSse" style="width:100%;margin-top:8px">SSE live</button>
+      <a class="link-muted" id="journalDownload" href="/api/journal/download" download style="display:block;margin-top:6px">Télécharger journal ↓</a>
+      <p class="artifact-kpi" id="sessionInfo" style="margin-top:8px">—</p>
     </div>
   </aside>
 
-  <footer>
-    <span id="footerHelp"><kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>G</kbd> globe</span>
-    <div id="timelineWrap"><canvas id="timelineCanvas"></canvas></div>
-    <span class="zoom-readout" id="zoomReadout">zoom —</span>
+  <footer class="footer-stack" id="mainFooter">
+    <div id="replayBar">
+      <button type="button" id="rpPlay">▶</button>
+      <input type="range" id="rpSlider" min="0" max="0" value="0">
+      <span id="rpInfo">replay</span>
+      <button type="button" id="rpReload">↻ journal</button>
+      <button type="button" id="rpExit">✕</button>
+    </div>
+    <div class="footer-row">
+      <span id="footerHelp"><kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>G</kbd> globe</span>
+      <div id="timelineWrap"><canvas id="timelineCanvas"></canvas></div>
+      <span class="zoom-readout" id="zoomReadout">zoom —</span>
+    </div>
   </footer>
 </div>
 
@@ -369,7 +433,16 @@ let macroMeta = { available: false, map_size_km: 4000, origin_km: [2000, 2000] }
 let pollStart = performance.now(), lastTick = 0, tpsEma = 0;
 let viewMode = 'local';
 let popHistory = [];
+let metricsHistory = { tick: [], population: [] };
 const MAX_HISTORY = 120;
+let replayActive = false;
+let replayEvents = [];
+let replayTick = 0, replayMinTick = 0, replayMaxTick = 0;
+let replayPlaying = false, replayPlayTimer = null;
+let scrubIndex = -1;
+let lastMeteo = null;
+let sseSource = null;
+let globeCloudShell = null;
 
 const viewport = document.getElementById('viewport');
 const globeCanvas = document.getElementById('globeCanvas');
@@ -585,22 +658,114 @@ function renderAgentList(agents) {
       followingRow = selectedRow;
       renderAgentList(lastAgents);
       drawAgents();
+      loadAgentDetail(selectedRow);
     });
   });
 }
 
-async function poll() {
+async function loadAgentDetail(row) {
+  const el = document.getElementById('agentDetail');
+  if (row == null) { el.textContent = '—'; return; }
   try {
-    const [snap, agentsR, metricsR, eventsR] = await Promise.all([
+    const d = await (await fetch(API + '/api/agent?row=' + row)).json();
+    if (d.error) { el.textContent = d.error; return; }
+    const inv = d.inventory || {};
+    el.innerHTML =
+      `<strong>#${d.row}</strong> gen ${d.generation} · vitalité ${(d.vitality ?? 0).toFixed(2)}<br>` +
+      `pos (${d.pos?.[0]?.toFixed?.(0) ?? '?'}, ${d.pos?.[1]?.toFixed?.(0) ?? '?'}) m<br>` +
+      `faim ${(d.drives?.hunger ?? 0).toFixed(2)} · soif ${(d.drives?.thirst ?? 0).toFixed(2)}<br>` +
+      `inv eau ${(inv.water ?? 0).toFixed(0)} · nourriture ${(inv.food ?? 0).toFixed(0)} · bois ${(inv.wood ?? 0).toFixed(0)}`;
+  } catch (e) {
+    el.textContent = 'détail indisponible';
+  }
+}
+
+function updateAtmosphereHud(meteo) {
+  if (!meteo || meteo.global_temp_c == null) {
+    ['pillTemp', 'pillClouds', 'pillWind'].forEach(id =>
+      document.getElementById(id).classList.add('view-hidden'));
+    return;
+  }
+  lastMeteo = meteo;
+  document.getElementById('pillTemp').classList.remove('view-hidden');
+  document.getElementById('pillClouds').classList.remove('view-hidden');
+  document.getElementById('pillWind').classList.remove('view-hidden');
+  document.getElementById('hdrTemp').textContent = `${meteo.global_temp_c}°C`;
+  document.getElementById('hdrClouds').textContent =
+    `${Math.round((meteo.global_cloud_cover ?? 0) * 100)}%`;
+  document.getElementById('hdrWind').textContent = `${meteo.global_wind_ms} m/s`;
+  if (globeCloudShell?.material) {
+    const cc = Math.min(0.55, (meteo.global_cloud_cover ?? 0) * 0.5);
+    globeCloudShell.material.opacity = cc;
+    globeCloudShell.visible = cc > 0.02;
+  }
+}
+
+async function loadSession() {
+  try {
+    const s = await (await fetch(API + '/api/session')).json();
+    const j = s.journal_path || '—';
+    document.getElementById('sessionInfo').textContent =
+      `seed 0x${(s.seed >>> 0).toString(16)} · journal ${s.journal_exists ? '✓' : '○'} ${j.split(/[/\\]/).pop()}` +
+      (s.meteorology ? ' · météo ✓' : '');
+    const dl = document.getElementById('journalDownload');
+    dl.style.display = s.journal_exists ? 'block' : 'none';
+  } catch (_) {}
+}
+
+document.getElementById('btnSse').addEventListener('click', () => {
+  const btn = document.getElementById('btnSse');
+  if (sseSource) {
+    sseSource.close();
+    sseSource = null;
+    btn.textContent = 'SSE live';
+    btn.classList.remove('sse-on');
+    return;
+  }
+  if (typeof EventSource === 'undefined') {
+    alert('EventSource non supporté');
+    return;
+  }
+  sseSource = new EventSource(API + '/api/events/stream');
+  btn.textContent = 'SSE ●';
+  btn.classList.add('sse-on');
+  sseSource.addEventListener('tick', ev => {
+    try {
+      const p = JSON.parse(ev.data);
+      if (p.meteorology) updateAtmosphereHud(p.meteorology);
+      if (p.tick != null) document.getElementById('hdrTick').textContent = p.tick;
+      if (p.alive != null) document.getElementById('hdrAlive').textContent = p.alive;
+    } catch (_) {}
+  });
+  sseSource.onerror = () => {
+    btn.textContent = 'SSE (reconnexion…)';
+    btn.classList.remove('sse-on');
+  };
+});
+
+async function loadMetricsHistory() {
+  try {
+    const m = await (await fetch(API + '/api/metrics/history')).json();
+    if (m.tick?.length) metricsHistory = m;
+  } catch (_) {}
+}
+
+async function poll() {
+  if (replayActive) return;
+  try {
+    const [snap, agentsR, metricsR, eventsR, meteoR] = await Promise.all([
       fetch(API + '/api/state'),
       fetch(API + '/api/agents'),
       fetch(API + '/api/metrics'),
       fetch(API + '/api/events/recent?n=30'),
+      fetch(API + '/api/meteorology_state'),
     ]);
     const snapJ = await snap.json();
     const agentsJ = await agentsR.json();
     const metricsJ = await metricsR.json();
     const eventsJ = await eventsR.json();
+    const meteoJ = await meteoR.json();
+    if (meteoJ && Object.keys(meteoJ).length) updateAtmosphereHud(meteoJ);
     document.getElementById('statusDot').classList.add('live');
     document.getElementById('connPill').textContent = 'live';
     const tick = snapJ.tick ?? 0;
@@ -621,7 +786,11 @@ async function poll() {
     lastAgents = agentsJ.agents || [];
     popHistory.push(alive);
     if (popHistory.length > MAX_HISTORY) popHistory.shift();
-    drawTimeline();
+    if (metricsHistory.tick.length && metricsHistory.tick[metricsHistory.tick.length - 1] !== tick) {
+      metricsHistory.tick.push(tick);
+      metricsHistory.population.push(alive);
+    }
+    drawTimeline(scrubIndex >= 0 ? scrubIndex : -1);
     updateGlobeMarker();
     renderAgentList(lastAgents);
     const ev = eventsJ.events || [];
@@ -668,6 +837,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyR') recenterAgents();
   if (e.code === 'KeyG') setViewMode(viewMode === 'globe' ? 'local' : 'globe');
   if (e.code === 'KeyI') setViewMode(viewMode === 'iso' ? 'local' : 'iso');
+  if (e.code === 'KeyP') setReplayMode(!replayActive);
 });
 
 // --- Globe WebGL (Three.js) ---
@@ -693,6 +863,17 @@ function initGlobe() {
   const geo = new THREE.SphereGeometry(1, 72, 48);
   globeMesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ map: tex, shininess: 8 }));
   globeScene.add(globeMesh);
+  const cloudGeo = new THREE.SphereGeometry(1.03, 64, 48);
+  globeCloudShell = new THREE.Mesh(
+    cloudGeo,
+    new THREE.MeshPhongMaterial({
+      color: 0xdde8f4,
+      transparent: true,
+      opacity: 0.12,
+      depthWrite: false,
+    })
+  );
+  globeScene.add(globeCloudShell);
   const starGeo = new THREE.SphereGeometry(0.025, 12, 12);
   globeMarker = new THREE.Mesh(starGeo, new THREE.MeshBasicMaterial({ color: 0xff6b4a }));
   globeScene.add(globeMarker);
@@ -763,27 +944,196 @@ window.addEventListener('resize', () => { if (globeInited && globeRenderer) { co
 // --- Population timeline sparkline ---
 const tCanvas = document.getElementById('timelineCanvas');
 const tCtx = tCanvas.getContext('2d');
-function drawTimeline() {
+function drawTimeline(scrubIdx = -1) {
   const wrap = document.getElementById('timelineWrap');
   tCanvas.width = wrap.clientWidth;
   tCanvas.height = wrap.clientHeight;
   const w = tCanvas.width, h = tCanvas.height;
   tCtx.fillStyle = '#141c2a';
   tCtx.fillRect(0, 0, w, h);
-  if (popHistory.length < 2) return;
-  const maxP = Math.max(...popHistory, 1);
+  const series = metricsHistory.population?.length >= 2
+    ? metricsHistory.population
+    : (popHistory.length >= 2 ? popHistory : []);
+  if (series.length < 2) return;
+  const maxP = Math.max(...series, 1);
   tCtx.strokeStyle = '#3dd6c6';
   tCtx.lineWidth = 1.5;
   tCtx.beginPath();
-  popHistory.forEach((p, i) => {
-    const x = (i / (popHistory.length - 1)) * (w - 4) + 2;
+  series.forEach((p, i) => {
+    const x = (i / (series.length - 1)) * (w - 4) + 2;
     const y = h - 4 - (p / maxP) * (h - 8);
     if (i === 0) tCtx.moveTo(x, y); else tCtx.lineTo(x, y);
   });
   tCtx.stroke();
+  if (scrubIdx >= 0 && scrubIdx < series.length) {
+    const x = (scrubIdx / (series.length - 1)) * (w - 4) + 2;
+    tCtx.strokeStyle = '#e8b86d';
+    tCtx.lineWidth = 2;
+    tCtx.beginPath();
+    tCtx.moveTo(x, 2);
+    tCtx.lineTo(x, h - 2);
+    tCtx.stroke();
+  }
 }
 
+document.getElementById('timelineWrap').addEventListener('click', e => {
+  const series = metricsHistory.population?.length >= 2 ? metricsHistory.population : popHistory;
+  if (series.length < 2) return;
+  const rect = tCanvas.getBoundingClientRect();
+  const u = (e.clientX - rect.left) / rect.width;
+  scrubIndex = Math.min(series.length - 1, Math.max(0, Math.floor(u * series.length)));
+  const tick = metricsHistory.tick[scrubIndex] ?? scrubIndex;
+  document.getElementById('kpiTick').textContent = tick;
+  document.getElementById('kpiAlive').textContent = series[scrubIndex];
+  drawTimeline(scrubIndex);
+  if (replayActive) {
+    replayTick = tick;
+    document.getElementById('rpSlider').value = replayTick;
+    updateReplayView();
+  }
+});
+
+// --- Replay (journal JSONL + live tail) ---
+async function loadReplayEvents() {
+  const r = await (await fetch(API + '/api/journal/events?n=3000')).json();
+  replayEvents = (r.events || []).slice().sort((a, b) => a.tick - b.tick);
+  if (replayEvents.length) {
+    replayMinTick = replayEvents[0].tick;
+    replayMaxTick = replayEvents[replayEvents.length - 1].tick;
+    replayTick = replayMinTick;
+    const slider = document.getElementById('rpSlider');
+    slider.min = replayMinTick;
+    slider.max = replayMaxTick;
+    slider.value = replayTick;
+  }
+  updateReplayInfo();
+}
+
+function updateReplayInfo() {
+  document.getElementById('rpInfo').textContent =
+    `tick ${replayTick} / ${replayMaxTick} · ${replayEvents.length} événements`;
+}
+
+function eventsAtTick(tick) {
+  return replayEvents.filter(e => e.tick === tick);
+}
+
+function updateReplayView() {
+  updateReplayInfo();
+  const ev = eventsAtTick(replayTick);
+  document.getElementById('events').innerHTML = ev.length
+    ? ev.map(e => `<div class="event-line ${e.kind || ''}">t${e.tick} ${e.kind}</div>`).join('')
+    : `<div class="event-line">aucun événement @ ${replayTick}</div>`;
+  drawReplayMarkers(ev);
+}
+
+function drawReplayMarkers(evList) {
+  const { w, h } = vp();
+  aCtx.clearRect(0, 0, w, h);
+  if (!evList.length) return;
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  const pts = [];
+  evList.forEach(e => {
+    const loc = e.location;
+    if (loc && loc.length >= 2) pts.push([loc[0], loc[1]]);
+    const posMap = e.positions || {};
+    Object.values(posMap).forEach(p => { if (p?.length >= 2) pts.push(p); });
+  });
+  if (!pts.length) return;
+  pts.forEach(([x, y]) => {
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+  });
+  const pad = 80;
+  camCenterX = (minX + maxX) / 2;
+  camCenterY = (minY + maxY) / 2;
+  camZoom = Math.max((maxX - minX + pad) / w, (maxY - minY + pad) / h, 0.2);
+  updateZoom();
+  scheduleTerrain();
+  pts.forEach(([x, y]) => {
+    const p = w2s(x, y);
+    aCtx.fillStyle = '#e8b86d';
+    aCtx.beginPath();
+    aCtx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    aCtx.fill();
+  });
+  aCtx.fillStyle = '#e8eef6';
+  aCtx.font = '11px var(--mono)';
+  aCtx.fillText(`REPLAY t${replayTick} · ${pts.length} points`, 12, 20);
+}
+
+function setReplayMode(on) {
+  replayActive = on;
+  document.getElementById('replayBar').classList.toggle('active', on);
+  document.getElementById('btnReplayMode').classList.toggle('active', on);
+  if (on) {
+    postCtl('pause');
+    document.getElementById('btnPause').textContent = '▶ Lecture';
+    loadReplayEvents().then(() => updateReplayView());
+  } else {
+    stopReplayPlayback();
+    scrubIndex = -1;
+    drawAgents();
+    scheduleTerrain();
+  }
+}
+
+document.getElementById('btnReplayMode').addEventListener('click', () => setReplayMode(!replayActive));
+document.getElementById('rpExit').addEventListener('click', () => setReplayMode(false));
+document.getElementById('rpReload').addEventListener('click', () => loadReplayEvents().then(updateReplayView));
+document.getElementById('rpSlider').addEventListener('input', e => {
+  replayTick = parseInt(e.target.value, 10);
+  updateReplayView();
+});
+document.getElementById('rpPlay').addEventListener('click', () => {
+  if (replayPlaying) stopReplayPlayback();
+  else startReplayPlayback();
+});
+function startReplayPlayback() {
+  if (!replayEvents.length) return;
+  replayPlaying = true;
+  document.getElementById('rpPlay').textContent = '⏸';
+  replayPlayTimer = setInterval(() => {
+    replayTick = Math.min(replayMaxTick, replayTick + Math.max(1, Math.floor((replayMaxTick - replayMinTick) / 200)));
+    document.getElementById('rpSlider').value = replayTick;
+    updateReplayView();
+    if (replayTick >= replayMaxTick) stopReplayPlayback();
+  }, 80);
+}
+function stopReplayPlayback() {
+  replayPlaying = false;
+  document.getElementById('rpPlay').textContent = '▶';
+  if (replayPlayTimer) { clearInterval(replayPlayTimer); replayPlayTimer = null; }
+}
+
+document.getElementById('artifactFile').addEventListener('change', async e => {
+  const f = e.target.files?.[0];
+  if (!f) return;
+  const text = await f.text();
+  const el = document.getElementById('artifactKpis');
+  try {
+    let data;
+    if (f.name.endsWith('.jsonl')) {
+      const lines = text.trim().split('\n').filter(Boolean);
+      const last = JSON.parse(lines[lines.length - 1]);
+      data = { tick: last.tick, events: lines.length, kind: last.kind };
+      el.innerHTML = `<div class="artifact-kpi">Journal <strong>${lines.length}</strong> lignes · dernier t<strong>${last.tick}</strong> ${last.kind}</div>`;
+      replayEvents = lines.map(ln => JSON.parse(ln)).sort((a, b) => a.tick - b.tick);
+      setReplayMode(true);
+      return;
+    }
+    data = JSON.parse(text);
+    const tick = data.tick ?? data.snapshot?.tick ?? '—';
+    const alive = data.alive ?? data.agents?.length ?? data.snapshot?.alive ?? '—';
+    el.innerHTML = `<div class="artifact-kpi">Snapshot t<strong>${tick}</strong> · vivants <strong>${alive}</strong></div>`;
+  } catch (err) {
+    el.innerHTML = `<div class="artifact-kpi" style="color:var(--danger)">${err.message}</div>`;
+  }
+});
+
 loadMacro();
+loadSession();
+loadMetricsHistory();
 scheduleTerrain();
 setInterval(poll, 400);
 poll();

@@ -9,7 +9,7 @@
 
 Laboratoire open-source d’**artificial life** : monde physique déterministe (Terre ou procédural) + agents autonomes + civilisations émergentes, observable via smokes, dashboard et exports GIS.
 
-**Tests :** `pytest runtime/tests` — **76** tests · smoke **p83** dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **83+** tests · smoke **p83** dans `validate-all`.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
@@ -46,8 +46,8 @@ Estimation **globale ~70 %** vers une simulation « publication-grade » type Te
 | Dimension | ~% | Piste principale |
 |-----------|-----|------------------|
 | Climat / biomes | 76 | Köppen FAIR + bootstrap Genesis (p80) |
-| Rendu visuel | **80** | Earth Console globe WebGL + iso live + PBR batch |
-| Observation IA | **84** | **Earth Console** (`run_earth_console.py`) + SSE + JSONL |
+| Rendu visuel | **82** | Earth Console globe WebGL + atmosphère + iso live + PBR batch |
+| Observation IA | **86** | **Earth Console** + SSE intégré + replay + JSONL observable |
 | Sociétés / agents | **76** | Journal `trade` + transferts inventaire + alliances |
 | Géologie / relief | 55 | Tectonique, stratigraphie légère |
 | Écologie / hydrologie | 65 | **`hydrology_mode`** stub/sv1d/lbm ; preset **`run.py realism`** |
@@ -85,7 +85,8 @@ Depuis la racine du repo (`PYTHONPATH=runtime` implicite via `make` ou `cd runti
 ```bash
 make smoke                    # p0 — sanity
 make civilization             # pipeline émergence + manifest
-make validate-all             # pytest (73 tests) + smokes p72–p83 + SSE
+make validate-all             # pytest (83 tests) + smokes p72–p83 + SSE
+make earth-console            # Terre live UI (8090)
 make terre-long               # preset terre 2000 ticks + artifact enrichi
 python run.py terre --ticks 500
 cd runtime && python scripts/p82_civilization_pipeline_smoke.py

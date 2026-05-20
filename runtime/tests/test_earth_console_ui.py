@@ -16,6 +16,12 @@ def test_earth_console_html_exists():
     assert "/api/macro" in text
     assert "globeCanvas" in text
     assert "mode=iso" in text or "viewMode" in text
+    assert "/api/journal/events" in text
+    assert "btnReplayMode" in text
+    assert "artifactFile" in text
+    assert "btnSse" in text
+    assert "meteorology_state" in text or "hdrTemp" in text
+    assert "agentDetail" in text
 
 
 def test_run_earth_console_script_exists():

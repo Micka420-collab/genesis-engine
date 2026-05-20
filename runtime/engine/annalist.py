@@ -119,6 +119,7 @@ class Annalist:
         self._distinct_lex_signatures = set()
         self.events_emitted = 0
         self._start_ts = time.monotonic()
+        self._last_batch: List[dict] = []
 
     def wall_clock_s(self) -> float:
         """Seconds elapsed since this Annalist (and its sim) was constructed."""
@@ -286,6 +287,30 @@ class Annalist:
         self.metrics.matings_cum.append(self.cum_matings)
         self.metrics.avg_generation.append(avg_g)
         self.metrics.avg_affinity.append(avg_aff)
+        self._last_batch = [e.to_dict() for e in out]
+        return out
+
+    @staticmethod
+    def read_jsonl_tail(path: str, max_lines: int = 2000) -> List[dict]:
+        """Read the last *max_lines* JSON objects from a JSONL journal file."""
+        if not path or not os.path.isfile(path):
+            return []
+        try:
+            with open(path, "rb") as f:
+                f.seek(0, 2)
+                size = f.tell()
+                chunk = min(size, 512 * 1024)
+                f.seek(max(0, size - chunk))
+                data = f.read().decode("utf-8", errors="replace")
+        except OSError:
+            return []
+        lines = [ln for ln in data.splitlines() if ln.strip()]
+        out: List[dict] = []
+        for ln in lines[-max_lines:]:
+            try:
+                out.append(json.loads(ln))
+            except json.JSONDecodeError:
+                continue
         return out
 
     def _event(self, kind, tick, participants, location, metadata):

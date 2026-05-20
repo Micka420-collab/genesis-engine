@@ -103,6 +103,24 @@ python run.py origins --ticks 8000   # émergence seule ; ajouter --realism pour
 
 **Origins + realism :** preset **`terre`** ou `python run.py origins --realism`.
 
+## Earth Console (observation live)
+
+| Module | Rôle |
+|--------|------|
+| `scripts/run_earth_console.py` | Bootstrap Genesis + `wire_full_stack` + météo Wave 7 + serveur HTTP |
+| `engine/earth_console.html` | UI : globe WebGL, iso, replay journal, SSE, panneau agent |
+| `engine/dashboard.py` | API `/api/journal/*`, `/api/events/stream`, `/api/observable`, render bbox |
+| `engine/annalist.py` | Journal JSONL + `_last_batch` pour tail événements |
+
+```bash
+make earth-console
+# → http://127.0.0.1:8090/
+```
+
+Raccourcis : **G** globe · **I** iso · **P** replay · **Espace** pause · **S** pas.
+
+Doc : [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md).
+
 ## Ponts futurs
 
 - `ge-substrate` (Rust) ↔ Python physics tick
