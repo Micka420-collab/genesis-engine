@@ -63,6 +63,10 @@ class SimConfig:
     hydrology_mode: str = "stub"  # stub | sv1d | lbm
     # Physics + chemistry + architecture + social topology layers.
     knowledge_layers: bool = False
+    # Macro settlement gravity trade → agent TRADE edges (needs genesis bootstrap).
+    macro_commerce: bool = False
+    # Observe all agent chunks each tick when native genesis_world is loaded.
+    rust_worldgraph_prod: bool = False
 
 
 @dataclass

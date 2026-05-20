@@ -272,6 +272,13 @@ def tick_emergence_world(sim) -> None:
         except Exception:
             pass
 
+    if getattr(sim, "_commerce_emergence", None) is not None:
+        try:
+            from engine.commerce_emergence import tick_commerce_emergence
+            tick_commerce_emergence(sim)
+        except Exception:
+            pass
+
 
 def emergence_snapshot(sim) -> Dict[str, Any]:
     """Block for ``Simulation.snapshot()`` / artifacts."""
@@ -294,6 +301,13 @@ def emergence_snapshot(sim) -> Dict[str, Any]:
         try:
             from engine.rust_worldgraph_tick import rust_worldgraph_snapshot
             out["rust_worldgraph"] = rust_worldgraph_snapshot(sim)
+        except Exception:
+            pass
+    ce = getattr(sim, "_commerce_emergence", None)
+    if ce is not None:
+        try:
+            from engine.commerce_emergence import commerce_emergence_snapshot
+            out["commerce"] = commerce_emergence_snapshot(sim)
         except Exception:
             pass
     return {k: v for k, v in out.items() if v is not None}

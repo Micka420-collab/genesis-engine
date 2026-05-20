@@ -9,7 +9,7 @@
 
 Laboratoire open-source d’**artificial life** : monde physique déterministe (Terre ou procédural) + agents autonomes + civilisations émergentes, observable via smokes, dashboard et exports GIS.
 
-**Tests :** `pytest runtime/tests` — **61** tests (voir `Makefile` `test-python`).  
+**Tests :** `pytest runtime/tests` — **63** tests (voir `Makefile` `test-python`).  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
@@ -51,7 +51,8 @@ Estimation **globale ~70 %** vers une simulation « publication-grade » type Te
 | Sociétés / agents | 70 | Épidémie R0 réseau vs SIR (exp4) |
 | Géologie / relief | 55 | Tectonique, stratigraphie légère |
 | Écologie / hydrologie | 65 | **`hydrology_mode`** stub/sv1d/lbm ; preset **`run.py realism`** |
-| Pont Python ↔ Rust | 72 | **maturin bloquant en CI** + **rust WorldGraph tick** (`rust_worldgraph_tick.py`) dans `sim_emergence` |
+| Pont Python ↔ Rust | **74** | Tick prod (`rust_worldgraph_prod`) + `submit_intent` prefetch natif |
+| Économie macro ↔ agents | **68** | `commerce_emergence.py` + boost TRADE dans `social_topology` |
 
 **Référence complète :** [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 **Prochain sprint réalisme :** section « Prochain sprint » dans ce fichier roadmap.

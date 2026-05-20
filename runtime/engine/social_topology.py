@@ -183,13 +183,22 @@ def propose_trade_edge(sim, st: SocialTopologyState, a: int, b: int) -> bool:
         _agent_trade_mass(sim.agents, b),
         dist,
     )
+    threshold = 0.02
+    ce = getattr(sim, "_commerce_emergence", None)
+    if ce is not None:
+        from engine.commerce_emergence import macro_trade_flow_between
+
+        flow = macro_trade_flow_between(ce, a, b)
+        if flow > 0.0:
+            p = min(1.0, p + flow / 100.0)
+            threshold = 0.01
     # Complementarity: one has food surplus, other has stone/metal.
     food_a = float(sim.agents.inv_food[a])
     food_b = float(sim.agents.inv_food[b])
     craft_a = float(sim.agents.inv_stone[a]) + float(sim.agents.inv_metal[a])
     craft_b = float(sim.agents.inv_stone[b]) + float(sim.agents.inv_metal[b])
     complementary = (food_a > 0.2 and craft_b > 0.1) or (food_b > 0.2 and craft_a > 0.1)
-    if not complementary or p < 0.02:
+    if not complementary or p < threshold:
         return False
     add_edge(st, a, b, EdgeKind.TRADE, weight=p)
     st.trade_volume += p

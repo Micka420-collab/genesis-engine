@@ -86,6 +86,7 @@ PYTHONPATH=runtime python -m pytest runtime/tests/test_knowledge_layers.py -q
 
 | Module | Rôle |
 |--------|------|
+| `engine/commerce_emergence.py` | Settlements + `trade_flow` → boost liens TRADE agents |
 | `engine/full_stack.py` | Post-`Simulation()` : genesis bootstrap, rust WorldGraph, MP API (si clé), 5cd |
 | `engine/rust_worldgraph_tick.py` | `observe_chunk` sparse chaque N ticks via `sim_emergence` |
 | `runtime/run.py` | Presets **`realism`** et **`terre`** appellent `wire_full_stack` |
@@ -95,7 +96,10 @@ PYTHONPATH=runtime python -m pytest runtime/tests/test_knowledge_layers.py -q
 ```bash
 python run.py terre --ticks 500
 python run.py realism --no-5cd
+python run.py origins --ticks 8000   # émergence seule ; ajouter --realism pour layers+hydro
 ```
+
+**Origins + realism :** preset **`terre`** ou `python run.py origins --realism`.
 
 ## Ponts futurs
 

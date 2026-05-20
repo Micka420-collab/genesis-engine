@@ -183,6 +183,55 @@ class IntegrationRiskyTests(unittest.TestCase):
             if prev is not None:
                 os.environ["MP_API_KEY"] = prev
 
+    def test_commerce_emergence_after_genesis(self):
+        gp = GenesisParams(
+            seed=0xC0110ACE,
+            resolution=16,
+            erosion_iters=2,
+            rain_iters=2,
+            n_plates=4,
+        )
+        sim = Simulation(
+            SimConfig(
+                seed=gp.seed,
+                founders=2,
+                max_agents=8,
+                bounds_km=(0.12, 0.12),
+                life_emergence=False,
+                epidemic_observer=False,
+                emergence_subsystems=True,
+                knowledge_layers=True,
+                macro_commerce=True,
+            )
+        )
+        bootstrap_genesis_sim(sim, genesis_params=gp, modules={MOD_GENESIS})
+        from engine.commerce_emergence import install_commerce_emergence
+
+        st = install_commerce_emergence(sim, refresh_every=1000)
+        self.assertIsNotNone(st.trade)
+        self.assertGreaterEqual(len(st.settlements), 2)
+        snap = __import__(
+            "engine.commerce_emergence",
+            fromlist=["commerce_emergence_snapshot"],
+        ).commerce_emergence_snapshot(sim)
+        self.assertTrue(snap.get("installed"))
+
+    def test_rust_worldgraph_prod_flag(self):
+        sim = Simulation(
+            SimConfig(
+                founders=2,
+                max_agents=6,
+                life_emergence=False,
+                epidemic_observer=False,
+                emergence_subsystems=True,
+                rust_worldgraph_prod=True,
+            )
+        )
+        from engine.rust_worldgraph_tick import install_rust_worldgraph
+
+        st = install_rust_worldgraph(sim, prod_mode=True)
+        self.assertTrue(st.prod_mode)
+
     def test_terre_preset_keys(self):
         sys.path.insert(0, os.path.abspath(os.path.join(HERE, "..")))
         import run as run_mod
@@ -193,6 +242,8 @@ class IntegrationRiskyTests(unittest.TestCase):
         self.assertTrue(terre["knowledge_layers"])
         self.assertEqual(terre["hydrology_mode"], "sv1d")
         self.assertEqual(terre["founders"], 0)
+        self.assertTrue(terre.get("macro_commerce"))
+        self.assertTrue(terre.get("rust_worldgraph_prod"))
 
 
 if __name__ == "__main__":

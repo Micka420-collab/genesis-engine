@@ -18,12 +18,14 @@ def wire_full_stack(
     rust_worldgraph: bool = True,
     mp_api: bool = True,
     five_cd: bool = True,
+    macro_commerce: bool = True,
     genesis_resolution: int = 64,
 ) -> Dict[str, Any]:
     """Idempotent post-``Simulation()`` wiring. Returns status dict."""
     out: Dict[str, Any] = {
         "genesis_bootstrapped": False,
         "rust_worldgraph": False,
+        "macro_commerce": False,
         "mp_api_records": 0,
         "five_cd": False,
     }
@@ -47,8 +49,16 @@ def wire_full_stack(
     if rust_worldgraph:
         from engine.rust_worldgraph_tick import install_rust_worldgraph
 
-        install_rust_worldgraph(sim)
+        prod = bool(getattr(sim.cfg, "rust_worldgraph_prod", False))
+        install_rust_worldgraph(sim, prod_mode=prod)
         out["rust_worldgraph"] = True
+        out["rust_worldgraph_prod"] = prod
+
+    if macro_commerce and getattr(sim.cfg, "macro_commerce", False):
+        from engine.commerce_emergence import install_commerce_emergence
+
+        install_commerce_emergence(sim)
+        out["macro_commerce"] = True
 
     if mp_api and getattr(sim, "_materials_project", None) is not None:
         from engine.materials_project import try_fetch_mp_bootstrap

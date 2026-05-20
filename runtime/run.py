@@ -58,6 +58,8 @@ PRESETS = {
         knowledge_layers=True,
         full_biosphere=True,
         hydrology_mode="sv1d",
+        macro_commerce=True,
+        rust_worldgraph_prod=True,
     ),
     "terre": dict(
         seed=0x7E112E_DE000000,
@@ -67,6 +69,8 @@ PRESETS = {
         max_emergent_founders=2,
         knowledge_layers=True,
         hydrology_mode="sv1d",
+        macro_commerce=True,
+        rust_worldgraph_prod=True,
         max_agents=200,
         bounds_km=(2.5, 2.5),
         cultures=1,
@@ -265,6 +269,7 @@ def main() -> int:
                 rust_worldgraph=True,
                 mp_api=bool(cfg.knowledge_layers),
                 five_cd=not args.no_5cd,
+                macro_commerce=bool(getattr(cfg, "macro_commerce", False)),
             )
         except Exception as exc:
             print(f"[run] full stack wiring failed (continuing): {exc}",
@@ -330,6 +335,7 @@ def main() -> int:
             "hydrology_mode": str(cfg.hydrology_mode),
             "genesis_bootstrapped": bool(genesis_bootstrapped),
             "rust_worldgraph": bool(stack_status.get("rust_worldgraph")),
+            "macro_commerce": bool(stack_status.get("macro_commerce")),
             "mp_api_records": int(stack_status.get("mp_api_records", 0)),
             "catastrophe_at_tick": int(cfg.catastrophe_at_tick),
             "5cd_installed": bool(five_cd_installed),
@@ -352,6 +358,8 @@ def main() -> int:
         summary["koeppen"] = emergence["koeppen"]
     if emergence.get("rust_worldgraph"):
         summary["rust_worldgraph"] = emergence["rust_worldgraph"]
+    if emergence.get("commerce"):
+        summary["commerce"] = emergence["commerce"]
     live = getattr(getattr(sim, "_emergence", None), "live_observable", None)
     if live:
         summary["observable"] = live

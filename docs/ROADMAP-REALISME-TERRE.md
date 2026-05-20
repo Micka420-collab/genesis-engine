@@ -9,10 +9,10 @@ Estimation honnête du niveau de réalisme **au 19 mai 2026** après la session 
 | Climat / biomes | **76 %** | Köppen FAIR (checksums), bootstrap Genesis p80, harness 6 stations | Circulation 3D, Beck 2018 |
 | Géologie / relief | **55 %** | Tectonique + stratigraphie légère | Érosion GPU dynamique, datation absolue |
 | Écologie / hydrologie | **65 %** | Stub par défaut ; **`hydrology_mode`** (`stub` / `sv1d` / `lbm`) dans le tick + preset **`run.py realism`** | Biogeochimie, bassins versants complets |
-| Sociétés / agents | **70 %** | R0 réseau vs SIR, exp4 + dashboard | Économie complète, memotype borné |
+| Sociétés / agents | **72 %** | R0 réseau ; commerce macro→TRADE (`commerce_emergence`) |
 | Rendu visuel | **73 %** | PBR-lite, HG phase + ray-march colonne | Volumétrique GPU, humains photoréalistes |
 | Observation IA | **78 %** | SSE `observation_server.py`, dashboard auto-refresh | Fog-of-war, multi-tenant |
-| Pont Python↔Rust | **70 %** | **maturin CI bloquant** (wheel + smoke p73), `genesis_world` + mock ; preset realism bootstrap | WorldGraph passes prod en tick |
+| Pont Python↔Rust | **74 %** | maturin CI bloquant ; tick prod `rust_worldgraph_prod` + prefetch intents |
 
 **Global pondéré : ~70 %** (moyenne simple des 7 dimensions).
 
