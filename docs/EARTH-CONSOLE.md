@@ -15,8 +15,11 @@ Ouvre **http://127.0.0.1:8090/** dans le navigateur.
 
 | Zone | Rôle |
 |------|------|
-| **Viewport** | Terrain live (`/api/render`), pan/zoom, agents en overlay |
-| **Carte macro** | Continent Genesis 4000 km (`/api/macro`) — clic pour ancrer la caméra |
+| **Vue locale** | Terrain top-down (`/api/render`), pan/zoom, agents en overlay |
+| **Globe WebGL** | Sphère Three.js texturée par `/api/macro` — rotation + clic téléport |
+| **Vue isométrique** | 2.5D Age-of-Empires (`/api/render?mode=iso`) |
+| **Carte macro** | Mini-carte continent — clic pour ancrer la caméra |
+| **Timeline** | Sparkline population (footer) |
 | **Couches** | Relief, température, précip, NDVI, marin, nuages |
 | **Transport** | Pause, pas, vitesses 0.5×–5× |
 | **Panneau** | KPIs, liste agents, événements récents |
@@ -39,9 +42,12 @@ Ouvre **http://127.0.0.1:8090/** dans le navigateur.
 |--------|--------|
 | Espace | Pause / lecture |
 | S | Un pas |
+| G | Globe WebGL / local |
+| I | Isométrique / local |
 | R | Recentrer sur les agents |
-| Drag | Pan |
-| Molette | Zoom |
+| Drag | Pan (local) ou rotation (globe) |
+| Molette | Zoom (local) |
+| Clic globe | Téléportation |
 
 ## Voir aussi
 

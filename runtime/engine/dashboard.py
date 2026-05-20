@@ -396,6 +396,49 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
     return _encode_png(img)
 
 
+def render_bbox_iso_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax: float,
+                      out_w: int, out_h: int) -> bytes:
+    """Isometric 2.5D render of the bbox (Wave 36) resized to output dimensions."""
+    from engine.world_render_isometric import (
+        IsometricRenderOptions,
+        render_sim_isometric,
+    )
+
+    out_w = max(64, min(int(out_w), 1200))
+    out_h = max(64, min(int(out_h), 900))
+    cx_min = int(math.floor(xmin / CHUNK_SIDE_M))
+    cy_min = int(math.floor(ymin / CHUNK_SIDE_M))
+    cx_max = int(math.floor(xmax / CHUNK_SIDE_M))
+    cy_max = int(math.floor(ymax / CHUNK_SIDE_M))
+    if cx_max < cx_min:
+        cx_min, cx_max = cx_max, cx_min
+    if cy_max < cy_min:
+        cy_min, cy_max = cy_max, cy_min
+    opts = IsometricRenderOptions(
+        draw_agents=True,
+        draw_buildings=True,
+        tile_w=8,
+        tile_h=4,
+    )
+    rgb = render_sim_isometric(
+        sim,
+        chunks_range=(cx_min, cy_min, cx_max, cy_max),
+        options=opts,
+    )
+    rh, rw = rgb.shape[:2]
+    if rh < 2 or rw < 2:
+        img = np.zeros((out_h, out_w, 4), dtype=np.uint8)
+        img[..., 3] = 255
+        return _encode_png(img)
+    yi = np.linspace(0, rh - 1, out_h).astype(np.int32)
+    xi = np.linspace(0, rw - 1, out_w).astype(np.int32)
+    small = rgb[yi][:, xi]
+    img = np.zeros((out_h, out_w, 4), dtype=np.uint8)
+    img[..., :3] = small
+    img[..., 3] = 255
+    return _encode_png(img)
+
+
 def render_macro_continental_png(sim: Simulation, out_w: int = 480, out_h: int = 320
                                  ) -> Optional[Tuple[bytes, dict]]:
     """Render Genesis continental macro grid (elevation hillshade + biomes)."""
@@ -684,7 +727,11 @@ class _Handler(BaseHTTPRequestHandler):
             xmax = float(qs.get("xmax", 100));  ymax = float(qs.get("ymax", 100))
             w = int(qs.get("w", 600)); h = int(qs.get("h", 400))
             overlay = qs.get("overlay", "")
-            png = render_bbox_png(self.sim_ref, xmin, ymin, xmax, ymax, w, h, overlay)
+            mode = qs.get("mode", "").lower()
+            if mode == "iso":
+                png = render_bbox_iso_png(self.sim_ref, xmin, ymin, xmax, ymax, w, h)
+            else:
+                png = render_bbox_png(self.sim_ref, xmin, ymin, xmax, ymax, w, h, overlay)
             self._png(png); return
         if path == "/api/control":
             qs = self._qs()

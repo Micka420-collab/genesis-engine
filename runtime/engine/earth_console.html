@@ -251,7 +251,23 @@
       color: var(--text);
     }
     .zoom-readout { margin-left: auto; color: var(--text); }
+    .view-hidden { display: none !important; }
+    #globeCanvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+    #globeCanvas.grabbing { cursor: grabbing; }
+    .globe-hud {
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      font-size: 11px; color: var(--muted); pointer-events: none;
+      background: var(--bg-panel); padding: 6px 14px; border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    #timelineWrap {
+      flex: 1; height: 28px; margin: 0 12px;
+      background: var(--bg-elevated); border-radius: 6px; overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    #timelineCanvas { width: 100%; height: 100%; display: block; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 </head>
 <body>
 <div class="shell">
@@ -276,9 +292,9 @@
   </header>
 
   <nav class="rail" aria-label="Outils">
-    <button class="active" title="Vue locale" data-tool="local">🌍</button>
-    <button title="Couches" data-tool="layers">◫</button>
-    <button title="Agents" data-tool="agents">◎</button>
+    <button class="active" title="Vue locale top-down" data-view-mode="local">🗺</button>
+    <button title="Globe planétaire WebGL" data-view-mode="globe">🌐</button>
+    <button title="Vue isométrique 2.5D" data-view-mode="iso">◆</button>
     <button title="God view classique" onclick="location.href='god_view_v2.html'">⚡</button>
   </nav>
 
@@ -286,8 +302,10 @@
     <div id="viewport">
       <img id="worldImg" alt="terrain">
       <canvas id="agentLayer"></canvas>
+      <canvas id="globeCanvas" class="view-hidden"></canvas>
+      <div class="globe-hud view-hidden" id="globeHud">Glisser pour tourner · clic pour te téléporter</div>
     </div>
-    <div class="hud-bl">
+    <div class="hud-bl" id="macroCard">
       <div class="card">
         <h3>Continent Genesis</h3>
         <img id="macroImg" alt="macro continental" src="">
@@ -307,6 +325,7 @@
 
       <div class="section-title">Couche terrain</div>
       <div class="layers" id="layerChips">
+        <button class="layer-chip" data-overlay="iso" id="isoChip" style="display:none">Isométrique</button>
         <button class="layer-chip active" data-overlay="">Relief</button>
         <button class="layer-chip" data-overlay="temperature">Température</button>
         <button class="layer-chip" data-overlay="precip">Précipitations</button>
@@ -332,7 +351,8 @@
   </aside>
 
   <footer>
-    <span><kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>Espace</kbd> pause · <kbd>S</kbd> pas · <kbd>R</kbd> recentrer</span>
+    <span id="footerHelp"><kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>G</kbd> globe</span>
+    <div id="timelineWrap"><canvas id="timelineCanvas"></canvas></div>
     <span class="zoom-readout" id="zoomReadout">zoom —</span>
   </footer>
 </div>
@@ -347,8 +367,12 @@ let lastAgents = [], selectedRow = null, followingRow = null;
 let imgLoading = false, lastImgUrl = '';
 let macroMeta = { available: false, map_size_km: 4000, origin_km: [2000, 2000] };
 let pollStart = performance.now(), lastTick = 0, tpsEma = 0;
+let viewMode = 'local';
+let popHistory = [];
+const MAX_HISTORY = 120;
 
 const viewport = document.getElementById('viewport');
+const globeCanvas = document.getElementById('globeCanvas');
 const worldImg = document.getElementById('worldImg');
 const agentLayer = document.getElementById('agentLayer');
 const aCtx = agentLayer.getContext('2d');
@@ -404,7 +428,10 @@ document.getElementById('layerChips').addEventListener('click', e => {
   if (!b) return;
   document.querySelectorAll('#layerChips .layer-chip').forEach(x => x.classList.remove('active'));
   b.classList.add('active');
-  overlay = b.dataset.overlay || '';
+  const ov = b.dataset.overlay || '';
+  if (ov === 'iso') { setViewMode('iso'); return; }
+  overlay = ov;
+  if (viewMode === 'iso') setViewMode('local');
   scheduleTerrain();
 });
 document.getElementById('agentViewChips').addEventListener('click', e => {
@@ -422,13 +449,14 @@ function scheduleTerrain() {
   terrainTimer = setTimeout(loadTerrain, 60);
 }
 function loadTerrain() {
-  if (imgLoading) return;
+  if (imgLoading || viewMode === 'globe') return;
   const { w, h } = vp();
   const b = bbox();
   const ow = Math.min(w, 960), oh = Math.min(h, 640);
   let url = `${API}/api/render?xmin=${b.xmin.toFixed(1)}&ymin=${b.ymin.toFixed(1)}` +
     `&xmax=${b.xmax.toFixed(1)}&ymax=${b.ymax.toFixed(1)}&w=${ow}&h=${oh}&t=${Date.now()}`;
-  if (overlay) url += `&overlay=${encodeURIComponent(overlay)}`;
+  if (viewMode === 'iso') url += '&mode=iso';
+  else if (overlay) url += `&overlay=${encodeURIComponent(overlay)}`;
   if (url === lastImgUrl) return;
   lastImgUrl = url;
   imgLoading = true;
@@ -591,6 +619,10 @@ async function poll() {
     document.getElementById('kpiBirths').textContent = metricsJ.cum_births ?? '—';
     document.getElementById('kpiDeaths').textContent = metricsJ.cum_deaths ?? '—';
     lastAgents = agentsJ.agents || [];
+    popHistory.push(alive);
+    if (popHistory.length > MAX_HISTORY) popHistory.shift();
+    drawTimeline();
+    updateGlobeMarker();
     renderAgentList(lastAgents);
     const ev = eventsJ.events || [];
     document.getElementById('events').innerHTML = ev.slice(-20).reverse().map(e =>
@@ -602,12 +634,154 @@ async function poll() {
   }
 }
 
+// --- View modes: local | globe | iso ---
+document.querySelectorAll('[data-view-mode]').forEach(btn => {
+  btn.addEventListener('click', () => setViewMode(btn.dataset.viewMode));
+});
+function setViewMode(mode) {
+  viewMode = mode;
+  document.querySelectorAll('[data-view-mode]').forEach(b => {
+    b.classList.toggle('active', b.dataset.viewMode === mode);
+  });
+  const isGlobe = mode === 'globe';
+  const isIso = mode === 'iso';
+  worldImg.classList.toggle('view-hidden', isGlobe);
+  agentLayer.classList.toggle('view-hidden', isGlobe || isIso);
+  globeCanvas.classList.toggle('view-hidden', !isGlobe);
+  document.getElementById('globeHud').classList.toggle('view-hidden', !isGlobe);
+  document.getElementById('macroCard').classList.toggle('view-hidden', isGlobe);
+  document.getElementById('isoChip').style.display = isIso ? '' : 'none';
+  document.getElementById('footerHelp').innerHTML = isGlobe
+    ? '<kbd>drag</kbd> rotation · <kbd>clic</kbd> téléport · <kbd>G</kbd> local'
+    : isIso
+      ? 'Vue isométrique · <kbd>drag</kbd> pan · <kbd>I</kbd> local'
+      : '<kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>G</kbd> globe';
+  if (isGlobe) initGlobe();
+  scheduleTerrain();
+  drawAgents();
+  if (isGlobe) globeAnimate();
+}
 window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
   if (e.code === 'Space') { e.preventDefault(); document.getElementById('btnPause').click(); }
   if (e.code === 'KeyS') document.getElementById('btnStep').click();
   if (e.code === 'KeyR') recenterAgents();
+  if (e.code === 'KeyG') setViewMode(viewMode === 'globe' ? 'local' : 'globe');
+  if (e.code === 'KeyI') setViewMode(viewMode === 'iso' ? 'local' : 'iso');
 });
+
+// --- Globe WebGL (Three.js) ---
+let globeInited = false, globeRenderer, globeScene, globeCamera, globeMesh, globeMarker;
+let globeRotY = 0, globeDrag = false, globeLastX = 0;
+
+function initGlobe() {
+  if (globeInited || typeof THREE === 'undefined') return;
+  globeInited = true;
+  const { w, h } = vp();
+  globeRenderer = new THREE.WebGLRenderer({ canvas: globeCanvas, antialias: true, alpha: true });
+  globeRenderer.setSize(w, h);
+  globeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  globeScene = new THREE.Scene();
+  globeCamera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
+  globeCamera.position.z = 2.8;
+  globeScene.add(new THREE.AmbientLight(0x6688aa, 0.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+  sun.position.set(5, 3, 5);
+  globeScene.add(sun);
+  const tex = new THREE.TextureLoader().load(`${API}/api/macro?w=1024&h=512&t=${Date.now()}`);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const geo = new THREE.SphereGeometry(1, 72, 48);
+  globeMesh = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ map: tex, shininess: 8 }));
+  globeScene.add(globeMesh);
+  const starGeo = new THREE.SphereGeometry(0.025, 12, 12);
+  globeMarker = new THREE.Mesh(starGeo, new THREE.MeshBasicMaterial({ color: 0xff6b4a }));
+  globeScene.add(globeMarker);
+  updateGlobeMarker();
+  globeCanvas.addEventListener('mousedown', e => { if (e.button === 0) { globeDrag = true; globeLastX = e.clientX; globeCanvas.classList.add('grabbing'); } });
+  window.addEventListener('mouseup', () => { globeDrag = false; globeCanvas.classList.remove('grabbing'); });
+  globeCanvas.addEventListener('mousemove', e => {
+    if (globeDrag) { globeRotY += (e.clientX - globeLastX) * 0.01; globeLastX = e.clientX; }
+  });
+  globeCanvas.addEventListener('click', onGlobeClick);
+}
+function kmToGlobePos(xKm, yKm) {
+  const u = xKm / macroMeta.map_size_km;
+  const v = 1 - yKm / macroMeta.map_size_km;
+  const phi = v * Math.PI;
+  const theta = u * 2 * Math.PI - Math.PI;
+  const r = 1.03;
+  return new THREE.Vector3(
+    r * Math.sin(phi) * Math.cos(theta),
+    r * Math.cos(phi),
+    r * Math.sin(phi) * Math.sin(theta)
+  );
+}
+function updateGlobeMarker() {
+  if (!globeMarker || !macroMeta.available) return;
+  const ox = macroMeta.origin_km[0], oy = macroMeta.origin_km[1];
+  const pos = kmToGlobePos(ox + camCenterX / 1000, oy + camCenterY / 1000);
+  globeMarker.position.copy(pos);
+}
+function onGlobeClick(e) {
+  if (!macroMeta.available || !globeCamera) return;
+  const rect = globeCanvas.getBoundingClientRect();
+  const mouse = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    -((e.clientY - rect.top) / rect.height) * 2 + 1
+  );
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(mouse, globeCamera);
+  const hits = ray.intersectObject(globeMesh);
+  if (!hits.length) return;
+  const p = hits[0].point.clone().applyMatrix4(globeMesh.matrixWorld.clone().invert());
+  const phi = Math.acos(Math.max(-1, Math.min(1, p.y)));
+  const theta = Math.atan2(p.z, p.x);
+  const v = phi / Math.PI;
+  const u = (theta + Math.PI) / (2 * Math.PI);
+  const xKm = u * macroMeta.map_size_km;
+  const yKm = (1 - v) * macroMeta.map_size_km;
+  const ox = macroMeta.origin_km[0], oy = macroMeta.origin_km[1];
+  camCenterX = (xKm - ox) * 1000;
+  camCenterY = (yKm - oy) * 1000;
+  camZoom = Math.max(macroMeta.map_size_km * 8, 1.5);
+  updateZoom(); updateGlobeMarker();
+  if (viewMode === 'local' || viewMode === 'iso') scheduleTerrain();
+}
+function globeAnimate() {
+  if (viewMode !== 'globe' || !globeRenderer) return;
+  requestAnimationFrame(globeAnimate);
+  if (globeMesh) globeMesh.rotation.y = globeRotY;
+  updateGlobeMarker();
+  const { w, h } = vp();
+  globeCamera.aspect = w / h;
+  globeCamera.updateProjectionMatrix();
+  globeRenderer.setSize(w, h);
+  globeRenderer.render(globeScene, globeCamera);
+}
+window.addEventListener('resize', () => { if (globeInited && globeRenderer) { const { w, h } = vp(); globeRenderer.setSize(w, h); } });
+
+// --- Population timeline sparkline ---
+const tCanvas = document.getElementById('timelineCanvas');
+const tCtx = tCanvas.getContext('2d');
+function drawTimeline() {
+  const wrap = document.getElementById('timelineWrap');
+  tCanvas.width = wrap.clientWidth;
+  tCanvas.height = wrap.clientHeight;
+  const w = tCanvas.width, h = tCanvas.height;
+  tCtx.fillStyle = '#141c2a';
+  tCtx.fillRect(0, 0, w, h);
+  if (popHistory.length < 2) return;
+  const maxP = Math.max(...popHistory, 1);
+  tCtx.strokeStyle = '#3dd6c6';
+  tCtx.lineWidth = 1.5;
+  tCtx.beginPath();
+  popHistory.forEach((p, i) => {
+    const x = (i / (popHistory.length - 1)) * (w - 4) + 2;
+    const y = h - 4 - (p / maxP) * (h - 8);
+    if (i === 0) tCtx.moveTo(x, y); else tCtx.lineTo(x, y);
+  });
+  tCtx.stroke();
+}
 
 loadMacro();
 scheduleTerrain();

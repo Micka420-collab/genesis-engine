@@ -14,6 +14,8 @@ def test_earth_console_html_exists():
     assert "earth_console" in text or "Terre" in text
     assert "/api/render" in text
     assert "/api/macro" in text
+    assert "globeCanvas" in text
+    assert "mode=iso" in text or "viewMode" in text
 
 
 def test_run_earth_console_script_exists():
