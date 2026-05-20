@@ -702,6 +702,14 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception:
             return {}
 
+    def _sim_read(self, fn):
+        """Run a sim read callback under the shared API lock (thread-safe)."""
+        sim = self.sim_ref
+        if sim is None:
+            return fn()
+        with sim.api_lock:
+            return fn()
+
     def _serve_file(self, name: str, content_type: str = "text/html; charset=utf-8") -> None:
         path = os.path.join(self.static_dir, name)
         if not os.path.isfile(path):
@@ -750,18 +758,21 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_file("audio_overlay.js", content_type="application/javascript; charset=utf-8")
             return
         if path == "/api/state":
-            self._json(200, self.sim_ref.snapshot()); return
+            self._json(200, self._sim_read(self.sim_ref.snapshot)); return
         if path == "/api/agents":
             qs = self._qs()
             if qs.get("lite", "").lower() in ("1", "true", "yes"):
                 from engine.agent_batch import snapshot_positions_lite_with_vel
-                self._json(200, snapshot_positions_lite_with_vel(self.sim_ref)); return
+                self._json(200, self._sim_read(
+                    lambda: snapshot_positions_lite_with_vel(self.sim_ref))); return
             if qs.get("packed", "").lower() in ("1", "true", "yes"):
                 from engine.agent_ecs_batch import snapshot_agents_packed
-                self._json(200, snapshot_agents_packed(self.sim_ref)); return
-            self._json(200, {"agents": self.sim_ref.snapshot_agents()}); return
+                self._json(200, self._sim_read(
+                    lambda: snapshot_agents_packed(self.sim_ref))); return
+            self._json(200, self._sim_read(
+                lambda: {"agents": self.sim_ref.snapshot_agents()})); return
         if path == "/api/metrics":
-            self._json(200, self.sim_ref.annalist.metrics_to_dict()); return
+            self._json(200, self._sim_read(self.sim_ref.annalist.metrics_to_dict)); return
         if path == "/api/lift_state":
             self._json(200, lift_state(self.sim_ref)); return
         if path == "/api/realism_state":
@@ -1253,6 +1264,8 @@ def start_server(sim: Simulation, ctl: SimController, host: str = "0.0.0.0",
                  port: int = 8080, static_dir: str = "") -> ThreadingHTTPServer:
     _Handler.sim_ref = sim
     _Handler.ctl_ref = ctl
+    # One lock for pause/speed control and concurrent HTTP reads vs sim.step().
+    sim.api_lock = ctl.lock
     _Handler.static_dir = static_dir or os.path.dirname(os.path.abspath(__file__))
     # P2 — audio endpoints (best-effort wiring; safe if modules missing).
     try:

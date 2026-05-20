@@ -148,8 +148,8 @@ def install_deepmind_world_prior(
 
             install_nca_multichannel(sim, LEARNED_NCA_CONFIG)
             out["nca_learned"] = True
-        except Exception:
-            pass
+        except Exception as exc:
+            out["nca_error"] = f"{type(exc).__name__}: {exc}"
     return out
 
 

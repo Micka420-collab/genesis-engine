@@ -137,7 +137,8 @@ def main():
                 time.sleep(0.05)
                 continue
             t0 = time.monotonic()
-            stats = sim.step()
+            with ctl.lock:
+                stats = sim.step()
             feed_event_tail(ctl, sim.annalist)
             target_dt = 1.0 / max(0.01, ctl.target_tps * speed)
             elapsed = time.monotonic() - t0

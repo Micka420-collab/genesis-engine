@@ -9,7 +9,7 @@
 
 **EMERGENCE SIM v2** — laboratoire ZERO PRE-SCRIPT : lois physiques L0–L4, agents autonomes, civilisation **non scriptée**, observable via Earth Console et métriques d'émergence.
 
-**Tests :** `pytest runtime/tests` — **133** tests · smokes **p72–p86** (+ `p87` observer) dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **145** tests · smokes **p72–p86** (+ `p87` observer) dans `validate-all`.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
@@ -86,7 +86,7 @@ Depuis la racine du repo (`PYTHONPATH=runtime` implicite via `make` ou `cd runti
 ```bash
 make smoke                    # p0 — sanity
 make civilization             # pipeline émergence + manifest
-make validate-all             # pytest (133 tests) + smokes p72–p86 + SSE
+make validate-all             # pytest (145 tests) + smokes p72–p86 + SSE
 make earth-console            # Terre live UI (8090)
 make terre-long               # preset terre 2000 ticks + artifact enrichi
 python run.py terre --ticks 500

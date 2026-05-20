@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import math
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -110,6 +111,8 @@ class Simulation:
         # Phase 4: rate-limit competition penalties per (a,b) pair.
         self._last_competition_tick: Dict[Tuple[int, int], int] = {}
         self._competition_cooldown_ticks = 20
+        # Shared with dashboard HTTP threads and run_earth_console step loop.
+        self.api_lock = threading.RLock()
         if config.emergence_subsystems:
             from engine.sim_emergence import wire_civilization_emergence
             epidemic_every = 5 if config.catastrophe_at_tick > 0 else 20
@@ -189,6 +192,10 @@ class Simulation:
         return best if best is not None else (0.0, 0.0)
 
     def step(self) -> SimStats:
+        with self.api_lock:
+            return self._step_unlocked()
+
+    def _step_unlocked(self) -> SimStats:
         t0 = time.monotonic()
         if not self._bootstrapped:
             self.bootstrap()
@@ -589,22 +596,25 @@ class Simulation:
             "wall_clock_s": self.annalist.wall_clock_s(),
             "groups_active": len(self._groups),
         }
+        errors: Dict[str, str] = {}
         if self.cfg.emergence_subsystems:
             try:
                 from engine.sim_emergence import emergence_snapshot
                 out["emergence"] = emergence_snapshot(self)
-            except Exception:
-                pass
+            except Exception as exc:
+                errors["emergence"] = f"{type(exc).__name__}: {exc}"
         if self.cfg.life_emergence:
             try:
                 from engine.life_emergence import life_emergence_snapshot
                 out["life_emergence"] = life_emergence_snapshot(self)
-            except Exception:
-                pass
+            except Exception as exc:
+                errors["life_emergence"] = f"{type(exc).__name__}: {exc}"
         if self.cfg.knowledge_layers:
             try:
                 from engine.knowledge_layers import knowledge_layers_snapshot
                 out["knowledge_layers"] = knowledge_layers_snapshot(self)
-            except Exception:
-                pass
+            except Exception as exc:
+                errors["knowledge_layers"] = f"{type(exc).__name__}: {exc}"
+        if errors:
+            out["snapshot_errors"] = errors
         return out
