@@ -41,6 +41,9 @@ def test_earth_console_html_exists():
     assert "/api/observer_feed" in text
     assert "observerLayer" in text
     assert "earth_console_speech.js" in text
+    assert "earth_console_phoneme_audio.js" in text
+    assert "speechFocus" in text
+    assert "selVoiceMode" in text
     assert "btnListen" in text
     assert "KeyE" in text or "toggleListen" in text
     assert "/api/sun_state" in text or "loadSunState" in text

@@ -966,6 +966,10 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_file("earth_console_speech.js",
                              content_type="application/javascript; charset=utf-8")
             return
+        if path == "/earth_console_phoneme_audio.js":
+            self._serve_file("earth_console_phoneme_audio.js",
+                             content_type="application/javascript; charset=utf-8")
+            return
         if path == "/api/wind_field":
             qs = self._qs()
             try:
@@ -1156,6 +1160,21 @@ class _Handler(BaseHTTPRequestHandler):
                 }
             except Exception:
                 pass
+        if getattr(a, "lexicon", None) is not None:
+            try:
+                from engine.communication import lexicon_to_phonemes
+                lv = a.lexicon[row]
+                out["phonemes"] = lexicon_to_phonemes(lv, n_syllables=4)
+                out["lexicon_preview"] = [round(float(x), 3) for x in lv[:8]]
+            except Exception:
+                pass
+        act = int(a.action[row]) if hasattr(a, "action") else 0
+        from engine.agent import ActionKind
+        out["action_id"] = act
+        try:
+            out["action_name"] = ActionKind(act).name
+        except ValueError:
+            out["action_name"] = str(act)
         return out
 
     def _demography(self) -> Dict:

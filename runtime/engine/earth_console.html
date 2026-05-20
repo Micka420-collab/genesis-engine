@@ -459,10 +459,21 @@
       <div id="speechListenPanel">
         <button class="btn" type="button" id="btnListenSide" style="width:100%">🎧 Activer l'écoute</button>
         <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11px;color:var(--muted)">
-          <input type="checkbox" id="chkSpeakAloud" checked> Synthèse vocale (zoom agent)
+          <input type="checkbox" id="chkSpeakAloud" checked> Son des paroles (zoom agent)
+        </label>
+        <label style="display:block;margin-top:6px;font-size:11px;color:var(--muted)">Voix :
+          <select id="selVoiceMode" style="margin-left:6px;font-size:11px;background:var(--bg-elevated);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 6px">
+            <option value="phoneme" selected>Phonèmes (procédural)</option>
+            <option value="tts">Navigateur (TTS)</option>
+            <option value="both">Les deux</option>
+            <option value="off">Silencieux</option>
+          </select>
         </label>
         <div style="margin-top:6px;font-size:10px;color:var(--muted)">Proto-langages par culture :</div>
         <div id="speechLangs" style="margin-top:4px">—</div>
+        <div class="speech-focus-title" id="speechFocusTitle">Sélectionne un agent</div>
+        <div class="speech-focus" id="speechFocus">—</div>
+        <div style="margin-top:6px;font-size:10px;color:var(--muted)">Ambiance (zone) :</div>
         <div class="speech-log" id="speechLog">—</div>
       </div>
 
@@ -514,6 +525,7 @@
 <script src="/earth_console_sun_shadow.js"></script>
 <script src="/earth_console_ambient_audio.js"></script>
 <script src="/earth_console_agent_anim.js"></script>
+<script src="/earth_console_phoneme_audio.js"></script>
 <script src="/earth_console_speech.js"></script>
 <script>
 const API = '';
@@ -612,6 +624,7 @@ function initSpeech() {
     get camCenterY() { return camCenterY; },
     get camZoom() { return camZoom; },
     get selectedRow() { return selectedRow; },
+    getAudioCtx: () => ambientAudio,
   });
 }
 function syncSpeechOpts() {
@@ -622,8 +635,11 @@ function syncSpeechOpts() {
   agentSpeech.opts.camCenterY = camCenterY;
   agentSpeech.opts.camZoom = camZoom;
   agentSpeech.opts.selectedRow = selectedRow;
+  agentSpeech.opts.getAudioCtx = () => ambientAudio;
   const chk = document.getElementById('chkSpeakAloud');
-  if (chk) agentSpeech.speakAloud = chk.checked;
+  const sel = document.getElementById('selVoiceMode');
+  if (chk) agentSpeech.speakAloud = chk.checked && sel?.value !== 'off';
+  if (sel) agentSpeech.setVoiceMode(sel.value);
 }
 function toggleListen() {
   initSpeech();
@@ -1276,14 +1292,24 @@ async function loadAgentDetail(row) {
     const d = await (await fetch(API + '/api/agent?row=' + row)).json();
     if (d.error) { el.textContent = d.error; return; }
     const inv = d.inventory || {};
+    const ph = d.phonemes ? `<br><span style="color:var(--accent)">langage</span> «<strong>${d.phonemes}</strong>»` : '';
+    const act = d.action_name ? `<br>action <strong>${d.action_name}</strong>` : '';
     el.innerHTML =
-      `<strong>#${d.row}</strong> gen ${d.generation} · vitalité ${(d.vitality ?? 0).toFixed(2)}<br>` +
+      `<strong>#${d.row}</strong> gen ${d.generation} · culture ${d.culture ?? '?'} · vitalité ${(d.vitality ?? 0).toFixed(2)}${ph}${act}<br>` +
       `pos (${d.pos?.[0]?.toFixed?.(0) ?? '?'}, ${d.pos?.[1]?.toFixed?.(0) ?? '?'}) m<br>` +
-      `faim ${(d.drives?.hunger ?? 0).toFixed(2)} · soif ${(d.drives?.thirst ?? 0).toFixed(2)}<br>` +
+      `faim ${(d.drives?.hunger ?? 0).toFixed(2)} · soif ${(d.drives?.thirst ?? 0).toFixed(2)} · stress ${(d.drives?.stress ?? 0).toFixed(2)}<br>` +
       `inv eau ${(inv.water ?? 0).toFixed(0)} · nourriture ${(inv.food ?? 0).toFixed(0)} · bois ${(inv.wood ?? 0).toFixed(0)}` +
       (d.genome_brain
         ? `<br>cerveau ADN eff ${(d.genome_brain.cognitive_efficiency ?? 0).toFixed(2)} · actions ${(d.genome_brain.actions_top3 || []).join(',')}`
-        : '');
+        : '') +
+      `<br><button type="button" class="btn" id="btnPlayAgentVoice" style="margin-top:6px;font-size:11px">🔊 Écouter sa voix</button>`;
+    document.getElementById('btnPlayAgentVoice')?.addEventListener('click', () => {
+      initSpeech();
+      syncSpeechOpts();
+      if (ambientAudio) ambientAudio.unlock();
+      if (d.phonemes && agentSpeech) agentSpeech.speakPhonemes(d.phonemes, 1);
+    });
+    if (agentSpeech?.enabled) agentSpeech.onAgentSelected(row);
   } catch (e) {
     el.textContent = 'détail indisponible';
   }
@@ -1562,6 +1588,7 @@ window.addEventListener('keydown', e => {
 document.getElementById('btnListen')?.addEventListener('click', toggleListen);
 document.getElementById('btnListenSide')?.addEventListener('click', toggleListen);
 document.getElementById('chkSpeakAloud')?.addEventListener('change', syncSpeechOpts);
+document.getElementById('selVoiceMode')?.addEventListener('change', syncSpeechOpts);
 document.getElementById('zoomPresets').addEventListener('click', e => {
   const b = e.target.closest('[data-zoom]');
   if (b) applyZoomPreset(b.dataset.zoom);
