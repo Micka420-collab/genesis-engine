@@ -56,7 +56,7 @@ Manifesto: **[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
 | Waves 16–41 | ✅ | Genesis → clima → insediamenti → render |
 | **Realismo Terra (globale)** | **~76 %** | Media 7 dimensioni → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (obiettivo **80 %**) |
 
-**Test:** **155** pytest · smokes **p72–p87**
+**Test:** **157** pytest · smokes **p72–p87**
 
 > **Nota:** Vecchi documenti indicavano **68 %**, **74 %** o **80 %** come globale. **~76 %** è la media unificata.
 

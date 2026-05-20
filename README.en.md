@@ -77,7 +77,7 @@ Everything emerges from `Simulation.step()` — no orchestrator pipeline. See [`
 | **Waves 16–41** (realistic world) | ✅ | Genesis → climate → settlements → render → atmosphere → observers |
 | **Earth realism (global)** | **~76 %** | 7-dimension average → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (target **80 %**) |
 
-**Tests:** `pytest runtime/tests` — **155** tests · reference smokes **p72–p87** in `make validate-all`.
+**Tests:** `pytest runtime/tests` — **157** tests · reference smokes **p72–p87** in `make validate-all`.
 
 Maintained summary: **[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · work queue: **[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**.
 
