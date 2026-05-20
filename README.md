@@ -12,19 +12,29 @@
 [![Deterministic](https://img.shields.io/badge/deterministic-PRF-purple.svg)](#déterminisme)
 [![CI](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml)
 
-[État du projet](PROJECT-STATUS.md) · [Contribuer](CONTRIBUTING.md) · [Runtime Python](runtime/README.md) · [Moteur Rust](native/world-engine/README.md) · [Documentation](docs/README.md)
+[EMERGENCE SIM v2](docs/EMERGENCE-SIM-v2.md) · [État du projet](PROJECT-STATUS.md) · [Earth Console](docs/EARTH-CONSOLE.md) · [Runtime](runtime/README.md) · [Rust](native/world-engine/README.md)
 
 </div>
 
 ---
 
-## Vision
+## Vision — EMERGENCE SIM v2.0
 
-Genesis Engine est un **laboratoire open-source d’artificial life** : à partir d’un substrat physique cohérent (Terre réelle ou procédural) et de règles minimales, des agents autonomes naissent, se reproduisent et font émerger langage, économie, bâtiments et politiques — **sans scripts de fin de partie**. L’objectif scientifique est de rejouer des contrefactuelles de l’histoire humaine sous les mêmes lois de la nature ([`FUTURE-VISION.md`](FUTURE-VISION.md)).
+**ZERO PRE-SCRIPT** : seules les lois physiques sont hardcodées. Langage, outils, civilisation et terraformation doivent **émerger** des agents — jamais être des quêtes scriptées.
 
-### Émergence civilisationnelle (philosophie d’implémentation)
+Manifeste complet : **[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
 
-Climat Köppen, hydrologie, épidémies, observation et civilisation **ne sont pas pilotés par des pipelines de scripts** : ils sont branchés sur le cycle de vie de `Simulation` (`sim.step()`, `engine/sim_emergence.py`). Les smokes et `make smoke` servent à **valider** ; l’entrée utilisateur est `python runtime/run.py <expérience>` ou une boucle `sim.step()` en direct. Voir [`PROJECT-STATUS.md`](PROJECT-STATUS.md#philosophie--émergence-civilisationnelle).
+| Layer | Contenu |
+|-------|---------|
+| **L0** Physics | Thermo, gravité, hydrologie, érosion |
+| **L1** World | Genesis, climat, biomes, ressources |
+| **L2** Biology | ADN 256-D, métabolisme, sélection |
+| **L3** Cognition | Perception locale, plasticité (NEAT = cible) |
+| **L4** Civilization | Commerce, construction, polity, langage |
+
+**Observer :** `.\earth-console.ps1` → http://127.0.0.1:8090/ · KPIs : `/api/emergence_metrics`
+
+Implémentation : tout émerge de `Simulation.step()` + `sim_emergence.py` — pas de pipeline orchestrateur. Voir [`PROJECT-STATUS.md`](PROJECT-STATUS.md).
 
 ---
 

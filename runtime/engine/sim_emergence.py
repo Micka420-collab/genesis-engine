@@ -33,6 +33,7 @@ class EmergenceState:
     hydrology_ticks: int = 0
     hydrology_pairs_exchanged: int = 0
     observation_listeners: List[ObservationListener] = field(default_factory=list)
+    last_emergence_metrics: Optional[Dict[str, Any]] = None
     _hydrology_pairs_seen: Set[Tuple[Tuple[int, int, int], Tuple[int, int, int]]] = field(
         default_factory=set, repr=False)
 
@@ -268,6 +269,11 @@ def tick_emergence_world(sim) -> None:
 
     if sim.tick % st.observable_every == 0:
         _tick_live_observable(sim, st)
+        try:
+            from engine.emergence_metrics import tick_emergence_metrics
+            tick_emergence_metrics(sim, st)
+        except Exception:
+            pass
 
     if getattr(sim, "_epidemic_state", None) is not None:
         _refresh_epidemic_summary(sim, st)
@@ -317,6 +323,8 @@ def emergence_snapshot(sim) -> Dict[str, Any]:
             out["commerce"] = commerce_emergence_snapshot(sim)
         except Exception:
             pass
+    if st.last_emergence_metrics:
+        out["emergence_metrics"] = st.last_emergence_metrics
     return {k: v for k, v in out.items() if v is not None}
 
 

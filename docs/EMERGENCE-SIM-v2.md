@@ -134,18 +134,20 @@ Guide : [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md).
 
 ---
 
-## §8 — Métriques d'émergence à suivre
+## §8 — Métriques d'émergence (implémentées)
 
-| Métrique | Source possible |
-|----------|-----------------|
-| Complexité génétique moyenne | `genome.py` stats / export agents |
-| Entropie communication | distribution kinds vocalization + journal |
-| Diversité structures | `building_discovery` + rendu iso |
-| Surface terraformée | agriculture_state, diff NDVI |
-| Technologies découvertes | `invention` registry, events `innovation` |
-| Gini social | inventaires + polity_state |
+Module : `runtime/engine/emergence_metrics.py` · API : `GET /api/emergence_metrics` · panneau Earth Console.
 
-Brancher ces KPIs dans Earth Console (timeline / panneau) = prochain increment produit.
+| Métrique | Champ API | Rôle |
+|----------|-----------|------|
+| Complexité génétique moyenne | `genetic_complexity_mean` | Norme L2 des génomes vivants |
+| Entropie communication | `communication_entropy` | Shannon sur kinds Annalist / journal |
+| Diversité structures | `structures_diversity` | Inventions + projets build |
+| Surface terraformée | `terraformed_ratio` | Chunks cultivés / cache streamé |
+| Technologies découvertes | `technologies_discovered` | `InventionRegistry` |
+| Gini richesse | `wealth_gini` | Inventaires food/stone/water/wood |
+
+Recalcul toutes les `observable_every` ticks via `tick_emergence_world`.
 
 ---
 
@@ -174,11 +176,12 @@ RÉFÉRENCE CODE : docs/EMERGENCE-SIM-v2.md, runtime/engine/sim.py, make earth-c
 
 ## §10 — Prochaines étapes (alignement v2 → code)
 
-1. **NEAT / cerveau dans ADN** — prototype Rust ou Python sans backprop externe.
-2. **Réduire ActionKind** — remplacer enum fixe par espace d'action continu émergent (long terme).
-3. **WebGPU agents** ou Rust ECS faune sur hot path — perf 10k entités.
-4. **KPIs émergence** — panneau Earth Console branché sur métriques §8.
-5. **WASM publish** — core physics côté client (vision navigateur).
+1. **NEAT / cerveau dans ADN** — prototype sans backprop externe ; poids = gènes cognition.
+2. **Réduire ActionKind** — espace d'action continu découvert (long terme).
+3. **WebGPU agents** ou Rust ECS sur hot path — milliers d'entités.
+4. **Zoom village → agent** — niveaux d'échelle manquants dans Earth Console.
+5. **WASM + IndexedDB** — client navigateur (vision §6).
+6. **Memetic engine** — réplication culturelle explicite (imitation + mutation mèmes).
 
 ---
 

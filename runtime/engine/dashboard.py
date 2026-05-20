@@ -616,6 +616,8 @@ def live_stream_payload(sim: Simulation) -> dict:
     st = getattr(sim, "_emergence", None)
     if st and st.epidemic_summary:
         payload["epidemic"] = st.epidemic_summary
+    if st and st.last_emergence_metrics:
+        payload["emergence_metrics"] = st.last_emergence_metrics
     return payload
 
 
@@ -854,6 +856,13 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(200, session_info(self.sim_ref)); return
         if path == "/api/observable":
             self._json(200, live_observable_payload(self.sim_ref)); return
+        if path == "/api/emergence_metrics":
+            from engine.emergence_metrics import compute_emergence_metrics
+            jpath = None
+            if self.sim_ref.annalist.journal:
+                jpath = self.sim_ref.annalist.journal.path
+            tail = merge_journal_events(self.ctl_ref.last_event_tail or [], jpath, 500)
+            self._json(200, compute_emergence_metrics(self.sim_ref, journal_tail=tail)); return
         if path == "/api/events/stream":
             self._handle_sse_stream(); return
         if path == "/api/journal/download":

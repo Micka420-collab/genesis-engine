@@ -366,6 +366,14 @@
         <div class="kpi"><div class="label">Décès</div><div class="value" id="kpiDeaths">—</div></div>
       </div>
 
+      <div class="section-title">Émergence (ZERO PRE-SCRIPT)</div>
+      <div class="kpi-grid" id="emergenceKpis">
+        <div class="kpi"><div class="label">Génome μ</div><div class="value" id="emGenome">—</div></div>
+        <div class="kpi"><div class="label">H comm.</div><div class="value" id="emComm">—</div></div>
+        <div class="kpi"><div class="label">Tech</div><div class="value" id="emTech">—</div></div>
+        <div class="kpi"><div class="label">Gini</div><div class="value" id="emGini">—</div></div>
+      </div>
+
       <div class="section-title">Couche terrain</div>
       <div class="layers" id="layerChips">
         <button class="layer-chip" data-overlay="iso" id="isoChip" style="display:none">Isométrique</button>
@@ -753,18 +761,26 @@ async function loadMetricsHistory() {
 async function poll() {
   if (replayActive) return;
   try {
-    const [snap, agentsR, metricsR, eventsR, meteoR] = await Promise.all([
+    const [snap, agentsR, metricsR, eventsR, meteoR, emR] = await Promise.all([
       fetch(API + '/api/state'),
       fetch(API + '/api/agents'),
       fetch(API + '/api/metrics'),
       fetch(API + '/api/events/recent?n=30'),
       fetch(API + '/api/meteorology_state'),
+      fetch(API + '/api/emergence_metrics'),
     ]);
     const snapJ = await snap.json();
     const agentsJ = await agentsR.json();
     const metricsJ = await metricsR.json();
     const eventsJ = await eventsR.json();
     const meteoJ = await meteoR.json();
+    const emJ = await emR.json();
+    if (emJ && emJ.philosophy) {
+      document.getElementById('emGenome').textContent = emJ.genetic_complexity_mean ?? '—';
+      document.getElementById('emComm').textContent = emJ.communication_entropy ?? '—';
+      document.getElementById('emTech').textContent = emJ.technologies_discovered ?? '—';
+      document.getElementById('emGini').textContent = emJ.wealth_gini ?? '—';
+    }
     if (meteoJ && Object.keys(meteoJ).length) updateAtmosphereHud(meteoJ);
     document.getElementById('statusDot').classList.add('live');
     document.getElementById('connPill').textContent = 'live';

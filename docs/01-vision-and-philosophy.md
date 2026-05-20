@@ -1,5 +1,8 @@
 # 01 — Vision & Philosophie
 
+> **Document canonique :** [`EMERGENCE-SIM-v2.md`](EMERGENCE-SIM-v2.md) (ZERO PRE-SCRIPT · layers L0–L4).  
+> Ce fichier conserve les anti-patterns et la thèse scientifique ; les pourcentages et stacks obsolètes y sont remplacés par le manifeste v2.
+
 ## 1. La thèse scientifique
 
 Genesis Engine repose sur l'hypothèse de **l'émergence forte** : à partir de règles locales simples appliquées à un grand nombre d'agents et à un environnement cohérent, des structures globales (sociétés, économies, langages, croyances) apparaissent sans être codées explicitement.
