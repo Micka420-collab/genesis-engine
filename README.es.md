@@ -77,7 +77,7 @@ Todo emerge de `Simulation.step()` — sin pipeline orquestador. Ver [`PROJECT-S
 | **Waves 16–41** (mundo realista) | ✅ | Genesis → clima → asentamientos → render → atmósfera → observadores |
 | **Realismo Tierra (global)** | **~76 %** | Media de 7 dimensiones → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (objetivo **80 %**) |
 
-**Tests:** `pytest runtime/tests` — **152** tests · smokes **p72–p86** en `make validate-all`.
+**Tests:** `pytest runtime/tests` — **152** tests · smokes **p72–p87** en `make validate-all`.
 
 Resumen: **[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · cola de trabajo: **[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**.
 

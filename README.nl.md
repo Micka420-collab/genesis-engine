@@ -56,7 +56,7 @@ Manifest: **[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
 | Waves 16–41 | ✅ | Genesis → klimaat → nederzettingen → render |
 | **Aarde-realisme (globaal)** | **~76 %** | Gemiddelde 7 dimensies → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (doel **80 %**) |
 
-**Tests:** **152** pytest · smokes **p72–p86**
+**Tests:** **152** pytest · smokes **p72–p87**
 
 > **Let op:** Oudere docs toonden **68 %**, **74 %** of **80 %** als globaal. **~76 %** is het officiële gemiddelde.
 
