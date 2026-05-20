@@ -48,6 +48,7 @@ Implémentation : tout émerge de `Simulation.step()` + `sim_emergence.py` — p
 | Phase 5 (Genesis-α) | ⏳ | Long-run 10k sim-yr en cours |
 | **Waves 16–41** (monde réaliste) | ✅ | Genesis → climat → settlements → render → atmosphère → observateurs |
 | **Réalisme Terre (global)** | **~76 %** | Moyenne 7 dimensions → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (objectif **80 %**) |
+| **Tests** | ✅ | **152** pytest · smokes **p72–p87** (`make validate-all`) |
 
 Synthèse maintenue : **[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · file de travail : **[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**.
 

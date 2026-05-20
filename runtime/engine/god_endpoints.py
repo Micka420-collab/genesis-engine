@@ -267,14 +267,18 @@ def register_god_endpoints(handler_class, god, log):
         path = self.path.split("?", 1)[0]
         fn = _GET_ROUTES.get(path)
         if fn is not None:
-            return fn(self, self.god_ref, self.god_log_ref)
+            from engine.api_lock import handler_sim_lock
+            with handler_sim_lock(self):
+                return fn(self, self.god_ref, self.god_log_ref)
         return orig_get(self)
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         fn = _POST_ROUTES.get(path)
         if fn is not None:
-            return fn(self, self.god_ref, self.god_log_ref)
+            from engine.api_lock import handler_sim_lock
+            with handler_sim_lock(self):
+                return fn(self, self.god_ref, self.god_log_ref)
         return orig_post(self)
 
     handler_class.do_GET = do_GET

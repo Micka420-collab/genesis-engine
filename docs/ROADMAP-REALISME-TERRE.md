@@ -78,7 +78,7 @@ make earth-console
 
 ```bash
 # Python (depuis runtime/)
-python -m pytest tests/ -q          # 145 tests (mai 2026)
+python -m pytest tests/ -q          # 152 tests (mai 2026)
 python scripts/p74_koeppen_harness_smoke.py
 python scripts/p86_autonomous_world_smoke.py
 python scripts/p87_observer_sky_smoke.py

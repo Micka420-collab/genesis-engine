@@ -56,7 +56,7 @@ Manifest: **[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
 | Waves 16–41 | ✅ | Genesis → Klima → Siedlungen → Render |
 | **Erd-Realismus (global)** | **~76 %** | 7-Dimensionen-Durchschnitt → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (Ziel **80 %**) |
 
-**Tests:** **133** pytest · Smokes **p72–p86**
+**Tests:** **152** pytest · Smokes **p72–p86**
 
 > **Hinweis:** Ältere Docs zeigten **68 %**, **74 %** oder **80 %** als Globalwert. **~76 %** ist der einheitliche Durchschnitt.
 

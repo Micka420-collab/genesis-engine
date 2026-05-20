@@ -210,18 +210,20 @@ def register_audio_endpoints(handler_class, sim, sound_field: SoundField,
     def patched_do_get(self):
         path = self.path.split("?", 1)[0]
         try:
-            if path == "/api/audio":
-                payload = audio_snapshot(self._sim_audio, self._sound_field,
-                                         self._qs())
-                self._json(200, payload); return
-            if path == "/api/audio/history":
-                payload = audio_history(self._sim_audio, self._sound_field,
-                                        self._qs())
-                self._json(200, payload); return
-            if path == "/api/artifacts":
-                payload = artifacts_in_bbox(self._sim_audio,
-                                            self._knowledge_registry, self._qs())
-                self._json(200, payload); return
+            if path in ("/api/audio", "/api/audio/history", "/api/artifacts"):
+                from engine.api_lock import handler_sim_lock
+                with handler_sim_lock(self):
+                    if path == "/api/audio":
+                        payload = audio_snapshot(self._sim_audio, self._sound_field,
+                                                 self._qs())
+                        self._json(200, payload); return
+                    if path == "/api/audio/history":
+                        payload = audio_history(self._sim_audio, self._sound_field,
+                                                self._qs())
+                        self._json(200, payload); return
+                    payload = artifacts_in_bbox(self._sim_audio,
+                                                self._knowledge_registry, self._qs())
+                    self._json(200, payload); return
             if path == "/static/audio_overlay.js":
                 self._serve_file("audio_overlay.js",
                                  content_type="application/javascript; charset=utf-8")

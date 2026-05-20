@@ -599,18 +599,22 @@ def live_stream_payload(sim: Simulation) -> dict:
         "observable": live_observable_payload(sim),
     }
     if meteorology_state is not None:
-        try:
-            met = meteorology_state(sim)
-            if met:
-                payload["meteorology"] = {
-                    "global_temp_c": met.get("global_temp_c"),
-                    "global_cloud_cover": met.get("global_cloud_cover"),
-                    "global_precip_mm_h": met.get("global_precip_mm_h"),
-                    "global_wind_ms": met.get("global_wind_ms"),
-                    "active_storms": met.get("active_storms"),
-                }
-        except Exception:
-            pass
+        from engine.api_lock import safe_optional
+        met, met_err = safe_optional(
+            "meteorology",
+            lambda: meteorology_state(sim),
+            default=None,
+        )
+        if met_err:
+            payload["meteorology_error"] = met_err
+        elif met:
+            payload["meteorology"] = {
+                "global_temp_c": met.get("global_temp_c"),
+                "global_cloud_cover": met.get("global_cloud_cover"),
+                "global_precip_mm_h": met.get("global_precip_mm_h"),
+                "global_wind_ms": met.get("global_wind_ms"),
+                "active_storms": met.get("active_storms"),
+            }
     st = getattr(sim, "_emergence", None)
     if st and st.epidemic_summary:
         payload["epidemic"] = st.epidemic_summary
@@ -710,6 +714,13 @@ class _Handler(BaseHTTPRequestHandler):
         with sim.api_lock:
             return fn()
 
+    def _wave_payload(self, fn) -> dict:
+        """Optional wave snapshot with structured error field on failure."""
+        if fn is None:
+            return {}
+        from engine.api_lock import safe_dict
+        return safe_dict(getattr(fn, "__name__", "wave"), lambda: fn(self.sim_ref))
+
     def _serve_file(self, name: str, content_type: str = "text/html; charset=utf-8") -> None:
         path = os.path.join(self.static_dir, name)
         if not os.path.isfile(path):
@@ -723,20 +734,12 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_GET(self):
-        path = self.path.split("?", 1)[0]
-        if path == "/" or path == "/index.html" or path == "/earth" or path == "/earth_console.html":
-            self._serve_file("earth_console.html")
-            return
-        if path == "/index_classic.html":
-            self._serve_file("index.html")
-            return
-        if path == "/god_view_v2.html" or path == "/god_view_v2":
-            self._serve_file("god_view_v2.html")
-            return
-        if path == "/god_view.html" or path == "/god_view":
-            self._serve_file("god_view.html")
-            return
+    def _sim_api_lock(self):
+        from engine.api_lock import handler_sim_lock
+        return handler_sim_lock(self)
+
+    def _dispatch_api_get(self, path: str) -> bool:
+        """All /api/* GET routes (caller holds sim.api_lock)."""
         if path == "/api/macro":
             qs = self._qs()
             w = int(qs.get("w", 480))
@@ -744,120 +747,87 @@ class _Handler(BaseHTTPRequestHandler):
             result = render_macro_continental_png(self.sim_ref, w, h)
             if result is None:
                 self._json(200, macro_continental_meta(self.sim_ref))
-                return
+                return True
             png, meta = result
             if qs.get("meta", "") == "1":
                 self._json(200, meta)
-                return
+                return True
             self._png(png)
-            return
+            return True
         if path == "/api/macro_meta":
             self._json(200, macro_continental_meta(self.sim_ref))
-            return
-        if path == "/audio_overlay.js" or path == "/static/audio_overlay.js":
-            self._serve_file("audio_overlay.js", content_type="application/javascript; charset=utf-8")
-            return
+            return True
         if path == "/api/state":
-            self._json(200, self._sim_read(self.sim_ref.snapshot)); return
+            self._json(200, self._sim_read(self.sim_ref.snapshot)); return True
         if path == "/api/agents":
             qs = self._qs()
             if qs.get("lite", "").lower() in ("1", "true", "yes"):
                 from engine.agent_batch import snapshot_positions_lite_with_vel
                 self._json(200, self._sim_read(
-                    lambda: snapshot_positions_lite_with_vel(self.sim_ref))); return
+                    lambda: snapshot_positions_lite_with_vel(self.sim_ref))); return True
             if qs.get("packed", "").lower() in ("1", "true", "yes"):
                 from engine.agent_ecs_batch import snapshot_agents_packed
                 self._json(200, self._sim_read(
-                    lambda: snapshot_agents_packed(self.sim_ref))); return
+                    lambda: snapshot_agents_packed(self.sim_ref))); return True
             self._json(200, self._sim_read(
-                lambda: {"agents": self.sim_ref.snapshot_agents()})); return
+                lambda: {"agents": self.sim_ref.snapshot_agents()})); return True
         if path == "/api/metrics":
-            self._json(200, self._sim_read(self.sim_ref.annalist.metrics_to_dict)); return
+            self._json(200, self._sim_read(self.sim_ref.annalist.metrics_to_dict)); return True
         if path == "/api/lift_state":
-            self._json(200, lift_state(self.sim_ref)); return
+            self._json(200, lift_state(self.sim_ref)); return True
         if path == "/api/realism_state":
-            payload = (realism_state(self.sim_ref)
-                       if realism_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(realism_state)); return True
         if path == "/api/world_model_capabilities":
             payload = (world_model_capabilities()
                        if world_model_capabilities is not None else {})
-            self._json(200, payload); return
+            self._json(200, payload); return True
         if path == "/api/physiology_state":
-            payload = (physiology_state(self.sim_ref)
-                       if physiology_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(physiology_state)); return True
         if path == "/api/photosynthesis_state":
-            payload = (photosynthesis_state(self.sim_ref)
-                       if photosynthesis_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(photosynthesis_state)); return True
         if path == "/api/material_aging_state":
-            payload = (material_aging_state(self.sim_ref)
-                       if material_aging_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(material_aging_state)); return True
         if path == "/api/marine_state":
-            payload = (marine_state(self.sim_ref)
-                       if marine_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(marine_state)); return True
         if path == "/api/global_world_state":
             gw = getattr(self.sim_ref, "_global_world", None)
             payload = gw.state() if gw is not None else {
                 "sims": [], "atmosphere": {}, "clock": {},
                 "migration_count": 0, "migration_fail_count": 0,
             }
-            self._json(200, payload); return
+            self._json(200, payload); return True
         if path == "/api/plant_evolution_state":
-            payload = (plant_evolution_state(self.sim_ref)
-                       if plant_evolution_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(plant_evolution_state)); return True
         if path == "/api/meteorology_state":
-            payload = (meteorology_state(self.sim_ref)
-                       if meteorology_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(meteorology_state)); return True
         if path == "/api/animal_evolution_state":
-            payload = (animal_evolution_state(self.sim_ref)
-                       if animal_evolution_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(animal_evolution_state)); return True
         if path == "/api/agriculture_state":
-            payload = (agriculture_state(self.sim_ref)
-                       if agriculture_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(agriculture_state)); return True
         if path == "/api/writing_state":
-            payload = (writing_state(self.sim_ref)
-                       if writing_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(writing_state)); return True
         if path == "/api/polity_state":
-            payload = (polity_state(self.sim_ref)
-                       if polity_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(polity_state)); return True
         if path == "/api/geology_state":
-            payload = (geology_state(self.sim_ref)
-                       if geology_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(geology_state)); return True
         if path == "/api/metallurgy_state":
-            payload = (metallurgy_state(self.sim_ref)
-                       if metallurgy_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(metallurgy_state)); return True
         if path == "/api/realistic_construction_state":
-            payload = (realistic_construction_state(self.sim_ref)
-                       if realistic_construction_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(realistic_construction_state)); return True
         if path == "/api/building_discovery_state":
-            payload = (building_discovery_state(self.sim_ref)
-                       if building_discovery_state is not None else {})
-            self._json(200, payload); return
+            self._json(200, self._wave_payload(building_discovery_state)); return True
         if path == "/api/demography":
-            self._json(200, self._demography()); return
+            self._json(200, self._demography()); return True
         if path == "/api/agent":
             qs = self._qs()
             row = int(qs.get("row", 0))
-            self._json(200, self._agent_detail(row)); return
+            self._json(200, self._agent_detail(row)); return True
         if path == "/api/groups":
-            self._json(200, {"groups": self._groups()}); return
+            self._json(200, {"groups": self._groups()}); return True
         if path == "/api/events/recent":
             qs = self._qs()
             n = int(qs.get("n", 50))
-            self._json(200, {"events": (self.ctl_ref.last_event_tail or [])[-n:]}); return
+            self._json(200, {"events": (self.ctl_ref.last_event_tail or [])[-n:]}); return True
         if path == "/api/journal/events":
             qs = self._qs()
             n = min(int(qs.get("n", 2000)), 10000)
@@ -865,35 +835,35 @@ class _Handler(BaseHTTPRequestHandler):
             if self.sim_ref.annalist.journal:
                 jpath = self.sim_ref.annalist.journal.path
             events = merge_journal_events(self.ctl_ref.last_event_tail or [], jpath, n)
-            self._json(200, {"events": events, "count": len(events)}); return
+            self._json(200, {"events": events, "count": len(events)}); return True
         if path == "/api/metrics/history":
-            self._json(200, self.sim_ref.annalist.metrics_to_dict()); return
+            self._json(200, self.sim_ref.annalist.metrics_to_dict()); return True
         if path == "/api/session":
-            self._json(200, session_info(self.sim_ref)); return
+            self._json(200, session_info(self.sim_ref)); return True
         if path == "/api/observable":
-            self._json(200, live_observable_payload(self.sim_ref)); return
+            self._json(200, live_observable_payload(self.sim_ref)); return True
         if path == "/api/emergence_metrics":
             from engine.emergence_metrics import compute_emergence_metrics
             jpath = None
             if self.sim_ref.annalist.journal:
                 jpath = self.sim_ref.annalist.journal.path
             tail = merge_journal_events(self.ctl_ref.last_event_tail or [], jpath, 500)
-            self._json(200, compute_emergence_metrics(self.sim_ref, journal_tail=tail)); return
+            self._json(200, compute_emergence_metrics(self.sim_ref, journal_tail=tail)); return True
         if path == "/api/earth_laws":
             from engine.earth_laws import earth_laws_snapshot
-            self._json(200, earth_laws_snapshot(self.sim_ref)); return
+            self._json(200, earth_laws_snapshot(self.sim_ref)); return True
         if path == "/api/hydrology_state":
             from engine.hydrology_state import hydrology_snapshot
-            self._json(200, hydrology_snapshot(self.sim_ref)); return
+            self._json(200, hydrology_snapshot(self.sim_ref)); return True
         if path == "/api/circulation_state":
             from engine.atmospheric_circulation import circulation_snapshot
-            self._json(200, circulation_snapshot(self.sim_ref)); return
+            self._json(200, circulation_snapshot(self.sim_ref)); return True
         if path == "/api/world_prior":
             from engine.deepmind_world_prior import world_prior_snapshot
-            self._json(200, world_prior_snapshot(self.sim_ref)); return
+            self._json(200, world_prior_snapshot(self.sim_ref)); return True
         if path == "/api/algorithm_lab":
             from engine.algorithm_lab import algorithm_lab_snapshot
-            self._json(200, algorithm_lab_snapshot(self.sim_ref)); return
+            self._json(200, algorithm_lab_snapshot(self.sim_ref)); return True
         if path == "/api/algorithm_lab/discover":
             from engine.algorithm_lab import run_discovery_lab
             qs = self._qs()
@@ -913,34 +883,34 @@ class _Handler(BaseHTTPRequestHandler):
                 "fitness": round(best.fitness, 6),
                 "history": [round(x, 6) for x in result.history_best_fitness],
             })
-            return
+            return True
         if path == "/api/algorithm_lab/install":
             from engine.algorithm_lab import install_best_operator
-            self._json(200, install_best_operator(self.sim_ref)); return
+            self._json(200, install_best_operator(self.sim_ref)); return True
         if path == "/api/autonomous_world":
             from engine.autonomous_world import autonomous_world_snapshot
-            self._json(200, autonomous_world_snapshot(self.sim_ref)); return
+            self._json(200, autonomous_world_snapshot(self.sim_ref)); return True
         if path == "/api/world_physics":
             from engine.world_physics_registry import registry_snapshot
-            self._json(200, registry_snapshot()); return
+            self._json(200, registry_snapshot()); return True
         if path == "/api/earth_dynamo":
             from engine.earth_dynamo import dynamo_snapshot
-            self._json(200, dynamo_snapshot(self.sim_ref)); return
+            self._json(200, dynamo_snapshot(self.sim_ref)); return True
         if path == "/api/plate_tectonics":
             from engine.plate_tectonics_live import plate_tectonics_snapshot
-            self._json(200, plate_tectonics_snapshot(self.sim_ref)); return
+            self._json(200, plate_tectonics_snapshot(self.sim_ref)); return True
         if path == "/api/material_transform":
             from engine.material_transform import material_transform_snapshot
-            self._json(200, material_transform_snapshot(self.sim_ref)); return
+            self._json(200, material_transform_snapshot(self.sim_ref)); return True
         if path == "/api/emergent_construction":
             from engine.emergent_construction import emergent_construction_snapshot
-            self._json(200, emergent_construction_snapshot(self.sim_ref)); return
+            self._json(200, emergent_construction_snapshot(self.sim_ref)); return True
         if path == "/api/sun_state":
             from engine.earth_sun_state import sun_state_snapshot
-            self._json(200, sun_state_snapshot(self.sim_ref)); return
+            self._json(200, sun_state_snapshot(self.sim_ref)); return True
         if path == "/api/languages":
             from engine.speech_audio_bridge import languages_snapshot
-            self._json(200, languages_snapshot(self.sim_ref)); return
+            self._json(200, languages_snapshot(self.sim_ref)); return True
         if path == "/api/observer_feed":
             qs = self._qs()
             try:
@@ -949,10 +919,92 @@ class _Handler(BaseHTTPRequestHandler):
                 xmax = float(qs.get("xmax", 500))
                 ymax = float(qs.get("ymax", 500))
             except (TypeError, ValueError):
-                self._json(400, {"error": "invalid bbox"}); return
+                self._json(400, {"error": "invalid bbox"}); return True
             from engine.observer_feed import observer_feed_snapshot
             self._json(200, observer_feed_snapshot(
-                self.sim_ref, xmin, ymin, xmax, ymax)); return
+                self.sim_ref, xmin, ymin, xmax, ymax)); return True
+        if path == "/api/wind_field":
+            qs = self._qs()
+            try:
+                xmin = float(qs.get("xmin", -500))
+                ymin = float(qs.get("ymin", -500))
+                xmax = float(qs.get("xmax", 500))
+                ymax = float(qs.get("ymax", 500))
+                w = int(qs.get("w", 128))
+                h = int(qs.get("h", 96))
+            except (TypeError, ValueError):
+                self._json(400, {"error": "bad_bbox"}); return True
+            from engine.atmospheric_circulation import sample_wind_lite_field
+            self._json(200, sample_wind_lite_field(
+                self.sim_ref, xmin, ymin, xmax, ymax, w, h)); return True
+        if path == "/api/lite_field":
+            qs = self._qs()
+            try:
+                xmin = float(qs.get("xmin", -500))
+                ymin = float(qs.get("ymin", -500))
+                xmax = float(qs.get("xmax", 500))
+                ymax = float(qs.get("ymax", 500))
+                w = int(qs.get("w", 160))
+                h = int(qs.get("h", 120))
+                overlay = qs.get("overlay", "")
+            except (TypeError, ValueError):
+                self._json(400, {"error": "bad_bbox"}); return True
+            from engine.earth_laws import sample_lite_field
+            self._json(200, sample_lite_field(
+                self.sim_ref, xmin, ymin, xmax, ymax, w, h, overlay=overlay)); return True
+        if path == "/api/events/stream":
+            self._handle_sse_stream(); return True
+        if path == "/api/journal/download":
+            self._serve_journal_file(); return True
+        if path == "/api/world":
+            qs = self._qs()
+            cx = int(qs.get("cx", 0)); cy = int(qs.get("cy", 0))
+            png = render_chunk_png(self.sim_ref, cx, cy)
+            self._png(png); return True
+        if path == "/api/render":
+            qs = self._qs()
+            xmin = float(qs.get("xmin", -100)); ymin = float(qs.get("ymin", -100))
+            xmax = float(qs.get("xmax", 100));  ymax = float(qs.get("ymax", 100))
+            w = int(qs.get("w", 600)); h = int(qs.get("h", 400))
+            overlay = qs.get("overlay", "")
+            mode = qs.get("mode", "").lower()
+            if mode == "iso":
+                png = render_bbox_iso_png(self.sim_ref, xmin, ymin, xmax, ymax, w, h)
+            else:
+                png = render_bbox_png(self.sim_ref, xmin, ymin, xmax, ymax, w, h, overlay)
+            self._png(png); return True
+        if path == "/api/control":
+            qs = self._qs()
+            if "action" in qs:
+                val = float(qs["speed"]) if "speed" in qs else None
+                snap = self.ctl_ref.apply(qs["action"], val)
+                self._json(200, snap); return True
+            self._json(200, self.ctl_ref.snapshot()); return True
+        return False
+
+    def do_GET(self):
+        path = self.path.split("?", 1)[0]
+        if path == "/" or path == "/index.html" or path == "/earth" or path == "/earth_console.html":
+            self._serve_file("earth_console.html")
+            return
+        if path == "/index_classic.html":
+            self._serve_file("index.html")
+            return
+        if path == "/god_view_v2.html" or path == "/god_view_v2":
+            self._serve_file("god_view_v2.html")
+            return
+        if path == "/god_view.html" or path == "/god_view":
+            self._serve_file("god_view.html")
+            return
+        if path.startswith("/api/"):
+            with self._sim_api_lock():
+                if self._dispatch_api_get(path):
+                    return
+            self.send_response(404); self.end_headers()
+            return
+        if path == "/audio_overlay.js" or path == "/static/audio_overlay.js":
+            self._serve_file("audio_overlay.js", content_type="application/javascript; charset=utf-8")
+            return
         if path == "/earth_console_observer.js":
             self._serve_file("earth_console_observer.js",
                              content_type="application/javascript; charset=utf-8")
@@ -981,65 +1033,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._serve_file("earth_console_phoneme_audio.js",
                              content_type="application/javascript; charset=utf-8")
             return
-        if path == "/api/wind_field":
-            qs = self._qs()
-            try:
-                xmin = float(qs.get("xmin", -500))
-                ymin = float(qs.get("ymin", -500))
-                xmax = float(qs.get("xmax", 500))
-                ymax = float(qs.get("ymax", 500))
-                w = int(qs.get("w", 128))
-                h = int(qs.get("h", 96))
-            except (TypeError, ValueError):
-                self._json(400, {"error": "bad_bbox"}); return
-            from engine.atmospheric_circulation import sample_wind_lite_field
-            self._json(200, sample_wind_lite_field(
-                self.sim_ref, xmin, ymin, xmax, ymax, w, h)); return
-        if path == "/api/lite_field":
-            qs = self._qs()
-            try:
-                xmin = float(qs.get("xmin", -500))
-                ymin = float(qs.get("ymin", -500))
-                xmax = float(qs.get("xmax", 500))
-                ymax = float(qs.get("ymax", 500))
-                w = int(qs.get("w", 160))
-                h = int(qs.get("h", 120))
-                overlay = qs.get("overlay", "")
-            except (TypeError, ValueError):
-                self._json(400, {"error": "bad_bbox"}); return
-            from engine.earth_laws import sample_lite_field
-            self._json(200, sample_lite_field(
-                self.sim_ref, xmin, ymin, xmax, ymax, w, h, overlay=overlay)); return
-        if path == "/api/events/stream":
-            self._handle_sse_stream(); return
-        if path == "/api/journal/download":
-            self._serve_journal_file(); return
-        if path == "/api/world":
-            qs = self._qs()
-            cx = int(qs.get("cx", 0)); cy = int(qs.get("cy", 0))
-            png = render_chunk_png(self.sim_ref, cx, cy)
-            self._png(png); return
-        if path == "/api/render":
-            qs = self._qs()
-            xmin = float(qs.get("xmin", -100)); ymin = float(qs.get("ymin", -100))
-            xmax = float(qs.get("xmax", 100));  ymax = float(qs.get("ymax", 100))
-            w = int(qs.get("w", 600)); h = int(qs.get("h", 400))
-            overlay = qs.get("overlay", "")
-            mode = qs.get("mode", "").lower()
-            if mode == "iso":
-                png = render_bbox_iso_png(self.sim_ref, xmin, ymin, xmax, ymax, w, h)
-            else:
-                png = render_bbox_png(self.sim_ref, xmin, ymin, xmax, ymax, w, h, overlay)
-            self._png(png); return
-        if path == "/api/control":
-            qs = self._qs()
-            if "action" in qs:
-                val = float(qs["speed"]) if "speed" in qs else None
-                snap = self.ctl_ref.apply(qs["action"], val)
-                self._json(200, snap); return
-            self._json(200, self.ctl_ref.snapshot()); return
         self.send_response(404); self.end_headers()
-
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         if path == "/api/control":
@@ -1053,22 +1047,24 @@ class _Handler(BaseHTTPRequestHandler):
             value = req.get("speed")
             snap = self.ctl_ref.apply(action, value)
             self._json(200, snap); return
-        if path == "/api/timewarp":
-            ln = int(self.headers.get("Content-Length", "0"))
-            body = self.rfile.read(ln).decode("utf-8") if ln else "{}"
-            try:
-                req = json.loads(body or "{}")
-            except json.JSONDecodeError:
-                req = {}
-            mode = str(req.get("mode", "realtime"))
-            try:
-                from engine.timewarp import install_timewarp
-                tw = install_timewarp(self.sim_ref)
-                snap = tw.set_mode(mode)
-                self._json(200, snap); return
-            except Exception as exc:
-                self._json(400, {"error": type(exc).__name__,
-                                 "detail": str(exc)[:200]}); return
+        if path.startswith("/api/"):
+            with self._sim_api_lock():
+                if path == "/api/timewarp":
+                    ln = int(self.headers.get("Content-Length", "0"))
+                    body = self.rfile.read(ln).decode("utf-8") if ln else "{}"
+                    try:
+                        req = json.loads(body or "{}")
+                    except json.JSONDecodeError:
+                        req = {}
+                    mode = str(req.get("mode", "realtime"))
+                    try:
+                        from engine.timewarp import install_timewarp
+                        tw = install_timewarp(self.sim_ref)
+                        snap = tw.set_mode(mode)
+                        self._json(200, snap); return
+                    except Exception as exc:
+                        self._json(400, {"error": type(exc).__name__,
+                                         "detail": str(exc)[:200]}); return
         self.send_response(404); self.end_headers()
 
     def _png(self, png: bytes) -> None:
@@ -1091,7 +1087,8 @@ class _Handler(BaseHTTPRequestHandler):
         last_tick = -1
         try:
             while not self.ctl_ref.stop:
-                payload = live_stream_payload(self.sim_ref)
+                with self._sim_api_lock():
+                    payload = live_stream_payload(self.sim_ref)
                 tick = int(payload.get("tick", 0))
                 if tick != last_tick:
                     data = json.dumps(payload, default=_json_default)
@@ -1279,11 +1276,13 @@ def start_server(sim: Simulation, ctl: SimController, host: str = "0.0.0.0",
                 sim.sound_field = _sf
             if not hasattr(sim, "knowledge_registry"):
                 sim.knowledge_registry = _kr
-        except Exception:
-            pass
+        except Exception as exc:
+            errs = getattr(sim, "_dashboard_wiring_errors", None) or []
+            sim._dashboard_wiring_errors = [*errs, f"audio_fields: {type(exc).__name__}: {exc}"]
         register_audio_endpoints(_Handler, sim, _sf, _kr)
-    except Exception:
-        pass
+    except Exception as exc:
+        errs = getattr(sim, "_dashboard_wiring_errors", None) or []
+        sim._dashboard_wiring_errors = [*errs, f"audio_endpoints: {type(exc).__name__}: {exc}"]
     srv = ThreadingHTTPServer((host, port), _Handler)
     th = threading.Thread(target=srv.serve_forever, daemon=True)
     th.start()

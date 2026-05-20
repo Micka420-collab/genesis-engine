@@ -23,5 +23,5 @@ cd runtime; python -m pytest tests/ -q
 - Pas de comportement civilisationnel scripté sur le tick path.
 - Lois L0 via `earth_laws.py` / `physics_layer.py` uniquement.
 - Cognition Earth Console : `wire_emergence_v2` + `neat_brain.genome_decide`.
-- Tout changement : **145** tests pytest verts + KPIs `emergence_metrics` si comportement nouveau.
+- Tout changement : **152** tests pytest verts + KPIs `emergence_metrics` si comportement nouveau.
 - Hydrologie Earth Console : `hydrology_mode=sv1d` · overlay 2D **Flux eau**.
