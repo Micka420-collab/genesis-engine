@@ -159,7 +159,7 @@ Recalcul toutes les `observable_every` ticks via `tick_emergence_world`.
 
 ```text
 Genesis Engine · ZERO PRE-SCRIPT · L0 earth_laws → L4 civilization
-Observer http://127.0.0.1:8090/ · wire_emergence_v2 · 152 tests · réalisme Terre **~76 %** ([`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md))
+Observer http://127.0.0.1:8090/ · wire_emergence_v2 · 155 tests · réalisme Terre **~76 %** ([`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md))
 docs/MASTER-SCALE-PROMPT-v2.md · runtime/engine/sim.py · .\earth-console.ps1
 ```
 

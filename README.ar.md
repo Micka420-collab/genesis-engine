@@ -79,7 +79,7 @@
 | **Waves 16–41** (عالم واقعي) | ✅ | Genesis → مناخ → مستوطنات → عرض → غلاف جوي → مراقبون |
 | **واقعية الأرض (عالمية)** | **~76 %** | متوسط 7 أبعاد → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (هدف **80 %**) |
 
-**الاختبارات:** `pytest runtime/tests` — **152** اختبارًا · smokes **p72–p87** في `make validate-all`.
+**الاختبارات:** `pytest runtime/tests` — **155** اختبارًا · smokes **p72–p87** في `make validate-all`.
 
 ملخص: **[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · قائمة العمل: **[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**.
 

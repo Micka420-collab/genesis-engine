@@ -56,7 +56,7 @@ Manifest: **[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
 | Waves 16–41 | ✅ | Genesis → klimat → osady → render |
 | **Realizm Ziemi (globalny)** | **~76 %** | Średnia 7 wymiarów → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (cel **80 %**) |
 
-**Testy:** **152** pytest · smoki **p72–p87**
+**Testy:** **155** pytest · smoki **p72–p87**
 
 > **Uwaga:** Starsze dokumenty podawały **68 %**, **74 %** lub **80 %** jako globalne. **~76 %** to ujednolicona średnia.
 

@@ -54,6 +54,11 @@ jobs:
             p81_hydrology_smoke.py
             p82_civilization_pipeline_smoke.py
             p82_observation_sse_smoke.py
+            p83_terre_report_smoke.py
+            p84_earth_console_lite_smoke.py
+            p85_algorithm_evolution_smoke.py
+            p86_autonomous_world_smoke.py
+            p87_observer_sky_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="

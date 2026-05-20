@@ -68,6 +68,8 @@ smoke-realism:
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p73_rust_worldgraph_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p75_koeppen_grid_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p80_koeppen_genesis_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p84_earth_console_lite_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p87_observer_sky_smoke.py
 
 civilization:
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/civilization_pipeline.py --seed 0xC1A71CE0 --ticks 100

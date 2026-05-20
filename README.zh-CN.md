@@ -77,7 +77,7 @@
 | **Waves 16–41**（真实世界） | ✅ | Genesis → 气候 → 聚落 → 渲染 → 大气 → 观测 |
 | **地球真实度（全局）** | **~76 %** | 7 维平均 → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)（目标 **80 %**） |
 
-**测试：** `pytest runtime/tests` —— **152** 项 · 参考冒烟 **p72–p87**（`make validate-all`）。
+**测试：** `pytest runtime/tests` —— **155** 项 · 参考冒烟 **p72–p87**（`make validate-all`）。
 
 维护摘要：**[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · 待办：**[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**。
 

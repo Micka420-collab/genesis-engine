@@ -29,7 +29,9 @@ make rust-test
 make maturin-dev
 PYTHONPATH=runtime python runtime/scripts/p73_rust_worldgraph_smoke.py
 
-# Smokes réalisme (p72–p82)
+# Smokes réalisme (p72–p87, aligné validate-all)
+make validate-all
+# ou sous-ensemble rapide :
 make smoke-realism
 ```
 

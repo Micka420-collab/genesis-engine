@@ -15,7 +15,7 @@
 | **Racine** | `F:\DEvOps\projet alpha\genesis-engine` |
 | **Runtime** | `runtime/` |
 | **Console** | http://127.0.0.1:8090/ — `.\earth-console.ps1` |
-| **Tests** | `cd runtime && python -m pytest tests/ -q` → **152 tests OK** |
+| **Tests** | `cd runtime && python -m pytest tests/ -q` → **155 tests OK** |
 | **Score global** | **~76 %** (moyenne 7 dimensions — voir [`ROADMAP-REALISME-TERRE.md`](ROADMAP-REALISME-TERRE.md)) |
 | **Objectif cible** | **80 %** (pas confondre avec le score global actuel) |
 
@@ -115,7 +115,7 @@ cd "F:\DEvOps\projet alpha\genesis-engine"
 ```
 
 ```bash
-cd runtime && python -m pytest tests/ -q    # 152 tests
+cd runtime && python -m pytest tests/ -q    # 155 tests
 cd runtime && python run.py realism          # preset Terre
 make earth-console                           # alt Makefile
 ```
@@ -145,7 +145,7 @@ make earth-console                           # alt Makefile
 2. Vérifier [`runtime/AUDIT.md`](../runtime/AUDIT.md) avant tout ajout comportemental.
 3. Chaque nouveau comportement → observable dans `emergence_metrics`.
 4. Déterminisme bit-perfect : `prf_rng` partout, SHA-256 A==B.
-5. **152 tests pytest** doivent rester verts après toute modification.
+5. **155 tests pytest** doivent rester verts après toute modification.
 6. API REST existante : ne pas casser les endpoints `/api/*`.
 
 ---
@@ -171,5 +171,5 @@ make earth-console                           # alt Makefile
 ## Prompt condensé (une ligne)
 
 ```text
-Genesis Engine · ZERO PRE-SCRIPT · L0 earth_laws → L4 civilization · observer http://127.0.0.1:8090/ · wire_emergence_v2 · 152 tests · réalisme Terre ~76%
+Genesis Engine · ZERO PRE-SCRIPT · L0 earth_laws → L4 civilization · observer http://127.0.0.1:8090/ · wire_emergence_v2 · 155 tests · réalisme Terre ~76%
 ```

@@ -560,6 +560,7 @@ def session_info(sim: Simulation) -> dict:
         "meteorology": getattr(sim, "_meteo_state", None) is not None,
         "live_observable_tick": (st.live_observable or {}).get("tick") if st else None,
         "bounds_km": list(sim.cfg.bounds_km),
+        "dashboard_wiring_errors": list(getattr(sim, "_dashboard_wiring_errors", []) or []),
     }
 
 

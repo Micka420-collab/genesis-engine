@@ -31,7 +31,7 @@
 |--------|----------|
 | **Observer la Terre (live)** | `.\earth-console.ps1` → http://127.0.0.1:8090/ |
 | Preset long-run | `python runtime/run.py terre --ticks 2000` |
-| Tests | `cd runtime && python -m pytest tests/ -q` |
+| Tests | `cd runtime && python -m pytest tests/ -q` (**155** tests) · `make validate-all` (p72–p87) |
 
 Windows : pas de `make` requis — voir [`EARTH-CONSOLE.md`](EARTH-CONSOLE.md).
 
