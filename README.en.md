@@ -20,6 +20,8 @@
 [![CI](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml)
 [![Earth realism ~76%](https://img.shields.io/badge/Earth_realism-~76%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
 
+[EMERGENCE SIM v2](docs/EMERGENCE-SIM-v2.md) · [Master prompt](docs/MASTER-SCALE-PROMPT-v2.md) · [Project status](PROJECT-STATUS.md) · [Earth Console](docs/EARTH-CONSOLE.md) · [Runtime](runtime/README.md) · [Rust](native/world-engine/README.md)
+
 *Build a persistent digital universe in which truly autonomous AI agents are born, evolve, reproduce, shape their own history, and enable the scientific observation of emergent artificial civilizations.*
 
 [Vision](#-vision-in-one-sentence) ·
@@ -49,6 +51,44 @@ Human history is a single draw among billions of possibilities. Genesis Engine a
 
 ---
 
+## EMERGENCE SIM v2.0 — ZERO PRE-SCRIPT
+
+Only **physical laws** are hardcoded. Language, tools, civilization, and terraforming must **emerge** from agents — never scripted quests.
+
+Full manifesto: **[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
+
+| Layer | Content |
+|-------|---------|
+| **L0** Physics | Thermo, gravity, hydrology, erosion |
+| **L1** World | Genesis, climate, biomes, resources |
+| **L2** Biology | 256-D DNA, metabolism, selection |
+| **L3** Cognition | Local perception, plasticity (NEAT target) |
+| **L4** Civilization | Trade, emergent construction, polity, speech |
+
+**Observer:** `earth-console.ps1` (Windows) or `make earth-console` → http://127.0.0.1:8090/ · KPIs: `/api/emergence_metrics`
+
+Everything emerges from `Simulation.step()` — no orchestrator pipeline. See [`PROJECT-STATUS.md`](PROJECT-STATUS.md).
+
+---
+
+## Where the project stands
+
+| Area | Status | Detail |
+|------|--------|--------|
+| Phases 0–2 (life, society) | ✅ | Cognition, reproduction, lexicon |
+| Phase 4 (civilizational emergence) | ✅ | Agriculture, writing, polity, metallurgy |
+| Phase 5 (Genesis-α) | ⏳ | Long-run 10k sim-years in progress |
+| **Waves 16–41** (realistic world) | ✅ | Genesis → climate → settlements → render → atmosphere → observers |
+| **Earth realism (global)** | **~76 %** | 7-dimension average → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (target **80 %**) |
+
+**Tests:** `pytest runtime/tests` — **133** tests · reference smokes **p72–p86** in `make validate-all`.
+
+Maintained summary: **[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · work queue: **[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**.
+
+> **Note:** Older docs showed **68 %**, **74 %**, or **80 %** as “global” scores. **~76 %** is the unified average; **80 %** is the user target or climate-only score — see the roadmap table.
+
+---
+
 ## ✨ What works today
 
 | Capability | Status | Demo |
@@ -67,7 +107,8 @@ Human history is a single draw among billions of possibilities. Genesis Engine a
 | 🏘️ **Construction** (HEARTH, BUILD, multi-cultures) | ✅ | 1 HEARTH completed in 5K ticks |
 | ⚡ **Time-warp x10/x100/x1000** | ✅ | **38× / 84× speedup** measured, determinism preserved |
 | 🦠 **SIR epidemics** | ✅ | `infectious_until` + transmission radius |
-| 👁️ **God Mode dashboard** | ✅ | HTTP `/api/state`, `/api/realism_state`, `/api/demography`, `/api/lift_state` |
+| 👁️ **Earth Console** (globe, iso 2.5D, agent speech) | ✅ | http://127.0.0.1:8090/ · SSE · `/api/audio` · `/api/languages` |
+| 👁️ **God Mode dashboard** (legacy) | ✅ | HTTP `/api/state`, `/api/realism_state`, `/api/demography` |
 | 💾 **Save / Load / Branch** | ✅ | World library, open format |
 | 📤 **GIS Export** | ✅ | GeoTIFF (12 layers), cartographic PNG, OBJ heightfield, JSON |
 | 🔬 **Wave 1: Physics + Chemistry knowledge base** | ✅ | 43 elements, 54 bond energies, Bronze synthesizable |
@@ -288,6 +329,20 @@ git push origin feature/my-contribution
 - **UTF-8 stdout**: on Windows, emojis break cp1252 — see `p0_smoke.py` lines 1-15 for the pattern.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
+
+---
+
+## Documentation
+
+| Document | Role |
+|----------|------|
+| [`docs/README.md`](docs/README.md) | Documentation index |
+| [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) | **Earth realism ~76 %** (single source of truth) |
+| [`docs/EARTH-CONSOLE.md`](docs/EARTH-CONSOLE.md) | Live Earth observer UI |
+| [`PROJECT-STATUS.md`](PROJECT-STATUS.md) | Contributor status summary |
+| [`ROADMAP.md`](ROADMAP.md) | Product phases 0–5 |
+
+---
 
 ### Open chantiers
 

@@ -17,6 +17,10 @@
 [![Status: Phase 5g](https://img.shields.io/badge/status-Phase_5g_alpha-orange.svg)](#️-路线图)
 [![Earth-anchored](https://img.shields.io/badge/Earth-anchored-green.svg)](#-基于真实地球数据)
 [![Deterministic](https://img.shields.io/badge/deterministic-✓-purple.svg)](#-确定性)
+[![CI](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml)
+[![地球真实度 ~76%](https://img.shields.io/badge/%E5%9C%B0%E7%90%83%E7%9C%9F%E5%AE%9E%E5%BA%A6-~76%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
+
+[EMERGENCE SIM v2](docs/EMERGENCE-SIM-v2.md) · [主提示词](docs/MASTER-SCALE-PROMPT-v2.md) · [项目状态](PROJECT-STATUS.md) · [Earth Console](docs/EARTH-CONSOLE.md) · [Runtime](runtime/README.md) · [Rust](native/world-engine/README.md)
 
 *构建一个持续存在的数字宇宙，让真正自主的 AI 智能体在其中诞生、进化、繁衍、塑造自己的历史，并使科学观察涌现的人工文明成为可能。*
 
@@ -47,6 +51,44 @@
 
 ---
 
+## EMERGENCE SIM v2.0 — ZERO PRE-SCRIPT（零预设）
+
+仅 **物理定律** 被硬编码。语言、工具、文明与地形改造必须由智能体 **涌现** —— 而非脚本任务。
+
+完整宣言：**[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
+
+| 层级 | 内容 |
+|------|------|
+| **L0** 物理 | 热力学、重力、水文、侵蚀 |
+| **L1** 世界 | Genesis、气候、生物群系、资源 |
+| **L2** 生物 | 256 维 DNA、代谢、选择 |
+| **L3** 认知 | 局部感知、可塑性（NEAT 目标） |
+| **L4** 文明 | 贸易、涌现建造、政体、言语 |
+
+**观测：** `make earth-console` → http://127.0.0.1:8090/ · KPI：`/api/emergence_metrics`
+
+一切源于 `Simulation.step()` —— 无编排流水线。见 [`PROJECT-STATUS.md`](PROJECT-STATUS.md)。
+
+---
+
+## 项目进展
+
+| 方向 | 状态 | 说明 |
+|------|------|------|
+| 阶段 0–2（生命、社会） | ✅ | 认知、繁殖、词库 |
+| 阶段 4（文明涌现） | ✅ | 农业、文字、政体、冶金 |
+| 阶段 5（Genesis-α） | ⏳ | 长期 10k 模拟年进行中 |
+| **Waves 16–41**（真实世界） | ✅ | Genesis → 气候 → 聚落 → 渲染 → 大气 → 观测 |
+| **地球真实度（全局）** | **~76 %** | 7 维平均 → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)（目标 **80 %**） |
+
+**测试：** `pytest runtime/tests` —— **133** 项 · 参考冒烟 **p72–p86**（`make validate-all`）。
+
+维护摘要：**[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · 待办：**[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**。
+
+> **说明：** 旧文档中的 **68 %**、**74 %** 或 **80 %** 并非统一全局分。**~76 %** 为官方平均；**80 %** 为用户目标或仅气候维度 —— 见路线图。
+
+---
+
 ## ✨ 当前可用功能
 
 | 能力 | 状态 | 演示 |
@@ -65,7 +107,8 @@
 | 🏘️ **建造**（HEARTH, BUILD, 多文化） | ✅ | 5K 滴答内完成 1 个 HEARTH |
 | ⚡ **时间加速 x10/x100/x1000** | ✅ | **38× / 84× 加速** 测量值 |
 | 🦠 **SIR 流行病** | ✅ | `infectious_until` + 传播半径 |
-| 👁️ **上帝模式仪表板** | ✅ | HTTP `/api/state`, `/api/realism_state`, `/api/demography` |
+| 👁️ **Earth Console**（地球仪、等距 2.5D、智能体语音） | ✅ | http://127.0.0.1:8090/ · SSE · `/api/audio` · `/api/languages` |
+| 👁️ **上帝模式仪表板**（旧版） | ✅ | HTTP `/api/state`, `/api/realism_state`, `/api/demography` |
 | 💾 **保存 / 加载 / 分支** | ✅ | 世界库，开放格式 |
 | 📤 **GIS 导出** | ✅ | GeoTIFF（12 层）、PNG 地图、OBJ 高度场、JSON |
 | 🔬 **第 1 波：物理 + 化学知识库** | ✅ | 43 个元素、54 种键能、可合成青铜 |
@@ -269,6 +312,18 @@ git push origin feature/my-contribution
 - [`ETHICS.md`](ETHICS.md) —— 智能体道德地位、模拟"痛苦"的限制、外部伦理委员会
 - [`SECURITY.md`](SECURITY.md) —— 威胁模型、PQC、漏洞报告
 - **人类化身**：明确选择加入、加密水印、GDPR 被遗忘权
+
+---
+
+## 文档
+
+| 文档 | 作用 |
+|------|------|
+| [`docs/README.md`](docs/README.md) | 文档索引 |
+| [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) | **地球真实度 ~76 %**（唯一权威来源） |
+| [`docs/EARTH-CONSOLE.md`](docs/EARTH-CONSOLE.md) | 地球实时观测界面 |
+| [`PROJECT-STATUS.md`](PROJECT-STATUS.md) | 贡献者状态摘要 |
+| [`ROADMAP.md`](ROADMAP.md) | 产品阶段 0–5 |
 
 ---
 

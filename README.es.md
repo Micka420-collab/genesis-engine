@@ -17,6 +17,10 @@
 [![Status: Phase 5g](https://img.shields.io/badge/status-Phase_5g_alpha-orange.svg)](#️-hoja-de-ruta)
 [![Earth-anchored](https://img.shields.io/badge/Earth-anchored-green.svg)](#-anclado-a-la-tierra-real)
 [![Deterministic](https://img.shields.io/badge/deterministic-✓-purple.svg)](#-determinismo)
+[![CI](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml)
+[![Realismo Tierra ~76%](https://img.shields.io/badge/realismo_Tierra-~76%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
+
+[EMERGENCE SIM v2](docs/EMERGENCE-SIM-v2.md) · [Prompt maestro](docs/MASTER-SCALE-PROMPT-v2.md) · [Estado del proyecto](PROJECT-STATUS.md) · [Earth Console](docs/EARTH-CONSOLE.md) · [Runtime](runtime/README.md) · [Rust](native/world-engine/README.md)
 
 *Construir un universo digital persistente en el que agentes IA verdaderamente autónomos nacen, evolucionan, se reproducen, forjan su propia historia y permiten la observación científica de civilizaciones artificiales emergentes.*
 
@@ -47,6 +51,44 @@ La historia humana es un solo sorteo entre miles de millones de posibles. Genesi
 
 ---
 
+## EMERGENCE SIM v2.0 — ZERO PRE-SCRIPT
+
+Solo las **leyes físicas** están codificadas. El lenguaje, las herramientas, la civilización y la terraformation deben **emerger** de los agentes — nunca misiones scriptadas.
+
+Manifiesto: **[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
+
+| Capa | Contenido |
+|------|-----------|
+| **L0** Física | Termo, gravedad, hidrología, erosión |
+| **L1** Mundo | Genesis, clima, biomas, recursos |
+| **L2** Biología | ADN 256-D, metabolismo, selección |
+| **L3** Cognición | Percepción local, plasticidad (objetivo NEAT) |
+| **L4** Civilización | Comercio, construcción emergente, polity, habla |
+
+**Observador:** `earth-console.ps1` o `make earth-console` → http://127.0.0.1:8090/ · KPIs: `/api/emergence_metrics`
+
+Todo emerge de `Simulation.step()` — sin pipeline orquestador. Ver [`PROJECT-STATUS.md`](PROJECT-STATUS.md).
+
+---
+
+## Estado del proyecto
+
+| Eje | Estado | Detalle |
+|-----|--------|---------|
+| Fases 0–2 (vida, sociedad) | ✅ | Cognición, reproducción, léxico |
+| Fase 4 (emergencia civilizacional) | ✅ | Agricultura, escritura, polity, metalurgia |
+| Fase 5 (Genesis-α) | ⏳ | Long-run 10k años-sim en curso |
+| **Waves 16–41** (mundo realista) | ✅ | Genesis → clima → asentamientos → render → atmósfera → observadores |
+| **Realismo Tierra (global)** | **~76 %** | Media de 7 dimensiones → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (objetivo **80 %**) |
+
+**Tests:** `pytest runtime/tests` — **133** tests · smokes **p72–p86** en `make validate-all`.
+
+Resumen: **[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · cola de trabajo: **[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**.
+
+> **Nota:** Documentos antiguos mostraban **68 %**, **74 %** o **80 %** como global. **~76 %** es la media unificada; **80 %** es la meta o el score solo de clima — ver la roadmap.
+
+---
+
 ## ✨ Lo que funciona hoy
 
 | Capacidad | Estado | Demo |
@@ -65,7 +107,8 @@ La historia humana es un solo sorteo entre miles de millones de posibles. Genesi
 | 🏘️ **Construcción** (HEARTH, BUILD, multi-culturas) | ✅ | 1 HEARTH completado en 5K ticks |
 | ⚡ **Time-warp x10/x100/x1000** | ✅ | **38× / 84× speedup** medido |
 | 🦠 **Epidemias SIR** | ✅ | `infectious_until` + radio de transmisión |
-| 👁️ **Dashboard Modo Dios** | ✅ | HTTP `/api/state`, `/api/realism_state`, `/api/demography` |
+| 👁️ **Earth Console** (globo, iso 2.5D, voz de agentes) | ✅ | http://127.0.0.1:8090/ · SSE · `/api/audio` · `/api/languages` |
+| 👁️ **Dashboard Modo Dios** (legado) | ✅ | HTTP `/api/state`, `/api/realism_state`, `/api/demography` |
 | 💾 **Guardar / Cargar / Bifurcar** | ✅ | Biblioteca de mundos, formato abierto |
 | 📤 **Exportación GIS** | ✅ | GeoTIFF (12 capas), PNG cartográfico, OBJ heightfield, JSON |
 | 🔬 **Ola 1: Base de conocimiento Física + Química** | ✅ | 43 elementos, 54 energías de enlace, Bronce sintetizable |
@@ -263,6 +306,18 @@ Ver [CONTRIBUTING.md](CONTRIBUTING.md) para más detalles.
 - [`ETHICS.md`](ETHICS.md) — estatuto moral de los agentes, límites de "sufrimiento" simulado
 - [`SECURITY.md`](SECURITY.md) — modelo de amenaza, PQC, reporte de vulnerabilidades
 - **Avatares humanos**: opt-in explícito, watermark criptográfico, derecho al olvido GDPR
+
+---
+
+## Documentación
+
+| Documento | Rol |
+|-----------|-----|
+| [`docs/README.md`](docs/README.md) | Índice de documentación |
+| [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) | **Realismo Tierra ~76 %** (fuente de verdad) |
+| [`docs/EARTH-CONSOLE.md`](docs/EARTH-CONSOLE.md) | Observador Tierra en vivo |
+| [`PROJECT-STATUS.md`](PROJECT-STATUS.md) | Resumen para contribuidores |
+| [`ROADMAP.md`](ROADMAP.md) | Fases producto 0–5 |
 
 ---
 

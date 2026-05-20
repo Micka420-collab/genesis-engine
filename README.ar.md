@@ -17,6 +17,10 @@
 [![Status: Phase 5g](https://img.shields.io/badge/status-Phase_5g_alpha-orange.svg)](#️-خارطة-الطريق)
 [![Earth-anchored](https://img.shields.io/badge/Earth-anchored-green.svg)](#-مرتبط-بالأرض-الحقيقية)
 [![Deterministic](https://img.shields.io/badge/deterministic-✓-purple.svg)](#-الحتمية)
+[![CI](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml)
+[![واقعية الأرض ~76%](https://img.shields.io/badge/%D9%88%D8%A7%D9%82%D8%B9%D9%8A%D8%A9_%D8%A7%D9%84%D8%A3%D8%B1%D8%B6-~76%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
+
+[EMERGENCE SIM v2](docs/EMERGENCE-SIM-v2.md) · [المطالبة الرئيسية](docs/MASTER-SCALE-PROMPT-v2.md) · [حالة المشروع](PROJECT-STATUS.md) · [Earth Console](docs/EARTH-CONSOLE.md) · [Runtime](runtime/README.md) · [Rust](native/world-engine/README.md)
 
 *بناء كون رقمي دائم تولد فيه عملاء الذكاء الاصطناعي المستقلون حقًا، ويتطوّرون، ويتكاثرون، ويصوغون تاريخهم الخاص، ويسمحون بالملاحظة العلمية للحضارات الاصطناعية الناشئة.*
 
@@ -49,6 +53,44 @@
 
 ---
 
+## EMERGENCE SIM v2.0 — ZERO PRE-SCRIPT (بدون سيناريو مسبق)
+
+**القوانين الفيزيائية فقط** مبرمجة مسبقًا. يجب أن **تنبثق** اللغة والأدوات والحضارة وتشكيل التضاريس من العملاء — وليس مهامًا مكتوبة مسبقًا.
+
+البيان الكامل: **[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
+
+| الطبقة | المحتوى |
+|--------|---------|
+| **L0** فيزياء | ديناميكا حرارية، جاذبية، هيدرولوجيا، تآكل |
+| **L1** عالم | Genesis، مناخ، أحياء، موارد |
+| **L2** بيولوجيا | DNA 256-D، أيض، انتقاء |
+| **L3** إدراك | إدراك محلي، مرونة (هدف NEAT) |
+| **L4** حضارة | تجارة، بناء ناشئ، سياسة، كلام |
+
+**المراقبة:** `make earth-console` → http://127.0.0.1:8090/ · مؤشرات: `/api/emergence_metrics`
+
+كل شيء ينبثق من `Simulation.step()` — بلا خط أنابيب منسق. راجع [`PROJECT-STATUS.md`](PROJECT-STATUS.md).
+
+---
+
+## حالة المشروع
+
+| المحور | الحالة | التفاصيل |
+|--------|--------|----------|
+| المراحل 0–2 (حياة، مجتمع) | ✅ | إدراك، تكاثر، معجم |
+| المرحلة 4 (انبثاق حضاري) | ✅ | زراعة، كتابة، سياسة، معادن |
+| المرحلة 5 (Genesis-α) | ⏳ | تشغيل طويل 10k سنة محاكاة |
+| **Waves 16–41** (عالم واقعي) | ✅ | Genesis → مناخ → مستوطنات → عرض → غلاف جوي → مراقبون |
+| **واقعية الأرض (عالمية)** | **~76 %** | متوسط 7 أبعاد → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (هدف **80 %**) |
+
+**الاختبارات:** `pytest runtime/tests` — **133** اختبارًا · smokes **p72–p86** في `make validate-all`.
+
+ملخص: **[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · قائمة العمل: **[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**.
+
+> **ملاحظة:** وثائق قديمة ذكرت **68 %** أو **74 %** أو **80 %** كدرجة عالمية. **~76 %** هو المتوسط الموحد؛ **80 %** هو الهدف أو درجة المناخ فقط — راجع خارطة الطريق.
+
+---
+
 ## ✨ ما الذي يعمل اليوم
 
 | القدرة | الحالة | العرض |
@@ -67,7 +109,8 @@
 | 🏘️ **البناء** (HEARTH، BUILD، متعدد الثقافات) | ✅ | 1 HEARTH مكتمل في 5 آلاف نبضة |
 | ⚡ **تسريع الوقت x10/x100/x1000** | ✅ | تسريع **38× / 84×** مقاس، الحتمية محفوظة |
 | 🦠 **أوبئة SIR** | ✅ | `infectious_until` + نصف قطر النقل |
-| 👁️ **لوحة قيادة وضع الإله** | ✅ | HTTP `/api/state`، `/api/realism_state`، `/api/demography` |
+| 👁️ **Earth Console** (كرة أرضية، iso 2.5D، صوت العملاء) | ✅ | http://127.0.0.1:8090/ · SSE · `/api/audio` · `/api/languages` |
+| 👁️ **لوحة قيادة وضع الإله** (قديم) | ✅ | HTTP `/api/state`، `/api/realism_state`، `/api/demography` |
 | 💾 **حفظ / تحميل / تفرع** | ✅ | مكتبة عوالم، تنسيق مفتوح |
 | 📤 **تصدير GIS** | ✅ | GeoTIFF (12 طبقة)، PNG خرائطي، OBJ مجسم ارتفاع، JSON |
 | 🔬 **الموجة 1: قاعدة معرفة الفيزياء + الكيمياء** | ✅ | 43 عنصرًا، 54 طاقة ربط، البرونز قابل للتركيب |
@@ -265,6 +308,18 @@ git push origin feature/my-contribution
 - [`ETHICS.md`](ETHICS.md) — الوضع الأخلاقي للعملاء، حدود "المعاناة" المحاكاة، مجلس الأخلاقيات الخارجي
 - [`SECURITY.md`](SECURITY.md) — نموذج التهديد، PQC، الإبلاغ عن الثغرات الأمنية
 - **الصور الرمزية البشرية**: الموافقة الصريحة، علامة مائية مشفرة، الحق في النسيان GDPR
+
+---
+
+## التوثيق
+
+| مستند | الدور |
+|-------|------|
+| [`docs/README.md`](docs/README.md) | فهرس التوثيق |
+| [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) | **واقعية الأرض ~76 %** (مصدر الحقيقة الوحيد) |
+| [`docs/EARTH-CONSOLE.md`](docs/EARTH-CONSOLE.md) | مراقب الأرض المباشر |
+| [`PROJECT-STATUS.md`](PROJECT-STATUS.md) | ملخص للمساهمين |
+| [`ROADMAP.md`](ROADMAP.md) | مراحل المنتج 0–5 |
 
 ---
 
