@@ -9,7 +9,7 @@
 
 Laboratoire open-source d’**artificial life** : monde physique déterministe (Terre ou procédural) + agents autonomes + civilisations émergentes, observable via smokes, dashboard et exports GIS.
 
-**Tests :** `pytest runtime/tests` — **73** tests · smoke **p83** dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **75** tests · smoke **p83** dans `validate-all`.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
@@ -46,8 +46,8 @@ Estimation **globale ~70 %** vers une simulation « publication-grade » type Te
 | Dimension | ~% | Piste principale |
 |-----------|-----|------------------|
 | Climat / biomes | 76 | Köppen FAIR + bootstrap Genesis (p80) |
-| Rendu visuel | 73 | PBR-lite, Rayleigh, HG + ray-march colonne |
-| Observation IA | **80** | SSE + JSONL live (`run.py --observe-jsonl`, `observation_server --jsonl`) |
+| Rendu visuel | **76** | Earth Console live + PBR-lite / atmosphère batch |
+| Observation IA | **84** | **Earth Console** (`run_earth_console.py`) + SSE + JSONL |
 | Sociétés / agents | **76** | Journal `trade` + transferts inventaire + alliances |
 | Géologie / relief | 55 | Tectonique, stratigraphie légère |
 | Écologie / hydrologie | 65 | **`hydrology_mode`** stub/sv1d/lbm ; preset **`run.py realism`** |

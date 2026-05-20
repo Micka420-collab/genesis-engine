@@ -17,6 +17,7 @@ help:
 	@echo "  make terre-long     # preset terre 2000 ticks + enriched artifact"
 	@echo "  make validate-fair  # Köppen FAIR + checksums (p80)"
 	@echo "  make observe        # SSE observation server + dashboard URL"
+	@echo "  make earth-console  # live Terre UI (Genesis macro + god view)"
 	@echo "  make validate-all   # pytest + smokes p72–p82"
 	@echo "  make rust-check     # cargo check Rust workspace"
 	@echo "  make rust-test      # cargo test Rust workspace"
@@ -80,6 +81,9 @@ terre-long:
 validate-fair:
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p80_koeppen_genesis_smoke.py
 
+earth-console:
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/run_earth_console.py
+
 observe:
 	@echo "Dashboard (open in browser):"
 	@echo "  file://$$(pwd)/runtime/dashboard.html"
@@ -110,5 +114,5 @@ validate-all: test-python
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release
 
-.PHONY: help setup setup-earth setup-dev doctor compile-python test-python smoke smoke-realism civilization terre terre-long validate-fair observe validate-all maturin-dev rust-check rust-test rust-check-scaffolding rust-test-scaffolding test
+.PHONY: help setup setup-earth setup-dev doctor compile-python test-python smoke smoke-realism civilization terre terre-long validate-fair earth-console observe validate-all maturin-dev rust-check rust-test rust-check-scaffolding rust-test-scaffolding test
 

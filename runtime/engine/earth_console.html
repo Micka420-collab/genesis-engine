@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Genesis · Terre virtuelle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-deep: #060a12;
+      --bg-panel: rgba(12, 18, 28, 0.92);
+      --bg-elevated: #141c2a;
+      --border: rgba(120, 160, 200, 0.18);
+      --text: #e8eef6;
+      --muted: #8b9cb3;
+      --accent: #3dd6c6;
+      --accent-warm: #e8b86d;
+      --danger: #f07178;
+      --success: #7fd99a;
+      --glow: 0 0 40px rgba(61, 214, 198, 0.12);
+      --radius: 12px;
+      --font: "DM Sans", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: var(--font);
+      background: var(--bg-deep);
+      color: var(--text);
+      background-image:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(61, 214, 198, 0.08), transparent),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(232, 184, 109, 0.05), transparent);
+    }
+    .shell {
+      display: grid;
+      grid-template-rows: 52px 1fr 44px;
+      grid-template-columns: 72px 1fr 300px;
+      height: 100vh;
+    }
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+    }
+    .logo {
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo span { color: var(--accent); }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted);
+      box-shadow: 0 0 8px var(--muted);
+    }
+    .status-dot.live { background: var(--success); box-shadow: 0 0 10px var(--success); }
+    .header-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+    .pill {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--muted);
+    }
+    .pill strong { color: var(--text); font-weight: 500; }
+    .transport {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .btn {
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:hover { border-color: var(--accent); background: rgba(61, 214, 198, 0.1); }
+    .btn.primary { background: rgba(61, 214, 198, 0.2); border-color: var(--accent); color: var(--accent); }
+    .btn.icon { padding: 6px 10px; min-width: 36px; }
+    .rail {
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 8px;
+      border-right: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+    .rail button {
+      width: 48px; height: 48px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.15s;
+    }
+    .rail button:hover, .rail button.active {
+      background: rgba(61, 214, 198, 0.12);
+      border-color: var(--border);
+      color: var(--accent);
+    }
+    .viewport-wrap {
+      grid-row: 2;
+      position: relative;
+      overflow: hidden;
+      background: #020408;
+    }
+    #viewport { position: absolute; inset: 0; cursor: grab; }
+    #viewport.grabbing { cursor: grabbing; }
+    #worldImg {
+      position: absolute;
+      image-rendering: auto;
+      pointer-events: none;
+      user-select: none;
+    }
+    #agentLayer { position: absolute; inset: 0; pointer-events: none; }
+    .hud-bl {
+      position: absolute;
+      left: 16px; bottom: 16px;
+      display: flex; flex-direction: column; gap: 8px;
+      pointer-events: none;
+    }
+    .hud-bl .card { pointer-events: auto; }
+    .card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      backdrop-filter: blur(10px);
+      box-shadow: var(--glow);
+    }
+    .card h3 {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    #macroImg {
+      width: 220px;
+      height: 140px;
+      border-radius: 8px;
+      object-fit: cover;
+      cursor: crosshair;
+      border: 1px solid var(--border);
+      display: block;
+    }
+    .macro-hint { font-size: 10px; color: var(--muted); margin-top: 6px; max-width: 220px; line-height: 1.4; }
+    .sidebar {
+      grid-row: 2;
+      border-left: 1px solid var(--border);
+      background: var(--bg-panel);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-scroll { flex: 1; overflow-y: auto; padding: 14px; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .kpi {
+      background: var(--bg-elevated);
+      border-radius: 10px;
+      padding: 10px 12px;
+      border-left: 3px solid var(--accent);
+    }
+    .kpi .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .kpi .value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 12px 0 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .layers { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .layer-chip {
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .layer-chip.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(61, 214, 198, 0.15);
+    }
+    .agent-list { font-family: var(--mono); font-size: 11px; max-height: 200px; overflow-y: auto; }
+    .agent-row {
+      display: grid;
+      grid-template-columns: 28px 1fr 48px;
+      gap: 6px;
+      padding: 6px 4px;
+      border-radius: 6px;
+      cursor: pointer;
+      align-items: center;
+    }
+    .agent-row:hover { background: var(--bg-elevated); }
+    .agent-row.selected { outline: 1px solid var(--accent); background: rgba(61, 214, 198, 0.08); }
+    .events { font-family: var(--mono); font-size: 10px; max-height: 140px; overflow-y: auto; color: var(--muted); }
+    .event-line { padding: 2px 0; }
+    .event-line.birth { color: var(--success); }
+    .event-line.death { color: var(--danger); }
+    footer {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-panel);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    footer kbd {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text);
+    }
+    .zoom-readout { margin-left: auto; color: var(--text); }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="logo"><span>◉</span> Genesis · Terre</div>
+    <div class="status-dot" id="statusDot"></div>
+    <span class="pill" id="connPill">connexion…</span>
+    <div class="header-pills">
+      <span class="pill">tick <strong id="hdrTick">—</strong></span>
+      <span class="pill">vivants <strong id="hdrAlive">—</strong></span>
+      <span class="pill">TPS <strong id="hdrTps">—</strong></span>
+    </div>
+    <div class="transport">
+      <button class="btn primary" id="btnPause">⏸ Pause</button>
+      <button class="btn" id="btnStep">⏭ Pas</button>
+      <button class="btn icon" data-speed="0.5">0.5×</button>
+      <button class="btn icon active" data-speed="1">1×</button>
+      <button class="btn icon" data-speed="2">2×</button>
+      <button class="btn icon" data-speed="5">5×</button>
+      <button class="btn" id="btnRecenter">⊙ Agents</button>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Outils">
+    <button class="active" title="Vue locale" data-tool="local">🌍</button>
+    <button title="Couches" data-tool="layers">◫</button>
+    <button title="Agents" data-tool="agents">◎</button>
+    <button title="God view classique" onclick="location.href='god_view_v2.html'">⚡</button>
+  </nav>
+
+  <div class="viewport-wrap">
+    <div id="viewport">
+      <img id="worldImg" alt="terrain">
+      <canvas id="agentLayer"></canvas>
+    </div>
+    <div class="hud-bl">
+      <div class="card">
+        <h3>Continent Genesis</h3>
+        <img id="macroImg" alt="macro continental" src="">
+        <p class="macro-hint" id="macroHint">Clique sur la carte pour te téléporter (ancre sim).</p>
+      </div>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-scroll">
+      <div class="kpi-grid">
+        <div class="kpi"><div class="label">Tick</div><div class="value" id="kpiTick">—</div></div>
+        <div class="kpi"><div class="label">Vivants</div><div class="value" id="kpiAlive">—</div></div>
+        <div class="kpi"><div class="label">Naissances</div><div class="value" id="kpiBirths">—</div></div>
+        <div class="kpi"><div class="label">Décès</div><div class="value" id="kpiDeaths">—</div></div>
+      </div>
+
+      <div class="section-title">Couche terrain</div>
+      <div class="layers" id="layerChips">
+        <button class="layer-chip active" data-overlay="">Relief</button>
+        <button class="layer-chip" data-overlay="temperature">Température</button>
+        <button class="layer-chip" data-overlay="precip">Précipitations</button>
+        <button class="layer-chip" data-overlay="ndvi">Végétation</button>
+        <button class="layer-chip" data-overlay="marine">Marin</button>
+        <button class="layer-chip" data-overlay="clouds">Nuages</button>
+      </div>
+
+      <div class="section-title">Coloration agents</div>
+      <div class="layers" id="agentViewChips">
+        <button class="layer-chip active" data-view="biome">Biome</button>
+        <button class="layer-chip" data-view="culture">Culture</button>
+        <button class="layer-chip" data-view="group">Groupe</button>
+        <button class="layer-chip" data-view="hunger">Faim</button>
+      </div>
+
+      <div class="section-title">Agents</div>
+      <div class="agent-list" id="agentList"></div>
+
+      <div class="section-title">Événements</div>
+      <div class="events" id="events">—</div>
+    </div>
+  </aside>
+
+  <footer>
+    <span><kbd>drag</kbd> pan · <kbd>molette</kbd> zoom · <kbd>Espace</kbd> pause · <kbd>S</kbd> pas · <kbd>R</kbd> recentrer</span>
+    <span class="zoom-readout" id="zoomReadout">zoom —</span>
+  </footer>
+</div>
+
+<script>
+const API = '';
+let overlay = '';
+let agentView = 'biome';
+let camCenterX = 0, camCenterY = 0, camZoom = 0.8;
+let dragging = false, dragX = 0, dragY = 0, camStartX = 0, camStartY = 0;
+let lastAgents = [], selectedRow = null, followingRow = null;
+let imgLoading = false, lastImgUrl = '';
+let macroMeta = { available: false, map_size_km: 4000, origin_km: [2000, 2000] };
+let pollStart = performance.now(), lastTick = 0, tpsEma = 0;
+
+const viewport = document.getElementById('viewport');
+const worldImg = document.getElementById('worldImg');
+const agentLayer = document.getElementById('agentLayer');
+const aCtx = agentLayer.getContext('2d');
+
+function vp() { return { w: viewport.clientWidth, h: viewport.clientHeight }; }
+function bbox() {
+  const { w, h } = vp();
+  const hw = (w / 2) * camZoom, hh = (h / 2) * camZoom;
+  return { xmin: camCenterX - hw, ymin: camCenterY - hh, xmax: camCenterX + hw, ymax: camCenterY + hh };
+}
+function w2s(wx, wy) {
+  const { w, h } = vp();
+  return { x: (wx - camCenterX) / camZoom + w / 2, y: (wy - camCenterY) / camZoom + h / 2 };
+}
+function s2w(sx, sy) {
+  const { w, h } = vp();
+  return { x: (sx - w / 2) * camZoom + camCenterX, y: (sy - h / 2) * camZoom + camCenterY };
+}
+function resize() {
+  const { w, h } = vp();
+  agentLayer.width = w; agentLayer.height = h;
+}
+window.addEventListener('resize', () => { resize(); scheduleTerrain(); drawAgents(); });
+resize();
+
+viewport.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  dragging = true; dragX = e.clientX; dragY = e.clientY;
+  camStartX = camCenterX; camStartY = camCenterY;
+  followingRow = null;
+  viewport.classList.add('grabbing');
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  camCenterX = camStartX - (e.clientX - dragX) * camZoom;
+  camCenterY = camStartY - (e.clientY - dragY) * camZoom;
+  updateZoom(); scheduleTerrain(); drawAgents();
+});
+window.addEventListener('mouseup', () => viewport.classList.remove('grabbing'));
+viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = viewport.getBoundingClientRect();
+  const before = s2w(e.clientX - r.left, e.clientY - r.top);
+  camZoom = Math.max(0.08, Math.min(50, camZoom * Math.exp(e.deltaY * 0.001)));
+  const after = s2w(e.clientX - r.left, e.clientY - r.top);
+  camCenterX += before.x - after.x;
+  camCenterY += before.y - after.y;
+  updateZoom(); scheduleTerrain(); drawAgents();
+}, { passive: false });
+
+document.getElementById('layerChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-overlay]');
+  if (!b) return;
+  document.querySelectorAll('#layerChips .layer-chip').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  overlay = b.dataset.overlay || '';
+  scheduleTerrain();
+});
+document.getElementById('agentViewChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-view]');
+  if (!b) return;
+  document.querySelectorAll('#agentViewChips .layer-chip').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  agentView = b.dataset.view;
+  drawAgents();
+});
+
+let terrainTimer = null;
+function scheduleTerrain() {
+  if (terrainTimer) clearTimeout(terrainTimer);
+  terrainTimer = setTimeout(loadTerrain, 60);
+}
+function loadTerrain() {
+  if (imgLoading) return;
+  const { w, h } = vp();
+  const b = bbox();
+  const ow = Math.min(w, 960), oh = Math.min(h, 640);
+  let url = `${API}/api/render?xmin=${b.xmin.toFixed(1)}&ymin=${b.ymin.toFixed(1)}` +
+    `&xmax=${b.xmax.toFixed(1)}&ymax=${b.ymax.toFixed(1)}&w=${ow}&h=${oh}&t=${Date.now()}`;
+  if (overlay) url += `&overlay=${encodeURIComponent(overlay)}`;
+  if (url === lastImgUrl) return;
+  lastImgUrl = url;
+  imgLoading = true;
+  const img = new Image();
+  img.onload = () => {
+    worldImg.src = img.src;
+    worldImg.style.width = w + 'px';
+    worldImg.style.height = h + 'px';
+    worldImg.style.left = '0';
+    worldImg.style.top = '0';
+    imgLoading = false;
+  };
+  img.onerror = () => { imgLoading = false; };
+  img.src = url;
+}
+
+const CULTURE = ['#7fd99a','#e8b86d','#6eb5ff','#c9a0dc','#f07178','#3dd6c6','#a8d4ff','#d4a574'];
+function agentColor(a) {
+  if (agentView === 'culture') return CULTURE[a.culture % CULTURE.length];
+  if (agentView === 'group') return a.group_id ? CULTURE[a.group_id % CULTURE.length] : '#4a5568';
+  if (agentView === 'hunger') {
+    const h = Math.min(1, a.drives?.[0] ?? 0);
+    return `rgb(${Math.floor(80 + 175*h)},${Math.floor(180 - 100*h)},${Math.floor(140 - 100*h)})`;
+  }
+  return '#e8eef6';
+}
+function drawAgents() {
+  const { w, h } = vp();
+  aCtx.clearRect(0, 0, w, h);
+  if (followingRow != null) {
+    const a = lastAgents.find(x => x.row === followingRow);
+    if (a) { camCenterX = a.pos[0]; camCenterY = a.pos[1]; updateZoom(); }
+  }
+  lastAgents.forEach(a => {
+    const p = w2s(a.pos[0], a.pos[1]);
+    if (p.x < -20 || p.y < -20 || p.x > w + 20 || p.y > h + 20) return;
+    aCtx.beginPath();
+    aCtx.arc(p.x, p.y, a.row === selectedRow ? 7 : 4, 0, Math.PI * 2);
+    aCtx.fillStyle = agentColor(a);
+    aCtx.fill();
+    if (a.row === selectedRow) {
+      aCtx.strokeStyle = '#3dd6c6';
+      aCtx.lineWidth = 2;
+      aCtx.stroke();
+    }
+  });
+}
+
+function updateZoom() {
+  document.getElementById('zoomReadout').textContent =
+    `zoom ${(1/camZoom).toFixed(1)}× · centre (${camCenterX.toFixed(0)}, ${camCenterY.toFixed(0)}) m`;
+}
+
+async function postCtl(action, speed) {
+  const body = { action };
+  if (speed != null) body.speed = speed;
+  const r = await fetch(API + '/api/control', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return r.json();
+}
+document.getElementById('btnPause').addEventListener('click', async () => {
+  const s = await (await fetch(API + '/api/control')).json();
+  const n = await postCtl(s.paused ? 'play' : 'pause');
+  document.getElementById('btnPause').textContent = n.paused ? '▶ Lecture' : '⏸ Pause';
+});
+document.getElementById('btnStep').addEventListener('click', () => postCtl('step'));
+document.querySelectorAll('[data-speed]').forEach(b => {
+  b.addEventListener('click', async () => {
+    document.querySelectorAll('[data-speed]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    await postCtl('speed', parseFloat(b.dataset.speed));
+  });
+});
+document.getElementById('btnRecenter').addEventListener('click', recenterAgents);
+function recenterAgents() {
+  if (!lastAgents.length) return;
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  lastAgents.forEach(a => {
+    minX = Math.min(minX, a.pos[0]); maxX = Math.max(maxX, a.pos[0]);
+    minY = Math.min(minY, a.pos[1]); maxY = Math.max(maxY, a.pos[1]);
+  });
+  camCenterX = (minX + maxX) / 2;
+  camCenterY = (minY + maxY) / 2;
+  const { w, h } = vp();
+  camZoom = Math.max((maxX - minX + 200) / w, (maxY - minY + 200) / h, 0.15);
+  updateZoom(); scheduleTerrain(); drawAgents();
+}
+
+async function loadMacro() {
+  const meta = await (await fetch(API + '/api/macro_meta')).json();
+  macroMeta = meta;
+  const hint = document.getElementById('macroHint');
+  if (!meta.available) {
+    document.getElementById('macroImg').style.display = 'none';
+    hint.textContent = 'Genesis non bootstrappé — lance run_earth_console.py';
+    return;
+  }
+  document.getElementById('macroImg').style.display = 'block';
+  document.getElementById('macroImg').src = `${API}/api/macro?w=440&h=280&t=${Date.now()}`;
+  hint.textContent = `Carte ${Math.round(meta.map_size_km)} km · clic = ancrer la vue locale`;
+}
+document.getElementById('macroImg').addEventListener('click', e => {
+  if (!macroMeta.available) return;
+  const img = e.target;
+  const r = img.getBoundingClientRect();
+  const u = (e.clientX - r.left) / r.width;
+  const v = (e.clientY - r.top) / r.height;
+  const xKm = u * macroMeta.map_size_km;
+  const yKm = v * macroMeta.map_size_km;
+  const ox = macroMeta.origin_km[0], oy = macroMeta.origin_km[1];
+  camCenterX = (xKm - ox) * 1000;
+  camCenterY = (yKm - oy) * 1000;
+  camZoom = Math.max(macroMeta.map_size_km * 15, 2);
+  updateZoom(); scheduleTerrain(); drawAgents();
+});
+
+function renderAgentList(agents) {
+  const el = document.getElementById('agentList');
+  if (!agents.length) { el.textContent = '—'; return; }
+  el.innerHTML = agents.slice(0, 80).map(a =>
+    `<div class="agent-row${a.row === selectedRow ? ' selected' : ''}" data-row="${a.row}">
+      <span>${a.row}</span><span>c${a.culture}</span><span>${(a.drives?.[0] ?? 0).toFixed(2)}</span>
+    </div>`).join('');
+  el.querySelectorAll('.agent-row').forEach(row => {
+    row.addEventListener('click', () => {
+      selectedRow = parseInt(row.dataset.row, 10);
+      followingRow = selectedRow;
+      renderAgentList(lastAgents);
+      drawAgents();
+    });
+  });
+}
+
+async function poll() {
+  try {
+    const [snap, agentsR, metricsR, eventsR] = await Promise.all([
+      fetch(API + '/api/state'),
+      fetch(API + '/api/agents'),
+      fetch(API + '/api/metrics'),
+      fetch(API + '/api/events/recent?n=30'),
+    ]);
+    const snapJ = await snap.json();
+    const agentsJ = await agentsR.json();
+    const metricsJ = await metricsR.json();
+    const eventsJ = await eventsR.json();
+    document.getElementById('statusDot').classList.add('live');
+    document.getElementById('connPill').textContent = 'live';
+    const tick = snapJ.tick ?? 0;
+    const alive = snapJ.alive ?? agentsJ.agents?.length ?? 0;
+    if (tick > lastTick) {
+      const dt = (performance.now() - pollStart) / 1000;
+      tpsEma = tpsEma * 0.85 + (tick - lastTick) / Math.max(dt, 0.001) * 0.15;
+      pollStart = performance.now();
+      lastTick = tick;
+    }
+    document.getElementById('hdrTick').textContent = tick;
+    document.getElementById('hdrAlive').textContent = alive;
+    document.getElementById('hdrTps').textContent = tpsEma.toFixed(1);
+    document.getElementById('kpiTick').textContent = tick;
+    document.getElementById('kpiAlive').textContent = alive;
+    document.getElementById('kpiBirths').textContent = metricsJ.cum_births ?? '—';
+    document.getElementById('kpiDeaths').textContent = metricsJ.cum_deaths ?? '—';
+    lastAgents = agentsJ.agents || [];
+    renderAgentList(lastAgents);
+    const ev = eventsJ.events || [];
+    document.getElementById('events').innerHTML = ev.slice(-20).reverse().map(e =>
+      `<div class="event-line ${e.kind || ''}">t${e.tick} ${e.kind || '?'}</div>`).join('') || '—';
+    drawAgents();
+  } catch (err) {
+    document.getElementById('connPill').textContent = 'hors ligne';
+    document.getElementById('statusDot').classList.remove('live');
+  }
+}
+
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); document.getElementById('btnPause').click(); }
+  if (e.code === 'KeyS') document.getElementById('btnStep').click();
+  if (e.code === 'KeyR') recenterAgents();
+});
+
+loadMacro();
+scheduleTerrain();
+setInterval(poll, 400);
+poll();
+</script>
+</body>
+</html>

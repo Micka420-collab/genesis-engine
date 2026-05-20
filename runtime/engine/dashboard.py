@@ -396,6 +396,62 @@ def render_bbox_png(sim: Simulation, xmin: float, ymin: float, xmax: float, ymax
     return _encode_png(img)
 
 
+def render_macro_continental_png(sim: Simulation, out_w: int = 480, out_h: int = 320
+                                 ) -> Optional[Tuple[bytes, dict]]:
+    """Render Genesis continental macro grid (elevation hillshade + biomes)."""
+    try:
+        from engine.genesis_bootstrap import bootstrap_state
+        from engine.world_render import biome_color_map, hillshade
+
+        st = bootstrap_state(sim)
+        if st is None:
+            return None
+        elev = st.world.elevation_m.astype(np.float32)
+        biome = st.world.biome
+        rgb = biome_color_map(biome).astype(np.float32)
+        hs = hillshade(elev, azimuth_deg=315.0, altitude_deg=45.0)
+        rgb = np.clip(rgb * (0.55 + 0.45 * hs[..., None]), 0, 255)
+        h, w = rgb.shape[:2]
+        out_w = max(64, min(int(out_w), 1024))
+        out_h = max(64, min(int(out_h), 1024))
+        # Nearest resize without scipy
+        yi = (np.linspace(0, h - 1, out_h)).astype(np.int32)
+        xi = (np.linspace(0, w - 1, out_w)).astype(np.int32)
+        small = rgb[yi][:, xi]
+        img = np.zeros((out_h, out_w, 4), dtype=np.uint8)
+        img[..., :3] = small.astype(np.uint8)
+        img[..., 3] = 255
+        anchor = st.anchor
+        return _encode_png(img), {
+            "map_size_km": float(st.world.params.map_size_km),
+            "resolution": int(st.world.params.resolution),
+            "origin_km": list(anchor.sim_origin_macro_km),
+            "seed": int(st.world.params.seed) & 0xFFFFFFFFFFFFFFFF,
+        }
+    except Exception:
+        return None
+
+
+def macro_continental_meta(sim: Simulation) -> dict:
+    """JSON metadata for the continental macro map (no image)."""
+    try:
+        from engine.genesis_bootstrap import bootstrap_state
+
+        st = bootstrap_state(sim)
+        if st is None:
+            return {"available": False}
+        p = st.world.params
+        return {
+            "available": True,
+            "map_size_km": float(p.map_size_km),
+            "resolution": int(p.resolution),
+            "origin_km": list(st.anchor.sim_origin_macro_km),
+            "seed": int(p.seed) & 0xFFFFFFFFFFFFFFFF,
+        }
+    except Exception:
+        return {"available": False}
+
+
 # ---------------------------------------------------------------------------
 # Sim control shared state
 # ---------------------------------------------------------------------------
@@ -494,14 +550,34 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?", 1)[0]
-        if path == "/" or path == "/index.html":
-            self._serve_file("god_view.html")
+        if path == "/" or path == "/index.html" or path == "/earth" or path == "/earth_console.html":
+            self._serve_file("earth_console.html")
             return
         if path == "/index_classic.html":
             self._serve_file("index.html")
             return
         if path == "/god_view_v2.html" or path == "/god_view_v2":
             self._serve_file("god_view_v2.html")
+            return
+        if path == "/god_view.html" or path == "/god_view":
+            self._serve_file("god_view.html")
+            return
+        if path == "/api/macro":
+            qs = self._qs()
+            w = int(qs.get("w", 480))
+            h = int(qs.get("h", 320))
+            result = render_macro_continental_png(self.sim_ref, w, h)
+            if result is None:
+                self._json(200, macro_continental_meta(self.sim_ref))
+                return
+            png, meta = result
+            if qs.get("meta", "") == "1":
+                self._json(200, meta)
+                return
+            self._png(png)
+            return
+        if path == "/api/macro_meta":
+            self._json(200, macro_continental_meta(self.sim_ref))
             return
         if path == "/audio_overlay.js" or path == "/static/audio_overlay.js":
             self._serve_file("audio_overlay.js", content_type="application/javascript; charset=utf-8")
