@@ -36,15 +36,26 @@ jobs:
       - name: P0 smoke
         run: PYTHONPATH=runtime python runtime/scripts/p0_smoke.py
 
-      - name: Realism smokes p72–p82
+      # Mirrors `make validate-all` smoke order (`Makefile`), then SSE smoke.
+      - name: Realism smokes (validate-all + SSE)
         run: |
           export PYTHONPATH=runtime
-          for s in p72_world_atmosphere_smoke.py p73_rust_worldgraph_smoke.py \
-            p74_koeppen_harness_smoke.py p75_koeppen_grid_smoke.py \
-            p76_multi_rate_coupler_smoke.py p77_epidemic_contact_smoke.py \
-            p78_pbr_render_smoke.py p79_vision_observation_smoke.py \
-            p80_koeppen_genesis_smoke.py p81_hydrology_smoke.py \
-            p82_observation_sse_smoke.py; do
+          scripts=(
+            p72_world_atmosphere_smoke.py
+            p73_rust_worldgraph_smoke.py
+            p73_agent_observation_smoke.py
+            p74_koeppen_harness_smoke.py
+            p75_koeppen_grid_smoke.py
+            p76_multi_rate_coupler_smoke.py
+            p77_epidemic_contact_smoke.py
+            p78_pbr_render_smoke.py
+            p79_vision_observation_smoke.py
+            p80_koeppen_genesis_smoke.py
+            p81_hydrology_smoke.py
+            p82_civilization_pipeline_smoke.py
+            p82_observation_sse_smoke.py
+          )
+          for s in "${scripts[@]}"; do
             echo "=== $s ==="
             python "runtime/scripts/$s" || exit 1
           done
@@ -78,7 +89,6 @@ jobs:
   maturin-pybindings:
     runs-on: ubuntu-latest
     needs: rust-world-engine
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 

@@ -96,6 +96,7 @@ validate-all: test-python
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p80_koeppen_genesis_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p81_hydrology_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p82_civilization_pipeline_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p82_observation_sse_smoke.py
 
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release

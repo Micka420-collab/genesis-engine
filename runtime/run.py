@@ -2,22 +2,28 @@
 """Unified Genesis Engine launcher.
 
 Usage:
-    python run.py <experiment> [--ticks N] [--no-5cd] [--seed S] [--journal PATH]
+    python run.py <experiment> [--ticks N] [--no-5cd] [--realism] [--hydrology-mode MODE] ...
 
 Where <experiment> is one of:
+    realism - full_biosphere + knowledge_layers + sv1d cross-chunk hydrology;
+        runs engine.genesis_bootstrap.bootstrap_genesis_sim on startup
+        (continental genesis substrate). Defaults: founders=8, max_agents=200,
+        bounds_km=(2,2), drive_accel=8000, ticks=500.
     exp1_scarcity, exp2_food_pressure, exp3_two_cultures, exp4_catastrophe,
-    stress_100, exp5_stress_200
+    stress_100, exp5_stress_200, origins
 or a custom name + --founders N --max-agents M --bounds-km K to roll your own.
+Use ``--realism`` to merge the realism preset into any experiment (preset keys
+override the named preset for overlapping fields).
 
 Writes:
-    artifacts/<experiment>.json          — dashboard-ready summary + metrics
-    journals/<experiment>.jsonl          — full event journal
-    artifacts/<experiment>_snapshot.json — final agent positions (god-view)
+    artifacts/<experiment>.json          - dashboard-ready summary + metrics
+    journals/<experiment>.jsonl          - full event journal
+    artifacts/<experiment>_snapshot.json - final agent positions (god-view)
 
 Open dashboard.html (sibling file) in a browser to visualise.
 
-Civilization subsystems (coupler, epidemic, Köppen, observable) wire in
-``Simulation.__init__`` via ``engine/sim_emergence.py`` — this script only
+Civilization subsystems (coupler, epidemic, Koeppen, observable) wire in
+``Simulation.__init__`` via ``engine/sim_emergence.py`` - this script only
 runs ``sim.step()`` in a loop.
 """
 from __future__ import annotations
@@ -36,7 +42,21 @@ if HERE not in sys.path:
 from engine.sim import Simulation, SimConfig  # noqa: E402
 
 
+_PRESET_REALISM_SEED = 0xEA11_5CAF_DEAD_BEEF
+
 PRESETS = {
+    "realism": dict(
+        seed=_PRESET_REALISM_SEED,
+        founders=8,
+        max_agents=200,
+        bounds_km=(2.0, 2.0),
+        cultures=1,
+        drive_accel=8000.0,
+        ticks=500,
+        knowledge_layers=True,
+        full_biosphere=True,
+        hydrology_mode="sv1d",
+    ),
     "exp1_scarcity": dict(
         seed=0xC0FFEE_DEADBEEF, founders=10, max_agents=80,
         bounds_km=(0.4, 0.4), cultures=1, drive_accel=4000.0, ticks=250),
@@ -67,6 +87,9 @@ PRESETS = {
 def _resolve_config(args) -> Tuple[SimConfig, int]:
     name = args.experiment
     base = dict(PRESETS.get(name, {}))
+    if getattr(args, "realism", False):
+        r = dict(PRESETS["realism"])
+        base = {**base, **r}
     ticks = int(args.ticks or base.pop("ticks", 200))
     base.pop("ticks", None)
     if args.seed is not None:
@@ -90,6 +113,8 @@ def _resolve_config(args) -> Tuple[SimConfig, int]:
         base["full_biosphere"] = True
     if getattr(args, "knowledge_layers", False):
         base["knowledge_layers"] = True
+    if args.hydrology_mode is not None:
+        base["hydrology_mode"] = str(args.hydrology_mode)
     if not base:
         raise SystemExit(
             f"Unknown experiment '{name}'. Either pick a preset "
@@ -131,7 +156,8 @@ def _snapshot(sim: Simulation) -> dict:
         })
     bx_m = sim.cfg.bounds_km[0] * 500.0
     by_m = sim.cfg.bounds_km[1] * 500.0
-    return {"bounds_m": [bx_m, by_m], "agents": rows}
+    return {"bounds_m": [bx_m, by_m], "hydrology_mode": str(sim.cfg.hydrology_mode),
+            "agents": rows}
 
 
 def _collapse_metrics(raw: dict) -> dict:
@@ -181,12 +207,18 @@ def main() -> int:
     p.add_argument("--cultures", type=int, default=None)
     p.add_argument("--drive-accel", type=float, default=None)
     p.add_argument("--emergent-origins", action="store_true",
-                   help="100%% emergent biosphere: protocells → microbes → fauna → "
+                   help="100%% emergent biosphere: protocells -> microbes -> fauna -> "
                         "sapients (max 2 by default). No scripted founders.")
     p.add_argument("--full-biosphere", action="store_true",
                    help="Install photosynthesis + ancient plant/animal evolution.")
     p.add_argument("--knowledge-layers", action="store_true",
                    help="Physics + Materials Project + voxel architecture + social topology.")
+    p.add_argument("--realism", action="store_true",
+                   help="Merge realism preset (biosphere, knowledge_layers, sv1d hydrology, "
+                        "defaults); triggers genesis bootstrap after Simulation(). "
+                        "Same as experiment name 'realism' when used alone.")
+    p.add_argument("--hydrology-mode", choices=("stub", "sv1d", "lbm"), default=None,
+                   help="Cross-chunk hydrology model (default: stub, or from preset).")
     p.add_argument("--journal", default=None,
                    help="Override journal path (default: journals/<exp>.jsonl).")
     p.add_argument("--quiet", action="store_true",
@@ -195,12 +227,23 @@ def main() -> int:
 
     cfg, ticks = _resolve_config(args)
     name = cfg.name
+    use_realism_flow = bool(getattr(args, "realism", False) or args.experiment == "realism")
     journal_path = args.journal or os.path.join(
         HERE, "journals", f"{name}.jsonl")
     os.makedirs(os.path.dirname(journal_path), exist_ok=True)
     open(journal_path, "w").close()  # truncate
 
     sim = Simulation(cfg, journal_path=journal_path)
+
+    genesis_bootstrapped = False
+    if use_realism_flow:
+        try:
+            from engine.genesis_bootstrap import bootstrap_genesis_sim
+            bootstrap_genesis_sim(sim)
+            genesis_bootstrapped = True
+        except Exception as exc:
+            print(f"[run] genesis bootstrap failed (continuing without): {exc}",
+                  file=sys.stderr)
 
     coupler_installed = bool(getattr(sim, "_coupler_wrapped", False))
 
@@ -217,7 +260,8 @@ def main() -> int:
     if not args.quiet:
         print(f"[run] {name}: founders={cfg.founders} emergent={cfg.emergent_origins} "
               f"cap={cfg.max_agents} bounds_km={cfg.bounds_km} cultures={cfg.cultures} "
-              f"drive_accel={cfg.drive_accel} 5cd={five_cd_installed} "
+              f"drive_accel={cfg.drive_accel} hydrology_mode={cfg.hydrology_mode} "
+              f"genesis={genesis_bootstrapped} 5cd={five_cd_installed} "
               f"ticks={ticks} journal={journal_path}")
 
     t0 = time.monotonic()
@@ -256,6 +300,8 @@ def main() -> int:
             "bounds_km": list(cfg.bounds_km),
             "cultures": int(cfg.cultures),
             "drive_accel": float(cfg.drive_accel),
+            "hydrology_mode": str(cfg.hydrology_mode),
+            "genesis_bootstrapped": bool(genesis_bootstrapped),
             "catastrophe_at_tick": int(cfg.catastrophe_at_tick),
             "5cd_installed": bool(five_cd_installed),
             "multi_rate_coupler": bool(coupler_installed),

@@ -424,8 +424,9 @@ def install_animal_evolution(sim, *,
     orig_step = sim.step
 
     def wrapped_step():
-        orig_step()
+        stats = orig_step()
         tick_animal_evolution(sim, state)
+        return stats
 
     sim.step = wrapped_step
     return state

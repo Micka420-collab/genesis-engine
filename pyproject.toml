@@ -7,7 +7,7 @@ name = "genesis-engine"
 version = "0.1.0"
 description = "Deterministic artificial-life laboratory for emergent civilizations."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11,<3.14"
 license = { text = "AGPL-3.0-only" }
 authors = [
   { name = "Genesis Engine Contributors" },
@@ -48,4 +48,4 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py311"

@@ -9,9 +9,12 @@
 
 Laboratoire open-source d’**artificial life** : monde physique déterministe (Terre ou procédural) + agents autonomes + civilisations émergentes, observable via smokes, dashboard et exports GIS.
 
+**Tests :** `pytest runtime/tests` — **53** tests (voir `Makefile` `test-python`).  
+**CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
+
 ### Philosophie — émergence civilisationnelle
 
-Les phénomènes (climat Köppen, hydrologie, épidémies, commerce, culture, observation) **émergent du cycle `Simulation.step()`** et des interactions agents ↔ monde — pas d’un orchestrateur de scripts qui enchaîne des étapes. Les smokes (`scripts/p*.py`) et `make smoke` **valident** le comportement ; le cœur exécutable est `python runtime/run.py` ou une boucle `sim.step()`. Voir `engine/sim_emergence.py`.
+Les phénomènes (climat Köppen, hydrologie, épidémies, commerce, culture, observation) **émergent du cycle `Simulation.step()`** et des interactions agents ↔ monde — pas d’un orchestrateur de scripts qui enchaîne des étapes. Les smokes (`scripts/p*.py`) et `make smoke` **valident** le comportement ; le cœur exécutable est `python runtime/run.py` ou une boucle `sim.step()`. **`python runtime/run.py realism`** : preset realism (documenté avec la sous-commande `run.py` — voir aussi `make civilization`). Voir `engine/sim_emergence.py`.
 
 ---
 
@@ -19,7 +22,7 @@ Les phénomènes (climat Köppen, hydrologie, épidémies, commerce, culture, ob
 
 | Phase | Intitulé | Statut | Notes |
 |-------|----------|--------|-------|
-| **0** | Foundations (ECS, monorepo, observabilité) | ✅ | ADR-0005, PRF, CI |
+| **0** | Foundations (ECS, monorepo, observabilité) | ✅ | ADR-0005, PRF, CI (smokes alignés `validate-all`) |
 | **1** | MVP Vie (cognition, mort biologique) | ✅ | Boucle perceive → decide → act |
 | **2** | MVP Société (reproduction, mémoire, lexique) | ✅ | Multi-générations, vocalisations |
 | **3** | MVP Civilisation (construction, troc, conflits) | 🟡 | Partiel ; Waves 28–32 enrichissent |
@@ -34,7 +37,7 @@ Détail des **Waves 16–41** (genesis, tectonique, climat, NCA, settlements, ro
 
 ## Réalisme Terre (grille scientifique)
 
-Estimation **globale ~68 %** vers une simulation « publication-grade » type Terre.
+Estimation **globale ~70 %** vers une simulation « publication-grade » type Terre.
 
 | Dimension | ~% | Piste principale |
 |-----------|-----|------------------|
@@ -43,8 +46,8 @@ Estimation **globale ~68 %** vers une simulation « publication-grade » type Te
 | Observation IA | 78 | Vision JSONL, dashboard SSE (p82) |
 | Sociétés / agents | 70 | Épidémie R0 réseau vs SIR (exp4) |
 | Géologie / relief | 55 | Tectonique, stratigraphie légère |
-| Écologie / hydrologie | 58 | Saint-Venant + LBM cross-chunk (p81) |
-| Pont Python ↔ Rust | 55 | maturin CI + `genesis_world` / mock p73 |
+| Écologie / hydrologie | 65 | **`hydrology_mode`** stub/sv1d/lbm ; preset **`run.py realism`** |
+| Pont Python ↔ Rust | 70 | **maturin bloquant en CI** (`genesis_world`) + repli mock p73 |
 
 **Référence complète :** [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 **Prochain sprint réalisme :** section « Prochain sprint » dans ce fichier roadmap.
@@ -75,7 +78,8 @@ Depuis la racine du repo (`PYTHONPATH=runtime` implicite via `make` ou `cd runti
 ```bash
 make smoke                    # p0 — sanity
 make civilization             # pipeline émergence + manifest
-make validate-all             # pytest + p72–p82
+make validate-all             # pytest (58 tests) + smokes p72–p82 + SSE
+python run.py realism --ticks 500   # preset audit : genesis + biosphere + layers + sv1d
 cd runtime && python scripts/p82_civilization_pipeline_smoke.py
 ```
 

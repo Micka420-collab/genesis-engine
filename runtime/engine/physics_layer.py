@@ -156,7 +156,8 @@ def agent_thermal_delta(sim, row: int, temp_ambient_c: float) -> float:
     emissivity = 0.9
     q_rad = heat_transfer_radiation(
         emissivity, area, body_t_k, amb_k)
-    q_cond = heat_transfer_conduction(0.5, area, 37.0, float(temp_ambient_c))
+    q_cond = heat_transfer_conduction(
+        0.5, area, abs(body_t_k - amb_k), 0.02)
     # Positive delta = more thermal stress when ambient is cold.
     return float(max(0.0, (amb_k - body_t_k) * -1e-5 + q_cond * 1e-6))
 

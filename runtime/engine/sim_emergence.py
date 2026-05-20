@@ -26,6 +26,7 @@ class EmergenceState:
     koeppen_refresh_every: int = 200
     observable_every: int = 25
     hydrology_cross_chunk: bool = True
+    hydrology_mode: str = "stub"
     koeppen_manifest: Optional[Dict[str, Any]] = None
     epidemic_summary: Optional[Dict[str, Any]] = None
     live_observable: Optional[Dict[str, Any]] = None
@@ -40,6 +41,7 @@ def wire_civilization_emergence(sim, *,
                                  koeppen_refresh_every: int = 200,
                                  observable_every: int = 25,
                                  hydrology_cross_chunk: bool = True,
+                                 hydrology_mode: str = "stub",
                                  epidemic_snapshot_every: int = 10,
                                  install_coupler: bool = True,
                                  install_epidemic: bool = True,
@@ -49,10 +51,14 @@ def wire_civilization_emergence(sim, *,
     if existing is not None:
         return existing
 
+    mode = str(hydrology_mode or "stub").strip().lower()
+    if mode not in ("stub", "sv1d", "lbm"):
+        mode = "stub"
     st = EmergenceState(
         koeppen_refresh_every=max(0, int(koeppen_refresh_every)),
         observable_every=max(1, int(observable_every)),
         hydrology_cross_chunk=bool(hydrology_cross_chunk),
+        hydrology_mode=mode,
     )
     sim._emergence = st
 
@@ -116,16 +122,35 @@ def _agent_density_per_chunk(sim) -> Dict[Tuple[int, int, int], int]:
 
 def _tick_cross_chunk_hydrology(sim, st: EmergenceState,
                                  density: Dict[Tuple[int, int, int], int]) -> None:
-    """Saint-Venant stub across cached chunk neighbours; settlement activity boosts flux."""
+    """Cross-chunk water exchange; model selected by ``st.hydrology_mode``."""
     if not st.hydrology_cross_chunk:
         return
     cache = sim.streamer.cache
     if len(cache) < 2:
         return
+
+    mode = str(st.hydrology_mode or "stub").strip().lower()
     try:
         from engine.chunk_hydrology import cross_chunk_flow_stub
     except Exception:
         return
+
+    use_lbm_kwargs = False
+    if mode == "sv1d":
+        try:
+            from engine.chunk_hydrology import cross_chunk_saint_venant_1d
+            cross_fn = cross_chunk_saint_venant_1d
+        except Exception:
+            cross_fn = cross_chunk_flow_stub
+    elif mode == "lbm":
+        try:
+            from engine.chunk_hydrology import cross_chunk_lbm_d2q9_step
+            cross_fn = cross_chunk_lbm_d2q9_step
+            use_lbm_kwargs = True
+        except Exception:
+            cross_fn = cross_chunk_flow_stub
+    else:
+        cross_fn = cross_chunk_flow_stub
 
     coords = list(cache.keys())
     dt_s = float(sim.cfg.drive_accel) * 0.001
@@ -157,10 +182,12 @@ def _tick_cross_chunk_hydrology(sim, st: EmergenceState,
                 ch_b.water[:] *= irrigate
                 invalidate_resource_masks(ch_a)
                 invalidate_resource_masks(ch_b)
-            cross_chunk_flow_stub(
-                ch_a, ch_b, boundary,
-                dt_s=dt_s * boost,
-            )
+            eff_dt = dt_s * boost
+            if use_lbm_kwargs:
+                prf = int(sim.cfg.seed) ^ (sim.tick * 0x9E3779B9)
+                cross_fn(ch_a, ch_b, boundary, prf_seed=prf, dt_s=eff_dt)
+            else:
+                cross_fn(ch_a, ch_b, boundary, dt_s=eff_dt)
             pairs_this_tick += 1
     if pairs_this_tick:
         st.hydrology_ticks += 1
@@ -248,6 +275,7 @@ def emergence_snapshot(sim) -> Dict[str, Any]:
         "koeppen": st.koeppen_manifest,
         "observable_tick": (st.live_observable or {}).get("tick"),
         "hydrology": {
+            "mode": st.hydrology_mode,
             "ticks_active": st.hydrology_ticks,
             "pairs_exchanged": st.hydrology_pairs_exchanged,
         },

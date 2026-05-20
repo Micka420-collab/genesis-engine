@@ -684,8 +684,9 @@ def install_meteorology(sim, *, origin_lat: float = 46.510,
     orig_step = sim.step
 
     def wrapped_step():
-        orig_step()
+        stats = orig_step()
         tick_meteorology(sim, state)
+        return stats
 
     sim.step = wrapped_step
     return state

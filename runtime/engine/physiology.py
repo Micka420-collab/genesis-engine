@@ -764,7 +764,7 @@ def install_physiology(sim) -> PhysioFields:
     orig_step = sim.step
 
     def wrapped_step():
-        orig_step()
+        stats = orig_step()
         _tick_excretion(sim, fields)
         _tick_hygiene(sim, fields)
         _tick_skin(sim, fields)
@@ -772,6 +772,7 @@ def install_physiology(sim) -> PhysioFields:
         _tick_airborne_transmission(sim, fields)
         _tick_contamination_decay(sim, fields)
         _tick_auto_relief_and_bathe(sim, fields)
+        return stats
 
     sim.step = wrapped_step  # type: ignore[assignment]
     return fields

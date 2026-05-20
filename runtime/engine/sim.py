@@ -60,6 +60,7 @@ class SimConfig:
     koeppen_refresh_every: int = 200
     observable_every: int = 25
     hydrology_cross_chunk: bool = True
+    hydrology_mode: str = "stub"  # stub | sv1d | lbm
     # Physics + chemistry + architecture + social topology layers.
     knowledge_layers: bool = False
 
@@ -102,6 +103,7 @@ class Simulation:
                 koeppen_refresh_every=config.koeppen_refresh_every,
                 observable_every=config.observable_every,
                 hydrology_cross_chunk=config.hydrology_cross_chunk,
+                hydrology_mode=config.hydrology_mode,
                 epidemic_snapshot_every=epidemic_every,
                 install_epidemic=config.epidemic_observer,
             )

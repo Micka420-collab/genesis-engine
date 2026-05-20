@@ -8,13 +8,13 @@ Estimation honnête du niveau de réalisme **au 19 mai 2026** après la session 
 |-----------|-----------|---------------|---------------|
 | Climat / biomes | **76 %** | Köppen FAIR (checksums), bootstrap Genesis p80, harness 6 stations | Circulation 3D, Beck 2018 |
 | Géologie / relief | **55 %** | Tectonique + stratigraphie légère | Érosion GPU dynamique, datation absolue |
-| Écologie / hydrologie | **58 %** | Saint-Venant 1D + LBM D2Q9 cross-chunk (p81) | Biogeochimie, bassins versants complets |
+| Écologie / hydrologie | **65 %** | Stub par défaut ; **`hydrology_mode`** (`stub` / `sv1d` / `lbm`) dans le tick + preset **`run.py realism`** | Biogeochimie, bassins versants complets |
 | Sociétés / agents | **70 %** | R0 réseau vs SIR, exp4 + dashboard | Économie complète, memotype borné |
 | Rendu visuel | **73 %** | PBR-lite, HG phase + ray-march colonne | Volumétrique GPU, humains photoréalistes |
 | Observation IA | **78 %** | SSE `observation_server.py`, dashboard auto-refresh | Fog-of-war, multi-tenant |
-| Pont Python↔Rust | **55 %** | maturin CI, `genesis_world` + mock p73 | WorldGraph passes prod |
+| Pont Python↔Rust | **70 %** | **maturin CI bloquant** (wheel + smoke p73), `genesis_world` + mock ; preset realism bootstrap | WorldGraph passes prod en tick |
 
-**Global pondéré : ~68 %** (moyenne simple des 7 dimensions).
+**Global pondéré : ~70 %** (moyenne simple des 7 dimensions).
 
 > L’objectif **80 % absolu** (simulation « publication-grade » type Terre) n’est pas atteint en une session : il exigerait modèles 3D atmosphère, hydrologie physique complète, et pont Rust en production. La session a **maximisé les gains mesurables** sur chaque axe ; le chemin vers 80 % global est documenté ci-dessous.
 
@@ -50,7 +50,7 @@ Estimation honnête du niveau de réalisme **au 19 mai 2026** après la session 
 
 ## Prochain sprint (vers 80 % global)
 
-1. **CI maturin** : `genesis_world` natif vert → pont Rust ~70 %+.
+1. **CI maturin (bloquant)** : garder **`maturin-pybindings` vert** (wheel + smoke) → base pour monter le pont Rust ~70 %+.
 2. **Köppen** : export NetCDF diagnostics ; valider 50 stations (Beck 2018).
 3. **WorldGraph** : 1 pass Rust depuis `genesis_bootstrap` (tectonics/ecology).
 4. **Hydrologie** : LBM 2D minimal ou D8 accumulation cross-macro.

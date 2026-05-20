@@ -477,8 +477,9 @@ def install_photosynthesis(sim) -> PhotosynthesisState:
     orig_step = sim.step
 
     def wrapped_step():
-        orig_step()
+        stats = orig_step()
         tick_photosynthesis(sim, state)
+        return stats
 
     sim.step = wrapped_step
     return state
