@@ -265,6 +265,13 @@ def tick_emergence_world(sim) -> None:
     if getattr(sim, "_epidemic_state", None) is not None:
         _refresh_epidemic_summary(sim, st)
 
+    if getattr(sim, "_rust_worldgraph", None) is not None:
+        try:
+            from engine.rust_worldgraph_tick import tick_rust_worldgraph
+            tick_rust_worldgraph(sim)
+        except Exception:
+            pass
+
 
 def emergence_snapshot(sim) -> Dict[str, Any]:
     """Block for ``Simulation.snapshot()`` / artifacts."""
@@ -282,6 +289,13 @@ def emergence_snapshot(sim) -> Dict[str, Any]:
     }
     if st.epidemic_summary:
         out["epidemic"] = st.epidemic_summary
+    rw = getattr(sim, "_rust_worldgraph", None)
+    if rw is not None:
+        try:
+            from engine.rust_worldgraph_tick import rust_worldgraph_snapshot
+            out["rust_worldgraph"] = rust_worldgraph_snapshot(sim)
+        except Exception:
+            pass
     return {k: v for k, v in out.items() if v is not None}
 
 

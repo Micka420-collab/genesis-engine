@@ -82,6 +82,21 @@ PYTHONPATH=runtime python -m pytest runtime/tests/test_knowledge_layers.py -q
 - **Chimie** : [Materials Project API](https://docs.materialsproject.org/) (`formation_energy_per_atom`, densité)
 - **Social** : modèle gravitaire commerce (JASSS inter-settlement trade)
 
+## Wiring Terre (P1)
+
+| Module | Rôle |
+|--------|------|
+| `engine/full_stack.py` | Post-`Simulation()` : genesis bootstrap, rust WorldGraph, MP API (si clé), 5cd |
+| `engine/rust_worldgraph_tick.py` | `observe_chunk` sparse chaque N ticks via `sim_emergence` |
+| `runtime/run.py` | Presets **`realism`** et **`terre`** appellent `wire_full_stack` |
+
+**MP live :** `try_fetch_mp_bootstrap(sim)` si `MP_API_KEY` est défini (sinon bundle offline).
+
+```bash
+python run.py terre --ticks 500
+python run.py realism --no-5cd
+```
+
 ## Ponts futurs
 
 - `ge-substrate` (Rust) ↔ Python physics tick

@@ -31,7 +31,7 @@ if ROOT not in sys.path:
 
 from engine.sim import Simulation, SimConfig  # noqa: E402
 from engine.world_genesis import GenesisParams, world_signature  # noqa: E402
-from engine.genesis_bootstrap import bootstrap_genesis_sim, bootstrap_state  # noqa: E402
+from engine.genesis_bootstrap import bootstrap_state  # noqa: E402
 from engine.multi_rate_coupler import install_multi_rate_coupler, coupler_summary  # noqa: E402
 from engine.physiology import install_physiology  # noqa: E402
 from engine.epidemic_observer import (  # noqa: E402
@@ -42,7 +42,8 @@ from engine.agent_observation import (  # noqa: E402
 )
 from engine.koeppen_grid import export_fair_koeppen_from_sim  # noqa: E402
 from engine.chunk_hydrology import chunk_hydrology_state, genesis_anchor_from_sim  # noqa: E402
-from engine.rust_bridge import create_py_world_from_sim, bridge_status  # noqa: E402
+from engine.rust_bridge import bridge_status  # noqa: E402
+from engine.rust_worldgraph_tick import rust_worldgraph_snapshot  # noqa: E402
 
 
 def _parse_seed(raw: str) -> int:
@@ -90,6 +91,7 @@ def run_civilization_pipeline(
         rain_iters=3,
     )
 
+    stack_status: Dict[str, Any] = {}
     if synthetic_only:
         from engine.world_genesis import generate_world, make_anchor
         world = generate_world(gp)
@@ -98,8 +100,18 @@ def run_civilization_pipeline(
         sim.streamer.clear_cache()
         boot = None
     else:
-        boot = bootstrap_genesis_sim(sim, seed=seed, genesis_params=gp)
-        world = boot.world
+        from engine.full_stack import wire_full_stack
+
+        stack_status = wire_full_stack(
+            sim,
+            genesis=True,
+            rust_worldgraph=True,
+            mp_api=bool(cfg.knowledge_layers),
+            five_cd=True,
+            genesis_resolution=resolution,
+        )
+        boot = bootstrap_state(sim)
+        world = boot.world if boot is not None else None
 
     install_multi_rate_coupler(sim, master_dt=int(sim.cfg.drive_accel))
     install_physiology(sim)
@@ -149,10 +161,13 @@ def run_civilization_pipeline(
         except Exception as exc:
             render_paths["error"] = repr(exc)
 
-    py_world = create_py_world_from_sim(
-        sim, synthetic_only=synthetic_only)
-    rust_obs = py_world.observe_chunk(0, 0)
+    py_world = getattr(getattr(sim, "_rust_worldgraph", None), "py_world", None)
+    if py_world is None and not synthetic_only:
+        from engine.rust_bridge import create_py_world_from_sim
+        py_world = create_py_world_from_sim(sim)
+    rust_obs = py_world.observe_chunk(0, 0, 0) if py_world is not None else {}
     rust_bridge = bridge_status(sim)
+    rw_snap = rust_worldgraph_snapshot(sim) if not synthetic_only else {}
 
     manifest: Dict[str, Any] = {
         "schema": "genesis.civilization_run/v1",
@@ -182,6 +197,9 @@ def run_civilization_pipeline(
         "genesis_anchor": genesis_anchor_from_sim(
             sim, synthetic_only=synthetic_only) is not None,
         "rust_bridge": rust_bridge,
+        "rust_worldgraph": rw_snap,
+        "full_stack": stack_status or None,
+        "five_cd_installed": bool(stack_status.get("five_cd")),
         "rust_observe_chunk_mock": bool(rust_obs.get("mock")),
         "render_paths": render_paths,
     }

@@ -223,7 +223,20 @@ def run_synthesis_pipeline(
     return mat
 
 
-def install_materials_project(sim, *, bundle_path: Optional[str] = None) -> MaterialsProjectState:
+def try_fetch_mp_bootstrap(sim, *,
+                         material_ids: Optional[List[str]] = None) -> int:
+    """Optional MP REST enrichment when ``MP_API_KEY`` is set."""
+    if not os.environ.get("MP_API_KEY", "").strip():
+        return 0
+    st = getattr(sim, "_materials_project", None)
+    if st is None:
+        return 0
+    ids = material_ids or ["mp-149", "mp-13", "mp-30", "mp-118", "mp-2534"]
+    return fetch_from_mp_api(ids, st)
+
+
+def install_materials_project(sim, *, bundle_path: Optional[str] = None,
+                            fetch_mp: bool = False) -> MaterialsProjectState:
     existing = getattr(sim, "_materials_project", None)
     if existing is not None:
         return existing
@@ -233,6 +246,8 @@ def install_materials_project(sim, *, bundle_path: Optional[str] = None) -> Mate
     sim._materials_project = st
     if not hasattr(sim, "_synthesis_registry"):
         sim._synthesis_registry = MaterialRegistry()
+    if fetch_mp:
+        try_fetch_mp_bootstrap(sim)
     return st
 
 
@@ -258,6 +273,7 @@ __all__ = [
     "find_nearest_record",
     "formation_energy_favors_synthesis",
     "fetch_from_mp_api",
+    "try_fetch_mp_bootstrap",
     "run_synthesis_pipeline",
     "install_materials_project",
     "materials_project_snapshot",

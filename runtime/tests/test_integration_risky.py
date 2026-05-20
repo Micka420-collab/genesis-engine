@@ -134,6 +134,66 @@ class IntegrationRiskyTests(unittest.TestCase):
         self.assertIsNotNone(stats)
         self.assertEqual(sim.tick, 1)
 
+    def test_wire_full_stack_wires_genesis_and_rust(self):
+        sim = Simulation(
+            SimConfig(
+                seed=0xF01157AC,
+                founders=2,
+                max_agents=8,
+                bounds_km=(0.1, 0.1),
+                life_emergence=False,
+                epidemic_observer=False,
+                emergence_subsystems=True,
+                knowledge_layers=True,
+            )
+        )
+        from engine.full_stack import wire_full_stack
+
+        st = wire_full_stack(
+            sim,
+            genesis=True,
+            rust_worldgraph=True,
+            mp_api=False,
+            five_cd=False,
+        )
+        self.assertTrue(st["genesis_bootstrapped"])
+        self.assertTrue(st["rust_worldgraph"])
+        self.assertIsNotNone(getattr(sim, "_rust_worldgraph", None))
+        sim.bootstrap()
+        stats = sim.step()
+        self.assertIsNotNone(stats)
+        self.assertGreaterEqual(sim.tick, 1)
+
+    def test_mp_bootstrap_skips_without_api_key(self):
+        prev = os.environ.pop("MP_API_KEY", None)
+        try:
+            sim = Simulation(
+                SimConfig(
+                    founders=2,
+                    max_agents=6,
+                    knowledge_layers=True,
+                    life_emergence=False,
+                    epidemic_observer=False,
+                )
+            )
+            from engine.materials_project import try_fetch_mp_bootstrap
+
+            self.assertEqual(try_fetch_mp_bootstrap(sim), 0)
+        finally:
+            if prev is not None:
+                os.environ["MP_API_KEY"] = prev
+
+    def test_terre_preset_keys(self):
+        sys.path.insert(0, os.path.abspath(os.path.join(HERE, "..")))
+        import run as run_mod
+
+        terre = run_mod.PRESETS["terre"]
+        self.assertTrue(terre["emergent_origins"])
+        self.assertTrue(terre["full_biosphere"])
+        self.assertTrue(terre["knowledge_layers"])
+        self.assertEqual(terre["hydrology_mode"], "sv1d")
+        self.assertEqual(terre["founders"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

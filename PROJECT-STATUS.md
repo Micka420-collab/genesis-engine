@@ -9,12 +9,16 @@
 
 Laboratoire open-source d’**artificial life** : monde physique déterministe (Terre ou procédural) + agents autonomes + civilisations émergentes, observable via smokes, dashboard et exports GIS.
 
-**Tests :** `pytest runtime/tests` — **53** tests (voir `Makefile` `test-python`).  
+**Tests :** `pytest runtime/tests` — **61** tests (voir `Makefile` `test-python`).  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
 
-Les phénomènes (climat Köppen, hydrologie, épidémies, commerce, culture, observation) **émergent du cycle `Simulation.step()`** et des interactions agents ↔ monde — pas d’un orchestrateur de scripts qui enchaîne des étapes. Les smokes (`scripts/p*.py`) et `make smoke` **valident** le comportement ; le cœur exécutable est `python runtime/run.py` ou une boucle `sim.step()`. **`python runtime/run.py realism`** : preset realism (documenté avec la sous-commande `run.py` — voir aussi `make civilization`). Voir `engine/sim_emergence.py`.
+Les phénomènes (climat Köppen, hydrologie, épidémies, commerce, culture, observation) **émergent du cycle `Simulation.step()`** et des interactions agents ↔ monde — pas d’un orchestrateur de scripts qui enchaîne des étapes. Les smokes (`scripts/p*.py`) et `make smoke` **valident** le comportement ; le cœur exécutable est `python runtime/run.py` ou une boucle `sim.step()`.
+
+**Presets :**
+- **`python runtime/run.py realism`** — biosphère + knowledge layers + hydrologie sv1d + genesis + rust WorldGraph tick + 5cd (`engine/full_stack.py`).
+- **`python runtime/run.py terre`** — fusion **origins** + **realism** (founders émergents, 2000 ticks par défaut).
 
 ---
 
@@ -47,7 +51,7 @@ Estimation **globale ~70 %** vers une simulation « publication-grade » type Te
 | Sociétés / agents | 70 | Épidémie R0 réseau vs SIR (exp4) |
 | Géologie / relief | 55 | Tectonique, stratigraphie légère |
 | Écologie / hydrologie | 65 | **`hydrology_mode`** stub/sv1d/lbm ; preset **`run.py realism`** |
-| Pont Python ↔ Rust | 70 | **maturin bloquant en CI** (`genesis_world`) + repli mock p73 |
+| Pont Python ↔ Rust | 72 | **maturin bloquant en CI** + **rust WorldGraph tick** (`rust_worldgraph_tick.py`) dans `sim_emergence` |
 
 **Référence complète :** [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 **Prochain sprint réalisme :** section « Prochain sprint » dans ce fichier roadmap.
@@ -67,8 +71,9 @@ Estimation **globale ~70 %** vers une simulation « publication-grade » type Te
 
 ## Pipeline civilisation (orchestration)
 
-`runtime/scripts/civilization_pipeline.py` enchaîne bootstrap Genesis, coupler
-multi-taux, ticks agents et exports (observable, Köppen FAIR, épidémie).
+`runtime/scripts/civilization_pipeline.py` enchaîne bootstrap Genesis (**via `wire_full_stack`** :
+genesis, rust WorldGraph, 5cd), coupler multi-taux, ticks agents et exports
+(observable, Köppen FAIR, épidémie).
 Entrée Makefile : **`make civilization`** · smoke : **p82**.
 
 ## Smokes de référence (dernière vague)

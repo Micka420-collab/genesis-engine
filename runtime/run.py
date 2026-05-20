@@ -9,6 +9,8 @@ Where <experiment> is one of:
         runs engine.genesis_bootstrap.bootstrap_genesis_sim on startup
         (continental genesis substrate). Defaults: founders=8, max_agents=200,
         bounds_km=(2,2), drive_accel=8000, ticks=500.
+    terre - origins + realism merged: emergent sapients, genesis, layers,
+        rust WorldGraph tick, 5cd, sv1d hydrology (2000 ticks default).
     exp1_scarcity, exp2_food_pressure, exp3_two_cultures, exp4_catastrophe,
     stress_100, exp5_stress_200, origins
 or a custom name + --founders N --max-agents M --bounds-km K to roll your own.
@@ -56,6 +58,20 @@ PRESETS = {
         knowledge_layers=True,
         full_biosphere=True,
         hydrology_mode="sv1d",
+    ),
+    "terre": dict(
+        seed=0x7E112E_DE000000,
+        founders=0,
+        emergent_origins=True,
+        full_biosphere=True,
+        max_emergent_founders=2,
+        knowledge_layers=True,
+        hydrology_mode="sv1d",
+        max_agents=200,
+        bounds_km=(2.5, 2.5),
+        cultures=1,
+        drive_accel=10000.0,
+        ticks=2000,
     ),
     "exp1_scarcity": dict(
         seed=0xC0FFEE_DEADBEEF, founders=10, max_agents=80,
@@ -227,7 +243,10 @@ def main() -> int:
 
     cfg, ticks = _resolve_config(args)
     name = cfg.name
-    use_realism_flow = bool(getattr(args, "realism", False) or args.experiment == "realism")
+    use_full_stack = (
+        getattr(args, "realism", False)
+        or args.experiment in ("realism", "terre")
+    )
     journal_path = args.journal or os.path.join(
         HERE, "journals", f"{name}.jsonl")
     os.makedirs(os.path.dirname(journal_path), exist_ok=True)
@@ -235,20 +254,25 @@ def main() -> int:
 
     sim = Simulation(cfg, journal_path=journal_path)
 
-    genesis_bootstrapped = False
-    if use_realism_flow:
+    stack_status: dict = {}
+    if use_full_stack:
         try:
-            from engine.genesis_bootstrap import bootstrap_genesis_sim
-            bootstrap_genesis_sim(sim)
-            genesis_bootstrapped = True
+            from engine.full_stack import wire_full_stack
+
+            stack_status = wire_full_stack(
+                sim,
+                genesis=True,
+                rust_worldgraph=True,
+                mp_api=bool(cfg.knowledge_layers),
+                five_cd=not args.no_5cd,
+            )
         except Exception as exc:
-            print(f"[run] genesis bootstrap failed (continuing without): {exc}",
+            print(f"[run] full stack wiring failed (continuing): {exc}",
                   file=sys.stderr)
 
-    coupler_installed = bool(getattr(sim, "_coupler_wrapped", False))
-
-    five_cd_installed = False
-    if not args.no_5cd:
+    genesis_bootstrapped = bool(stack_status.get("genesis_bootstrapped"))
+    five_cd_installed = bool(stack_status.get("five_cd"))
+    if not use_full_stack and not args.no_5cd:
         try:
             from engine.sim_5cd_integration import install
             install(sim)
@@ -257,11 +281,14 @@ def main() -> int:
             print(f"[run] 5cd install failed (continuing without): {exc}",
                   file=sys.stderr)
 
+    coupler_installed = bool(getattr(sim, "_coupler_wrapped", False))
+
     if not args.quiet:
         print(f"[run] {name}: founders={cfg.founders} emergent={cfg.emergent_origins} "
               f"cap={cfg.max_agents} bounds_km={cfg.bounds_km} cultures={cfg.cultures} "
               f"drive_accel={cfg.drive_accel} hydrology_mode={cfg.hydrology_mode} "
-              f"genesis={genesis_bootstrapped} 5cd={five_cd_installed} "
+              f"genesis={genesis_bootstrapped} rust={stack_status.get('rust_worldgraph')} "
+              f"5cd={five_cd_installed} "
               f"ticks={ticks} journal={journal_path}")
 
     t0 = time.monotonic()
@@ -302,6 +329,8 @@ def main() -> int:
             "drive_accel": float(cfg.drive_accel),
             "hydrology_mode": str(cfg.hydrology_mode),
             "genesis_bootstrapped": bool(genesis_bootstrapped),
+            "rust_worldgraph": bool(stack_status.get("rust_worldgraph")),
+            "mp_api_records": int(stack_status.get("mp_api_records", 0)),
             "catastrophe_at_tick": int(cfg.catastrophe_at_tick),
             "5cd_installed": bool(five_cd_installed),
             "multi_rate_coupler": bool(coupler_installed),
@@ -321,6 +350,8 @@ def main() -> int:
         summary["epidemic"] = epidemic_summary
     if emergence.get("koeppen"):
         summary["koeppen"] = emergence["koeppen"]
+    if emergence.get("rust_worldgraph"):
+        summary["rust_worldgraph"] = emergence["rust_worldgraph"]
     live = getattr(getattr(sim, "_emergence", None), "live_observable", None)
     if live:
         summary["observable"] = live
