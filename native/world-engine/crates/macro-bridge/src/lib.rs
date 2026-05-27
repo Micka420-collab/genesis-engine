@@ -38,6 +38,12 @@ pub enum MacroBridgeError {
     /// Coordinate outside the grid.
     #[error("sample out of macro bounds")]
     OutOfBounds,
+    /// Underlying I/O error from a binary reader/writer. Required so the
+    /// `?` operator in `binary::read_binary` / `write_binary` can convert
+    /// `std::io::Error` to a `MacroBridgeError` automatically — without
+    /// this `#[from]` variant the binary module fails to compile on CI.
+    #[error("io: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 /// Read-only continental macro field (Python Genesis export).
