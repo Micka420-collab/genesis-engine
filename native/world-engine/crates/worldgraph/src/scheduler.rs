@@ -17,7 +17,7 @@ use crate::lineage::Lineage;
 use crate::pass::ContentAddressable;
 use crate::pipeline::{Pipeline, PipelineRun};
 use genesis_cache::{Cache, CacheKey};
-use genesis_core::{MultiRateCoupler, TickDomain};
+use genesis_core::{CouplerStep, MultiRateCoupler, TickDomain};
 use serde::{de::DeserializeOwned, Serialize};
 use smallvec::SmallVec;
 use std::any::Any;

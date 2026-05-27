@@ -77,16 +77,16 @@ pub fn hash_f64(hasher: &mut blake3::Hasher, v: f64) {
     hasher.update(&bits.to_le_bytes());
 }
 
-impl<T: Serialize> ContentAddressable for SerdeWrapper<T> {
+/// Adapter — wrap any `Serialize` type to satisfy `ContentAddressable`.
+pub struct SerdeWrapper<'a, T>(pub &'a T);
+
+impl<'a, T: Serialize> ContentAddressable for SerdeWrapper<'a, T> {
     fn hash_into(&self, hasher: &mut blake3::Hasher) {
         let bytes = bincode::serialize(&self.0).expect("serde encode failed");
         hasher.update(&(bytes.len() as u64).to_le_bytes());
         hasher.update(&bytes);
     }
 }
-
-/// Adapter — wrap any `Serialize` type to satisfy `ContentAddressable`.
-pub struct SerdeWrapper<'a, T>(pub &'a T);
 
 /// Implementation for common scalar types so they can be used as
 /// `Pass::Input = ()` "no-input" markers.
