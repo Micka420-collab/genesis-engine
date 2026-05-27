@@ -26,7 +26,9 @@ def _module(name: str) -> bool:
 
 def main() -> int:
     checks: list[tuple[str, bool, str]] = []
-    checks.append(("python>=3.12", sys.version_info >= (3, 12), platform.python_version()))
+    # pyproject.toml declares `requires-python = ">=3.11,<3.14"` so we align
+    # the doctor with the published constraint. The CI matrix tests 3.11–3.13.
+    checks.append(("python>=3.11", sys.version_info >= (3, 11), platform.python_version()))
     checks.append(("numpy", _module("numpy"), "required for runtime/engine"))
     checks.append(("pytest", _module("pytest"), "required for make test-python"))
     checks.append(("rasterio", _module("rasterio"), "optional: Earth-anchored mode"))
@@ -39,7 +41,7 @@ def main() -> int:
     for name, ok, detail in checks:
         print(f"{_status(ok):7} {name:14} {detail}")
 
-    required_ok = all(ok for name, ok, _ in checks if name in {"python>=3.12", "numpy"})
+    required_ok = all(ok for name, ok, _ in checks if name in {"python>=3.11", "numpy"})
     if not required_ok:
         print()
         print("Install the runtime with:")
