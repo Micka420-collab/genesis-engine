@@ -19,11 +19,46 @@ from engine.cognition import (Decision, MATURITY_TICKS, COOLDOWN_TICKS, MATING_R
                               apply_decision, decide, perceive)
 from engine.core import TICK_DT_S, prf_rng
 from engine.spatial import SpatialGrid
-from engine.world import (CHUNK_SIDE_M, ChunkStreamer, TerrainParams, Weather,
-                          _stable_bytes_sig, chunks_around,
-                          regenerate_chunk_resources, weather_at,
+from engine.world import (CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M,
+                          ChunkStreamer, TerrainParams, Weather,
+                          _stable_bytes_sig, chunks_around, chunks_around_sorted,
+                          _get_sorted_offsets,
+                          invalidate_resource_masks, regenerate_chunk_resources,
+                          regenerate_chunks_batch, weather_at,
                           world_to_chunk, world_to_cell)
 
+
+# Wave 54: Rust regen import (opt-in, transparent fallback to numpy).
+try:
+    from genesis_world import py_regen_chunk as _rust_regen_chunk
+    _HAS_RUST_REGEN = True
+except ImportError:
+    _HAS_RUST_REGEN = False
+    _rust_regen_chunk = None  # type: ignore
+
+# Wave 58: Rust batch near-agent scan (opt-in, transparent fallback).
+try:
+    from genesis_world import py_batch_near_agents as _rust_batch_near
+    _HAS_RUST_BATCH_NEAR = True
+except ImportError:
+    _HAS_RUST_BATCH_NEAR = False
+    _rust_batch_near = None  # type: ignore
+
+# Wave 59: Rust drives update (opt-in, transparent fallback).
+try:
+    from genesis_world import py_tick_drives as _rust_tick_drives
+    _HAS_RUST_DRIVES = True
+except ImportError:
+    _HAS_RUST_DRIVES = False
+    _rust_tick_drives = None  # type: ignore
+
+# Wave 60: Rust batch resource scan (opt-in, transparent fallback).
+try:
+    from genesis_world import py_batch_scan_resources as _rust_batch_scan
+    _HAS_RUST_BATCH_SCAN = True
+except ImportError:
+    _HAS_RUST_BATCH_SCAN = False
+    _rust_batch_scan = None  # type: ignore
 
 DRIVE_ACCEL = 1500.0
 HUNGER_PER_S = 1.0 / (14.0 * 86_400.0)
@@ -90,6 +125,15 @@ class SimStats:
     cum_events: int = 0
     last_tick_ms: float = 0.0
     chunks_in_mem: int = 0
+    # Wave 46: per-phase profiling (ms).
+    stream_ms: float = 0.0
+    perceive_ms: float = 0.0
+    decide_apply_ms: float = 0.0
+    regen_ms: float = 0.0
+    # Wave 53: fine-grained "other" profiling.
+    drives_ms: float = 0.0
+    thermal_ms: float = 0.0
+    post_ms: float = 0.0
 
 
 class Simulation:
@@ -200,16 +244,50 @@ class Simulation:
         if not self._bootstrapped:
             self.bootstrap()
         self.tick += 1
-        self._stream_around_agents()
-        for chunk in list(self.streamer.cache.values()):
-            base_t = float(np.mean(chunk.height) * -0.0065 + 15.0)
-            avg_precip = float(np.mean(chunk.food_capacity) * 3.0)
-            w = weather_at(self.tick * int(self.cfg.drive_accel), base_t, avg_precip)
-            regenerate_chunk_resources(chunk, w, dt_s=float(self.cfg.drive_accel))
+
+        # Wave 46: per-phase profiling.
+        _t_stream = time.monotonic()
+        _perceived_coords = self._stream_around_agents()
+        _t_regen = time.monotonic()
+        # Wave 54: Rust regen — single fused loop in Rust, no numpy ops.
+        # Fallback to numpy path if Rust not available.
+        _regen_dt = float(self.cfg.drive_accel)
+        _food_factor = float(_regen_dt / (3.0 * 86400.0))
+        _food_retain = float(1.0 - _food_factor)
+        _water_factor = float(_regen_dt / 3600.0)
+        _cache_get = self.streamer.cache.get
+        if _HAS_RUST_REGEN:
+            for coord in _perceived_coords:
+                chunk = _cache_get(coord)
+                if chunk is None:
+                    continue
+                _mfc = getattr(chunk, "_mean_food_cap", 0.0)
+                _rain = float(_mfc * 0.125 * _water_factor) if _mfc > 0.0 else 0.0
+                _rust_regen_chunk(
+                    chunk.food_kcal.ravel(), chunk.food_capacity.ravel(),
+                    chunk.water.ravel(),
+                    _food_retain, _food_factor, _rain)
+                invalidate_resource_masks(chunk)
+        else:
+            _ff32 = np.float32(_food_factor)
+            _fr32 = np.float32(_food_retain)
+            for coord in _perceived_coords:
+                chunk = _cache_get(coord)
+                if chunk is None:
+                    continue
+                np.multiply(chunk.food_kcal, _fr32, out=chunk.food_kcal)
+                chunk.food_kcal += chunk.food_capacity * _ff32
+                _mfc = getattr(chunk, "_mean_food_cap", 0.0)
+                if _mfc > 0.0:
+                    chunk.water += np.float32(_mfc * 0.125 * _water_factor)
+                invalidate_resource_masks(chunk)
+        _t_regen_end = time.monotonic()
         if self.cfg.emergence_subsystems:
             from engine.sim_emergence import tick_emergence_world
             tick_emergence_world(self)
+        _t_drives = time.monotonic()
         self._tick_drives()
+        _t_drives_end = time.monotonic()
 
         raw_events: List[dict] = []
         if self.cfg.life_emergence:
@@ -219,9 +297,46 @@ class Simulation:
         n = self.agents.n_active
         self._grid.rebuild(self.agents.pos[:n, :2], self.agents.alive[:n])
         alive_idx = np.flatnonzero(self.agents.alive[:n])
+        # Wave 61: move perceive timer start BEFORE batch pre-computation
+        # so batch_near + batch_scan are attributed to perceive_ms.
+        _t_perceive = time.monotonic()
+        # Wave 58: batch near-agent pre-computation in Rust.
+        _near_cache = None
+        if _HAS_RUST_BATCH_NEAR and alive_idx.size > 1:
+            _near_cache = _rust_batch_near(
+                self.agents.pos[:n, :2],
+                self.agents.alive[:n].view(np.uint8),
+                float(PERCEPTION_RADIUS_M))
+        # Wave 60: batch resource scan — ALL agents × ALL chunks in one Rust call.
+        _resource_cache = None
+        if _HAS_RUST_BATCH_SCAN and alive_idx.size > 0:
+            _cx_list, _cy_list = [], []
+            _w_list, _f_list, _wd_list, _st_list, _ht_list = [], [], [], [], []
+            for coord in _perceived_coords:
+                chunk = self.streamer.cache.get(coord)
+                if chunk is None:
+                    continue
+                _cx_list.append(coord[0])
+                _cy_list.append(coord[1])
+                _w_list.append(chunk.water.ravel())
+                _f_list.append(chunk.food_kcal.ravel())
+                _wd_list.append(chunk.wood.ravel())
+                _st_list.append(chunk.stone.ravel())
+                _ht_list.append(chunk.height.ravel())
+            if _cx_list:
+                _resource_cache = _rust_batch_scan(
+                    self.agents.pos[:n, :2],
+                    self.agents.alive[:n].view(np.uint8),
+                    _cx_list, _cy_list,
+                    _w_list, _f_list, _wd_list, _st_list, _ht_list,
+                    float(PERCEPTION_RADIUS_M), float(VOXEL_SIZE_M),
+                    float(CHUNK_SIDE_M), int(CHUNK_SIZE))
         for row in alive_idx:
             row = int(row)
-            obs = perceive(self.agents, row, self.streamer, grid=self._grid, tick=self.tick)
+            _nc = _near_cache[row] if _near_cache is not None else None
+            _rc = _resource_cache[row] if _resource_cache is not None else None
+            obs = perceive(self.agents, row, self.streamer, grid=self._grid, tick=self.tick,
+                           near_cache=_nc, resource_cache=_rc)
             d = decide(self.agents, obs, sim=self)
             self.agents.action[row] = d.action
             self.agents.target_x[row] = d.target_x
@@ -235,14 +350,19 @@ class Simulation:
             if obs.near_agents:
                 for j in obs.near_agents[:3]:
                     self.agents.relations[row].update_affinity(j, +0.001)
+        _t_perceive_end = time.monotonic()
 
+        # Wave 53: skip competition grid for few agents (creation overhead > benefit).
         RESOURCE_ACTIONS = (int(ActionKind.WALK_TO),)
-        target_xy = np.column_stack([self.agents.target_x[:n],
-                                     self.agents.target_y[:n]])
-        comp_grid = SpatialGrid(cell_size_m=2.0)
-        comp_pairs = comp_grid.find_target_collisions(
-            target_xy, self.agents.action[:n], self.agents.alive[:n],
-            RESOURCE_ACTIONS)
+        if alive_idx.size >= 2:
+            target_xy = np.column_stack([self.agents.target_x[:n],
+                                         self.agents.target_y[:n]])
+            comp_grid = SpatialGrid(cell_size_m=2.0)
+            comp_pairs = comp_grid.find_target_collisions(
+                target_xy, self.agents.action[:n], self.agents.alive[:n],
+                RESOURCE_ACTIONS)
+        else:
+            comp_pairs = []
         for a, b in comp_pairs:
             key = (a, b) if a < b else (b, a)
             last = self._last_competition_tick.get(key, -10_000)
@@ -259,7 +379,9 @@ class Simulation:
         np.clip(self.agents.pos[:n, 0], -bx_m, bx_m, out=self.agents.pos[:n, 0])
         np.clip(self.agents.pos[:n, 1], -by_m, by_m, out=self.agents.pos[:n, 1])
 
+        _t_thermal = time.monotonic()
         self._tick_thermal()
+        _t_thermal_end = time.monotonic()
 
         if (self.cfg.catastrophe_at_tick > 0 and
                 not self._catastrophe_applied and
@@ -277,6 +399,7 @@ class Simulation:
             from engine.social_topology import tick_social_topology
             raw_events.extend(tick_social_topology(self, self._social_topology))
 
+        _t_post = time.monotonic()
         self.annalist.record_tick(self.tick, self.agents, births=births, deaths=deaths,
                                   raw_events=raw_events)
 
@@ -290,88 +413,165 @@ class Simulation:
         self.stats.cum_events = self.annalist.events_emitted
         self.stats.chunks_in_mem = len(self.streamer.cache)
         self.stats.last_tick_ms = (time.monotonic() - t0) * 1000.0
+        # Wave 46/53: per-phase profiling.
+        self.stats.stream_ms = (_t_regen - _t_stream) * 1000.0
+        self.stats.regen_ms = (_t_regen_end - _t_regen) * 1000.0
+        self.stats.drives_ms = (_t_drives_end - _t_drives) * 1000.0
+        self.stats.perceive_ms = (_t_perceive_end - _t_perceive) * 1000.0
+        self.stats.decide_apply_ms = self.stats.perceive_ms  # combined in same loop
+        self.stats.thermal_ms = (_t_thermal_end - _t_thermal) * 1000.0
+        self.stats.post_ms = (time.monotonic() - _t_post) * 1000.0
         return self.stats
 
-    def _stream_around_agents(self) -> None:
+    def _stream_around_agents(self) -> set:
+        """Wave 55: optimised streaming — skip sorting when all cached.
+
+        Returns the set of chunk coords around agents (the "perceived set")
+        so that the regen loop can target only these chunks.
+        """
         n = self.agents.n_active
         alive = np.flatnonzero(self.agents.alive[:n])
+        if alive.size == 0:
+            return set()
+        # Wave 55: build seen set using cheaper chunks_around (unsorted)
+        # since we only need the set for regen targeting. Sorting is only
+        # needed when touch_area must prioritise which chunks to generate.
         seen = set()
+        _csm = CHUNK_SIDE_M
+        _pos = self.agents.pos
+        _floor = math.floor
         for r in alive:
-            x = float(self.agents.pos[int(r), 0]); y = float(self.agents.pos[int(r), 1])
-            ccoord = world_to_chunk(x, y)
-            for c in chunks_around(ccoord, radius=2):
-                seen.add(c)
-        self.streamer.touch_area(self.tick, seen)
+            ri = int(r)
+            ax = float(_pos[ri, 0]); ay = float(_pos[ri, 1])
+            acx = int(_floor(ax / _csm)); acy = int(_floor(ay / _csm))
+            for dx, dy in _get_sorted_offsets(2):
+                seen.add((acx + dx, acy + dy, 0))
+        # Fast path: if all chunks in cache, just update last_touch.
+        _cache = self.streamer.cache
+        all_cached = True
+        for c in seen:
+            if c not in _cache:
+                all_cached = False
+                break
+        if all_cached:
+            # Skip sort + touch_area overhead — just update timestamps.
+            self.streamer._stats_hits += len(seen)
+            _lt = self.streamer.last_touch
+            _tick = self.tick
+            for c in seen:
+                _lt[c] = _tick
+        else:
+            # Cold path: sort + batch generate uncached chunks.
+            cx_mean = float(np.mean(_pos[alive, 0]))
+            cy_mean = float(np.mean(_pos[alive, 1]))
+            ccx = int(_floor(cx_mean / _csm)); ccy = int(_floor(cy_mean / _csm))
+            sorted_seen = sorted(seen, key=lambda c: (
+                max(abs(c[0] - ccx), abs(c[1] - ccy)),
+                abs(c[0] - ccx) + abs(c[1] - ccy)))
+            self.streamer.touch_area(self.tick, sorted_seen)
+        return seen
 
     def _tick_drives(self) -> None:
+        """Wave 59: Rust drives / Wave 56 scalar fallback.
+
+        Rust path: single fused pass over contiguous arrays, no per-element
+        Python overhead.  Falls back to Python scalar loop if Rust unavailable.
+        """
         n = self.agents.n_active
-        m = self.agents.alive[:n]
         accel = self.cfg.drive_accel
-        for arr, rate in ((self.agents.hunger, HUNGER_PER_S),
-                          (self.agents.thirst, THIRST_PER_S),
-                          (self.agents.fatigue, FATIGUE_PER_S),
-                          (self.agents.sleep, SLEEP_PER_S)):
-            arr[:n][m] = np.clip(arr[:n][m] + rate * accel, 0.0, 1.5)
-        self.agents.pain[:n][m] = np.maximum(self.agents.pain[:n][m] - 0.001 * accel, 0.0)
-        self.agents.stress[:n][m] = np.clip(self.agents.stress[:n][m]
-                                            + (self.agents.hunger[:n][m] + self.agents.thirst[:n][m]) * 0.001 * accel
-                                            - 0.0005 * accel, 0.0, 1.5)
-        self.agents.injuries[:n][m] = np.maximum(self.agents.injuries[:n][m] - 0.00005 * accel, 0.0)
-        calm = ((self.agents.hunger[:n] < 0.4) & (self.agents.thirst[:n] < 0.4)
-                & (self.agents.injuries[:n] < 0.3))
-        recover = m & calm
-        self.agents.vitality[:n][recover] = np.minimum(self.agents.vitality[:n][recover] + 0.0001 * accel, 1.0)
+        _h_rate = float(HUNGER_PER_S * accel)
+        _t_rate = float(THIRST_PER_S * accel)
+        _f_rate = float(FATIGUE_PER_S * accel)
+        _s_rate = float(SLEEP_PER_S * accel)
+        _pain_dec = float(0.001 * accel)
+        _stress_rate = float(0.001 * accel)
+        _stress_dec = float(0.0005 * accel)
+        _inj_dec = float(0.00005 * accel)
+        _vit_inc = float(0.0001 * accel)
+
+        if _HAS_RUST_DRIVES:
+            a = self.agents
+            _rust_tick_drives(
+                a.alive[:n].view(np.uint8),
+                a.hunger[:n], a.thirst[:n], a.fatigue[:n], a.sleep[:n],
+                a.pain[:n], a.stress[:n], a.injuries[:n], a.vitality[:n],
+                _h_rate, _t_rate, _f_rate, _s_rate,
+                _pain_dec, _stress_rate, _stress_dec, _inj_dec, _vit_inc)
+            return
+
+        # Wave 56 Python fallback: scalar loop
+        _clamp = min
+        _max = max
+        a = self.agents
+        for row in range(n):
+            if not a.alive[row]:
+                continue
+            a.hunger[row] = _clamp(float(a.hunger[row]) + _h_rate, 1.5)
+            a.thirst[row] = _clamp(float(a.thirst[row]) + _t_rate, 1.5)
+            a.fatigue[row] = _clamp(float(a.fatigue[row]) + _f_rate, 1.5)
+            a.sleep[row] = _clamp(float(a.sleep[row]) + _s_rate, 1.5)
+            a.pain[row] = _max(float(a.pain[row]) - _pain_dec, 0.0)
+            _sv = float(a.stress[row]) + (float(a.hunger[row]) + float(a.thirst[row])) * _stress_rate - _stress_dec
+            a.stress[row] = _max(0.0, _clamp(_sv, 1.5))
+            a.injuries[row] = _max(float(a.injuries[row]) - _inj_dec, 0.0)
+            if float(a.hunger[row]) < 0.4 and float(a.thirst[row]) < 0.4 and float(a.injuries[row]) < 0.3:
+                a.vitality[row] = _clamp(float(a.vitality[row]) + _vit_inc, 1.0)
 
     def _tick_thermal(self) -> None:
-        """Vectorised thermal-load update.
+        """Wave 53: flat vectorised thermal — single pass, no per-chunk loop.
 
-        Bucket alive agents by chunk coord, look the chunk up once, then
-        update the whole bucket in a single numpy op.  At 200 agents this
-        is ~5-10× faster than the per-row loop because chunk lookup and
-        ``weather_at`` are amortised over many agents instead of run
-        per-agent.
+        Gathers base temperatures from chunks in a scalar loop (cheap for N
+        agents), then does ALL numpy operations ONCE across the full agent
+        array.  Eliminates ~15 numpy calls × N_chunks overhead from Wave 51.
         """
         n = self.agents.n_active
         if n == 0:
             return
         live_rows = np.flatnonzero(self.agents.alive[:n])
-        if live_rows.size == 0:
+        na = live_rows.size
+        if na == 0:
             return
-        pos = self.agents.pos[live_rows]
-        # Compute chunk coord for every live agent in one shot
-        cxs = np.floor(pos[:, 0] / CHUNK_SIDE_M).astype(np.int64)
-        cys = np.floor(pos[:, 1] / CHUNK_SIDE_M).astype(np.int64)
-        # Group by chunk coord — usually only a handful of distinct chunks
-        # contain agents, so this dramatically cuts the Python loop length.
-        unique_coords: Dict[Tuple[int, int], List[int]] = {}
-        for k, (cx, cy) in enumerate(zip(cxs.tolist(), cys.tolist())):
-            unique_coords.setdefault((cx, cy), []).append(int(live_rows[k]))
         accel = float(self.cfg.drive_accel)
         weather_tick = self.tick * int(accel)
-        for (cx, cy), rows in unique_coords.items():
-            chunk = self.streamer.cache.get((cx, cy, 0))
+        # Weather offset — constant for the entire tick.
+        _secs = weather_tick
+        _day_of_year = (_secs // 86400) % 365
+        _hour = (_secs % 86400) / 3600.0
+        _season = -math.cos((_day_of_year / 365.0) * 6.283185307179586)
+        _diurnal = -math.cos(((_hour - 14.0) / 24.0) * 6.283185307179586) * 6.0
+        _weather_offset = np.float32(_season * 12.0 + _diurnal)
+        # Gather base_t for all alive agents — scalar loop, no numpy per-chunk.
+        _cache = self.streamer.cache
+        _csm = CHUNK_SIDE_M
+        _inv_vs = 2.0   # 1.0 / VOXEL_SIZE_M (0.5)
+        _base_t = np.empty(na, dtype=np.float32)
+        _pos = self.agents.pos
+        for i in range(na):
+            r = int(live_rows[i])
+            ax = float(_pos[r, 0]); ay = float(_pos[r, 1])
+            cx = int(math.floor(ax / _csm)); cy = int(math.floor(ay / _csm))
+            chunk = _cache.get((cx, cy, 0))
             if chunk is None:
+                _base_t[i] = 15.0   # default sea-level temp
                 continue
-            rows_arr = np.array(rows, dtype=np.int64)
-            xs = self.agents.pos[rows_arr, 0]
-            ys = self.agents.pos[rows_arr, 1]
-            lx = np.clip(((xs - cx * CHUNK_SIDE_M) / 0.5).astype(np.int64), 0, 63)
-            ly = np.clip(((ys - cy * CHUNK_SIDE_M) / 0.5).astype(np.int64), 0, 63)
-            base_t = chunk.height[ly, lx].astype(np.float32) * np.float32(-0.0065) + np.float32(15.0)
-            # Sample ambient temp once per cell — weather_at is stateless,
-            # so we compute one scalar w per row using its own base_t.
-            therm = self.agents.thermal[rows_arr]
-            for i in range(rows_arr.size):
-                w = weather_at(weather_tick, float(base_t[i]), 200.0)
-                comfort = 1.0
-                if w.temp_c < 0.0:
-                    comfort = 1.0 + (0.0 - w.temp_c) * 0.01
-                elif w.temp_c > 35.0:
-                    comfort = 1.0 + (w.temp_c - 35.0) * 0.01
-                therm[i] = float(np.clip(
-                    therm[i] + (comfort - 1.0) * 0.02 * accel * 0.001 - 0.005,
-                    0.0, 1.5))
-            self.agents.thermal[rows_arr] = therm
+            lx = min(max(int((ax - cx * _csm) * _inv_vs), 0), 63)
+            ly = min(max(int((ay - cy * _csm) * _inv_vs), 0), 63)
+            _base_t[i] = float(chunk.height[ly, lx]) * -0.0065 + 15.0
+        # Single vectorised pass for ALL agents.
+        temp_c = _base_t + _weather_offset
+        _accel_factor = np.float32(0.02 * accel * 0.001)
+        _decay = np.float32(0.005)
+        # Comfort: 1.0 by default, modified by cold/hot.
+        comfort = np.ones(na, dtype=np.float32)
+        cold = temp_c < 0.0
+        hot = temp_c > 35.0
+        if cold.any():
+            comfort[cold] = np.float32(1.0) - temp_c[cold] * np.float32(0.01)
+        if hot.any():
+            comfort[hot] = np.float32(1.0) + (temp_c[hot] - np.float32(35.0)) * np.float32(0.01)
+        therm = self.agents.thermal[live_rows]
+        delta = (comfort - np.float32(1.0)) * _accel_factor - _decay
+        self.agents.thermal[live_rows] = np.clip(therm + delta, 0.0, 1.5)
 
     def _check_mortality(self) -> List[Tuple[int, int]]:
         n = self.agents.n_active

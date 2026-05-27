@@ -42,13 +42,15 @@ N_ACTIONS = len(CORE_ACTIONS)
 
 def _obs_features(obs: Observation) -> np.ndarray:
     d = obs.drives
+    # Wave 55: drives may be a tuple (fast path) — convert to numpy here.
+    d_arr = np.asarray(d[:N_INPUTS], dtype=np.float32)
     extra = np.array([
         1.0 if obs.nearest.get("water") else 0.0,
         1.0 if obs.nearest.get("food") or obs.nearest.get("game") else 0.0,
         1.0 if obs.nearest.get("shelter") else 0.0,
         1.0 if obs.near_agents else 0.0,
     ], dtype=np.float32)
-    return np.concatenate([d[:N_INPUTS].astype(np.float32), extra])
+    return np.concatenate([d_arr, extra])
 
 
 def _tile_genes(g: np.ndarray, n: int) -> np.ndarray:

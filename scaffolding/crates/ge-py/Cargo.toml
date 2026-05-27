@@ -15,6 +15,14 @@ ge-core  = { path = "../ge-core" }
 ge-world = { path = "../ge-world" }
 # extension-module piloté par [features] ci-dessous, pas ici.
 pyo3     = { version = "0.23" }
+# Phase 3b : retourner numpy arrays au lieu de PyList (élimine le bottleneck alloc).
+numpy    = { version = "0.23" }
+# Phase 3b : SplitMix64 fast noise — salt dérivé via BLAKE3 (fallback).
+blake3       = { workspace = true }
+# Phase 3c : BLAKE2b salt pour bit-for-bit match avec Python hashlib.blake2b.
+blake2b_simd = "1"
+# Phase 3f : parallélisation rayon pour batch de chunks adjacents.
+rayon        = { workspace = true }
 
 [features]
 # Activé automatiquement par maturin lors du build wheel.

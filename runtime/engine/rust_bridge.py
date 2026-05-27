@@ -95,8 +95,15 @@ def try_import_genesis_world() -> Tuple[Any, bool]:
         return MockPyWorld, False
 
 
-def _macro_kwargs(genesis_world: Any = None, **kwargs: Any) -> Dict[str, Any]:
-    """Attach GENM bytes to native PyWorld when a Genesis world is available."""
+def _macro_kwargs(genesis_world: Any = None,
+                  genesis_anchor: Any = None,
+                  **kwargs: Any) -> Dict[str, Any]:
+    """Attach GENM v2 bytes + anchor params to native PyWorld.
+
+    When a GenesisWorld is available, exports the full macro grid
+    (elevation + temperature + precipitation + biome) so the Rust
+    backend can do genesis-blend sampling without a Python round-trip.
+    """
     if genesis_world is None:
         return dict(kwargs)
     try:
@@ -107,6 +114,15 @@ def _macro_kwargs(genesis_world: Any = None, **kwargs: Any) -> Dict[str, Any]:
         from engine.world import CHUNK_SIDE_M
 
         kwargs.setdefault("chunk_side_m", float(CHUNK_SIDE_M))
+        # Pass anchor params if available (Phase 3e).
+        if genesis_anchor is not None:
+            ox, oy = genesis_anchor.sim_origin_macro_km
+            kwargs["sim_origin_x_km"] = float(ox)
+            kwargs["sim_origin_y_km"] = float(oy)
+            kwargs["blend"] = float(genesis_anchor.blend)
+            kwargs["micro_amp_m"] = float(genesis_anchor.micro_amp_m)
+            kwargs["micro_amp_temp_c"] = float(genesis_anchor.micro_amp_temp_c)
+            kwargs["micro_amp_precip_mm"] = float(genesis_anchor.micro_amp_precip_mm)
     except Exception:
         pass
     return kwargs
@@ -125,7 +141,7 @@ def create_py_world(seed: int = 42, *,
     """
     gw, native = try_import_genesis_world()
     if native:
-        kw = _macro_kwargs(genesis_world, **kwargs)
+        kw = _macro_kwargs(genesis_world, genesis_anchor=genesis_anchor, **kwargs)
         return gw.PyWorld(seed=seed, **kw)
     if synthetic_only and genesis_world is None:
         return MockPyWorld(seed=seed, **kwargs)
@@ -158,7 +174,7 @@ def create_py_world_from_sim(sim, *,
     gw, native = try_import_genesis_world()
     if native:
         world = world or getattr(anchor, "world", None) if anchor else world
-        kw = _macro_kwargs(world, **kwargs)
+        kw = _macro_kwargs(world, genesis_anchor=anchor, **kwargs)
         return gw.PyWorld(seed=seed, **kw)
     return MockPyWorld(
         seed=seed,

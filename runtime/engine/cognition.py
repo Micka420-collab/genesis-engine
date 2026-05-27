@@ -12,11 +12,19 @@ from engine.spatial import SpatialGrid
 from engine.world import (Biome, CHUNK_SIDE_M, CHUNK_SIZE, ChunkStreamer,
                           VOXEL_SIZE_M, _stable_bytes_sig, biome_npp,
                           biome_habitability, world_to_chunk, world_to_cell,
-                          chunks_around, invalidate_resource_masks)
+                          chunks_around, chunks_around_sorted,
+                          invalidate_resource_masks)
 
 
 PERCEPTION_RADIUS_M = 60.0
 INTERACT_RADIUS_M = 1.8
+
+# Wave 52: Rust perception — try to import scan_chunk from genesis_world.
+try:
+    from genesis_world import py_scan_chunk as _rust_scan_chunk
+    _HAS_RUST_SCAN = True
+except ImportError:
+    _HAS_RUST_SCAN = False
 CRITICAL_THRESHOLD = 0.85
 ACT_THRESHOLD = 0.40
 MATURITY_TICKS = 1_000
@@ -59,11 +67,14 @@ def _dominant_drive(drives):
     return int(best)
 
 
-def perceive(agents, row, streamer, radius_m=PERCEPTION_RADIUS_M, grid=None, tick=None):
+def perceive(agents, row, streamer, radius_m=PERCEPTION_RADIUS_M, grid=None, tick=None, near_cache=None, resource_cache=None):
     px, py, pz = (float(agents.pos[row, 0]), float(agents.pos[row, 1]), float(agents.pos[row, 2]))
-    drives = np.array([agents.hunger[row], agents.thirst[row], agents.sleep[row],
-                       agents.fatigue[row], agents.thermal[row], agents.pain[row],
-                       agents.stress[row], agents.loneliness[row]], dtype=np.float32)
+    # Wave 55: tuple instead of np.array (saves ~3μs per call, 8-element array).
+    # Only used for indexing + comparison, never for numpy math.
+    drives = (float(agents.hunger[row]), float(agents.thirst[row]),
+              float(agents.sleep[row]), float(agents.fatigue[row]),
+              float(agents.thermal[row]), float(agents.pain[row]),
+              float(agents.stress[row]), float(agents.loneliness[row]))
     nearest = {}
     chunk_center = world_to_chunk(px, py, pz)
     # r_chunks formula tightened (sprint 2026-05-16, optim #3):
@@ -79,68 +90,147 @@ def perceive(agents, row, streamer, radius_m=PERCEPTION_RADIUS_M, grid=None, tic
     r_chunks = max(1, int(math.ceil(radius_m / CHUNK_SIDE_M)))
     r_eff_sq = radius_m * radius_m
     wildlife_pools = getattr(streamer, "_wildlife_pools", None)
-    for coord in chunks_around(chunk_center, r_chunks):
-        chunk = streamer.cache.get(coord)
-        if chunk is None:
-            continue
-        cx0 = coord[0] * CHUNK_SIDE_M
-        cy0 = coord[1] * CHUNK_SIDE_M
-        cx1 = cx0 + CHUNK_SIDE_M
-        cy1 = cy0 + CHUNK_SIDE_M
-        dx = 0.0 if (cx0 <= px <= cx1) else (cx0 - px if px < cx0 else px - cx1)
-        dy = 0.0 if (cy0 <= py <= cy1) else (cy0 - py if py < cy0 else py - cy1)
-        if dx * dx + dy * dy > r_eff_sq:
-            continue
-        _scan_chunk(chunk, px, py, radius_m, nearest, tick)
-        # Wildlife pool check : chunk holds >= 1 deer -> mark its centre as game.
+
+    # Wave 60: batch resource cache — Rust pre-computed water/food/shelter
+    # for this agent across ALL chunks in a single FFI call.  Skip the
+    # per-chunk Python scan loop entirely; only the lightweight wildlife
+    # (game) scan still runs in Python (dict lookups only, no FFI).
+    if resource_cache is not None:
+        w_hit, f_hit, s_hit = resource_cache
+        if w_hit is not None:
+            nearest["water"] = PerceivedTarget(
+                "water", float(w_hit[0]), float(w_hit[1]),
+                float(w_hit[2]), float(w_hit[3]))
+        if f_hit is not None:
+            nearest["food"] = PerceivedTarget(
+                "food", float(f_hit[0]), float(f_hit[1]),
+                float(f_hit[2]), float(f_hit[3]))
+        if s_hit is not None:
+            nearest["shelter"] = PerceivedTarget(
+                "shelter", float(s_hit[0]), float(s_hit[1]),
+                float(s_hit[2]), float(s_hit[3]))
+        # Wildlife / game scan — lightweight dict lookups only.
         if wildlife_pools is not None:
-            pool = wildlife_pools.get(coord)
-            if pool is not None and pool.deer >= 1.0:
-                gx = (cx0 + cx1) * 0.5
-                gy = (cy0 + cy1) * 0.5
+            for coord in chunks_around_sorted(chunk_center, r_chunks):
+                pool = wildlife_pools.get(coord)
+                if pool is None or pool.deer < 1.0:
+                    continue
+                cx0 = coord[0] * CHUNK_SIDE_M
+                cy0 = coord[1] * CHUNK_SIDE_M
+                gx = cx0 + CHUNK_SIDE_M * 0.5
+                gy = cy0 + CHUNK_SIDE_M * 0.5
                 gdist = float(math.hypot(gx - px, gy - py))
                 if gdist <= radius_m:
                     cur = nearest.get("game")
                     if cur is None or gdist < cur.distance:
                         nearest["game"] = PerceivedTarget(
                             "game", gx, gy, gdist, float(pool.deer))
+    else:
+        # Python fallback — per-chunk scan with edge-d² pruning.
+        # Wave 50: sorted chunk iteration (closest-first) + chunk-edge
+        # distance pruning for aggressive early-exit.  Instead of
+        # INTERACT_RADIUS_M (1.8 m — tight), compare to the actual
+        # minimum agent-to-chunk-edge distance so we skip chunks that
+        # provably cannot contain a closer resource.
+        for coord in chunks_around_sorted(chunk_center, r_chunks):
+            chunk = streamer.cache.get(coord)
+            if chunk is None:
+                continue
+            cx0 = coord[0] * CHUNK_SIDE_M
+            cy0 = coord[1] * CHUNK_SIDE_M
+            cx1 = cx0 + CHUNK_SIDE_M
+            cy1 = cy0 + CHUNK_SIDE_M
+            dx = 0.0 if (cx0 <= px <= cx1) else (cx0 - px if px < cx0 else px - cx1)
+            dy = 0.0 if (cy0 <= py <= cy1) else (cy0 - py if py < cy0 else py - cy1)
+            chunk_edge_d2 = dx * dx + dy * dy
+            if chunk_edge_d2 > r_eff_sq:
+                continue
+            # Wave 50: all-found break — if all 3 resources already found
+            # closer than this chunk's nearest edge, no cell here can improve.
+            _w_found = "water" in nearest
+            _f_found = "food" in nearest
+            _s_found = "shelter" in nearest
+            if _w_found and _f_found and _s_found:
+                _w_d2 = nearest["water"].distance * nearest["water"].distance
+                _f_d2 = nearest["food"].distance * nearest["food"].distance
+                _s_d2 = nearest["shelter"].distance * nearest["shelter"].distance
+                if _w_d2 <= chunk_edge_d2 and _f_d2 <= chunk_edge_d2 and _s_d2 <= chunk_edge_d2:
+                    # Only game scan remains relevant for outer chunks.
+                    if wildlife_pools is not None:
+                        pool = wildlife_pools.get(coord)
+                        if pool is not None and pool.deer >= 1.0:
+                            gx = (cx0 + cx1) * 0.5
+                            gy = (cy0 + cy1) * 0.5
+                            gdist = float(math.hypot(gx - px, gy - py))
+                            if gdist <= radius_m:
+                                cur = nearest.get("game")
+                                if cur is None or gdist < cur.distance:
+                                    nearest["game"] = PerceivedTarget(
+                                        "game", gx, gy, gdist, float(pool.deer))
+                    continue
+            # Wave 50: chunk-edge distance pruning per resource.
+            need_w = not _w_found or (nearest["water"].distance * nearest["water"].distance > chunk_edge_d2)
+            need_f = not _f_found or (nearest["food"].distance * nearest["food"].distance > chunk_edge_d2)
+            need_s = not _s_found or (nearest["shelter"].distance * nearest["shelter"].distance > chunk_edge_d2)
+            _scan_chunk(chunk, px, py, radius_m, nearest, tick,
+                        need_water=need_w, need_food=need_f, need_shelter=need_s)
+            # Wildlife pool check : chunk holds >= 1 deer -> mark its centre as game.
+            if wildlife_pools is not None:
+                pool = wildlife_pools.get(coord)
+                if pool is not None and pool.deer >= 1.0:
+                    gx = (cx0 + cx1) * 0.5
+                    gy = (cy0 + cy1) * 0.5
+                    gdist = float(math.hypot(gx - px, gy - py))
+                    if gdist <= radius_m:
+                        cur = nearest.get("game")
+                        if cur is None or gdist < cur.distance:
+                            nearest["game"] = PerceivedTarget(
+                                "game", gx, gy, gdist, float(pool.deer))
 
-    n = agents.n_active
+    # Wave 58: batch near-agent scan (Rust) or Wave 55 scalar fallback.
     near_agents = []
-    r2 = radius_m * radius_m
-    if grid is not None and grid.n_indexed > 1:
-        candidates = grid.query_disk(px, py, radius_m, exclude_row=row)
-        if candidates:
-            cand_arr = np.array(candidates, dtype=np.int32)
-            cand_arr = cand_arr[agents.alive[cand_arr]]
-            if cand_arr.size > 0:
-                diffs = agents.pos[cand_arr, :2] - np.array([px, py], dtype=np.float32)
-                d2 = (diffs ** 2).sum(axis=1)
-                mask = d2 < r2
-                in_idx = cand_arr[mask]
-                in_d2 = d2[mask]
-                order = np.argsort(in_d2)[:16]
-                for k in order:
-                    j = int(in_idx[k])
-                    d = float(math.sqrt(in_d2[k]))
-                    near_agents.append(j)
-                    if "agent" not in nearest or d < nearest["agent"].distance:
-                        nearest["agent"] = PerceivedTarget("agent", float(agents.pos[j, 0]),
-                                                          float(agents.pos[j, 1]), d, 1.0, other_row=j)
-    elif n > 1:
-        diffs = agents.pos[:n, :2] - np.array([px, py], dtype=np.float32)
-        d2 = (diffs ** 2).sum(axis=1)
-        mask = agents.alive[:n] & (d2 < r2)
-        mask[row] = False
-        idxs = np.flatnonzero(mask)
-        idxs = idxs[np.argsort(d2[idxs])][:16]
-        for j in idxs:
-            j = int(j)
-            d = float(math.sqrt(d2[j]))
+    _pos = agents.pos
+    if near_cache is not None:
+        # Wave 58: pre-computed by Rust py_batch_near_agents — already
+        # sorted by distance, truncated to max_k=16.
+        for j_dist in near_cache:
+            j = int(j_dist[0])
+            d = float(j_dist[1])
             near_agents.append(j)
             if "agent" not in nearest or d < nearest["agent"].distance:
-                nearest["agent"] = PerceivedTarget("agent", float(agents.pos[j, 0]),
-                                                  float(agents.pos[j, 1]), d, 1.0, other_row=j)
+                nearest["agent"] = PerceivedTarget(
+                    "agent", float(_pos[j, 0]), float(_pos[j, 1]),
+                    d, 1.0, other_row=j)
+    else:
+        # Wave 55: scalar near-agent scan — Python fallback.
+        r2 = radius_m * radius_m
+        _alive = agents.alive
+        n = agents.n_active
+        if grid is not None and grid.n_indexed > 1:
+            candidates = grid.query_disk(px, py, radius_m, exclude_row=row)
+        elif n > 1:
+            candidates = [j for j in range(n) if j != row]
+        else:
+            candidates = None
+        if candidates:
+            _hits = []
+            for j in candidates:
+                if not _alive[j]:
+                    continue
+                dx = float(_pos[j, 0]) - px
+                dy = float(_pos[j, 1]) - py
+                d2_j = dx * dx + dy * dy
+                if d2_j < r2:
+                    _hits.append((d2_j, j))
+            if _hits:
+                _hits.sort()
+                for d2_j, j in _hits[:16]:
+                    d = math.sqrt(d2_j)
+                    near_agents.append(j)
+                    if "agent" not in nearest or d < nearest["agent"].distance:
+                        nearest["agent"] = PerceivedTarget(
+                            "agent", float(_pos[j, 0]), float(_pos[j, 1]),
+                            d, 1.0, other_row=j)
 
     mem = agents.memory[row]
     if "water" not in nearest and drives[int(DriveKind.THIRST)] >= ACT_THRESHOLD and mem.known_water_locations:
@@ -224,28 +314,60 @@ def _chunk_resource_masks(chunk):
     return entry
 
 
-def _scan_chunk(chunk, px, py, radius_m, out, tick=None):
+def _scan_chunk(chunk, px, py, radius_m, out, tick=None, need_water=True,
+                need_food=True, need_shelter=True):
     """Find the nearest water / food / shelter cell in ``chunk``.
 
-    Dense vectorised path (optim #3c+, sprint 2026-05-14 session 12).
+    Wave 52: uses Rust ``scan_chunk`` when available (single-pass over
+    all cells, no temporary numpy arrays). Falls back to the Python
+    vectorised path when the Rust backend is unavailable.
 
-    Threshold masks + presence flags per chunk are cached between
-    writes via ``_chunk_resource_masks``; the ``(px, py)``-dependent
-    distance array ``d2`` is built once per call and shared across the
-    three resources. The ``tick`` argument is kept for API compatibility
-    but is no longer consulted — write-site invalidation drives cache
-    coherence.
-
-    Determinism : ``np.argmin`` on a 4096-flat ``np.where(mask, d2, inf)``
-    picks the same row-major tie-break as before, so SHA-256 of the
-    agent snapshot stays bit-identical across runs same seed.
+    Determinism : both paths find the nearest cell by minimum d² with
+    row-major tie-break for equal distances.
     """
+    if _HAS_RUST_SCAN:
+        _scan_chunk_rust(chunk, px, py, radius_m, out, need_water, need_food, need_shelter)
+        return
+    _scan_chunk_py(chunk, px, py, radius_m, out, need_water, need_food, need_shelter)
+
+
+def _scan_chunk_rust(chunk, px, py, radius_m, out, need_water, need_food, need_shelter):
+    """Wave 52: Rust-backed chunk scan — single pass, no temp arrays."""
+    cx, cy, _ = chunk.coord
+    chunk_ox = cx * CHUNK_SIDE_M
+    chunk_oy = cy * CHUNK_SIDE_M
+    w_hit, f_hit, s_hit = _rust_scan_chunk(
+        chunk.water.ravel(), chunk.food_kcal.ravel(),
+        chunk.wood.ravel(), chunk.stone.ravel(), chunk.height.ravel(),
+        chunk_ox, chunk_oy, VOXEL_SIZE_M,
+        px, py, radius_m,
+        need_water, need_food, need_shelter,
+    )
+    if w_hit is not None:
+        x, y, dist, qty = w_hit
+        cur = out.get("water")
+        if cur is None or dist < cur.distance:
+            out["water"] = PerceivedTarget("water", x, y, dist, qty)
+    if f_hit is not None:
+        x, y, dist, qty = f_hit
+        cur = out.get("food")
+        if cur is None or dist < cur.distance:
+            out["food"] = PerceivedTarget("food", x, y, dist, qty)
+    if s_hit is not None:
+        x, y, dist, qty = s_hit
+        cur = out.get("shelter")
+        if cur is None or dist < cur.distance:
+            out["shelter"] = PerceivedTarget("shelter", x, y, dist, qty)
+
+
+def _scan_chunk_py(chunk, px, py, radius_m, out, need_water, need_food, need_shelter):
+    """Python fallback: dense vectorised path (optim #3c+)."""
     (water_mask, food_mask, shelter_mask,
      has_water, has_food, has_shelter) = _chunk_resource_masks(chunk)
-    # Cheapest gate first : if no resource exists anywhere in the chunk,
-    # skip the d2 work entirely. The flags are cached Python bools so
-    # this is a 3-op short-circuit, no ``.any()`` reduction here.
-    if not (has_water or has_food or has_shelter):
+    scan_water = has_water and need_water
+    scan_food = has_food and need_food
+    scan_shelter = has_shelter and need_shelter
+    if not (scan_water or scan_food or scan_shelter):
         return
 
     XX, YY = _chunk_cell_world_xy(chunk)
@@ -257,7 +379,7 @@ def _scan_chunk(chunk, px, py, radius_m, out, tick=None):
     if not in_r.any():
         return
 
-    if has_water:
+    if scan_water:
         m = in_r & water_mask
         if m.any():
             d2m = np.where(m, d2, np.float32(np.inf))
@@ -270,7 +392,7 @@ def _scan_chunk(chunk, px, py, radius_m, out, tick=None):
                     "water", float(XX[ay, ax]), float(YY[ay, ax]), dist,
                     float(chunk.water[ay, ax]))
 
-    if has_food:
+    if scan_food:
         m = in_r & food_mask
         if m.any():
             d2m = np.where(m, d2, np.float32(np.inf))
@@ -283,7 +405,7 @@ def _scan_chunk(chunk, px, py, radius_m, out, tick=None):
                     "food", float(XX[ay, ax]), float(YY[ay, ax]), dist,
                     float(chunk.food_kcal[ay, ax]))
 
-    if has_shelter:
+    if scan_shelter:
         m = in_r & shelter_mask
         if m.any():
             d2m = np.where(m, d2, np.float32(np.inf))

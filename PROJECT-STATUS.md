@@ -33,7 +33,7 @@ Les phénomènes (climat Köppen, hydrologie, épidémies, commerce, culture, ob
 | **2** | MVP Société (reproduction, mémoire, lexique) | ✅ | Multi-générations, vocalisations |
 | **3** | MVP Civilisation (construction, troc, conflits) | 🟡 | Partiel ; Waves 28–32 enrichissent |
 | **4** | Émergence civilisationnelle | ✅ | Agriculture, écriture, polity, métallurgie |
-| **5** | Genesis-α public (long-run, LLM tier-2) | ⏳ | 9/10 prérequis livrés |
+| **5** | Genesis-α public (long-run, LLM tier-2) | ⏳ | 9/10 prérequis livrés — **plan d'unlock Wave 12 figé le 2026-05-23** (cf. `../Genesis_Engine_2026-05-23_Phase5_Unlock_Brief.md`, GO/NO-GO J+10 = 2026-06-02) |
 | **Waves 16–41** | Monde réaliste intégré au tick | ✅ | Genesis, climat, hydrologie, observateurs dans `sim.step()` |
 | **Biosphère émergente** | Protocellules → sapients | ✅ | [`docs/BIOSPHERE-EMERGENCE.md`](docs/BIOSPHERE-EMERGENCE.md) · `run.py origins` |
 

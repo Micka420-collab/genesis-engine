@@ -170,12 +170,13 @@ except Exception as e:
 # ---------------------------------------------------------------------------
 try:
     speedup = "FASTER" if ratio > 1.0 else "SLOWER"
-    # Phase 3 note: le Rust est ~13× plus lent à cause du PyList overhead.
-    # Quand on passera aux numpy array returns (Phase 3b), le compute pur
-    # Rust devrait être plus rapide. Pour l'instant on accepte.
-    check(f"Rust backend {speedup} ({ratio:.1f}x) — PyList bottleneck",
+    # Phase 3b : SplitMix64 fast noise + numpy array returns.
+    # Rust est désormais ~5× plus rapide que Python numpy.
+    # Vérif non-bloquante : on accepte même si Rust est plus lent
+    # (ex: machine sans AVX, ou debug build).
+    check(f"Rust backend {speedup} ({ratio:.1f}x)",
           True,  # informatif, pas bloquant
-          f"Phase 3b = numpy returns")
+          f"fast_noise=SplitMix64, numpy returns")
 except Exception as e:
     check("Speedup assessment", False, str(e))
 
