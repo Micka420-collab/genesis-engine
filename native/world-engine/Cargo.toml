@@ -80,7 +80,15 @@ tracing-subscriber  = { version = "0.3", features = ["env-filter"] }
 pyo3       = { version = "0.22", features = ["extension-module", "abi3-py39"] }
 
 # GPU
-wgpu       = { version = "22.1", default-features = false, features = ["wgsl", "dx12", "metal", "vulkan"] }
+# wgpu 22.1 no longer exposes a `vulkan` feature — Vulkan is auto-enabled
+# on platforms where it's available. Listing it here breaks the workspace
+# load on Linux CI with `package 'genesis-gpu' depends on 'wgpu' with feature
+# 'vulkan' but 'wgpu' does not have that feature`. Available cross-platform
+# backends now live under `dx12` (Windows), `metal` (macOS), and the implicit
+# Vulkan default. See the wgpu 22 feature list: `vulkan-portability` is the
+# closest opt-in but is for forcing portability layers, not for enabling
+# Vulkan on its native platforms.
+wgpu       = { version = "22.1", default-features = false, features = ["wgsl", "dx12", "metal"] }
 pollster   = "0.4"
 bytemuck_derive = "1.7"
 
