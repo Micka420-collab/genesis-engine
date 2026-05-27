@@ -64,7 +64,7 @@ ed25519-dalek = "2"
 oqs         = "0.10"
 
 # Python bindings
-pyo3        = { version = "0.22", features = ["extension-module"] }
+pyo3        = { version = "0.23", features = ["extension-module"] }
 
 # Compression
 zstd        = "0.13"

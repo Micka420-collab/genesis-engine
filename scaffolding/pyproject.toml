@@ -17,7 +17,7 @@ build-backend = "maturin"
 name            = "genesis_world"
 version         = "0.1.0"
 description     = "Rust world backend for Genesis Engine (heightmap + biome)."
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11"
 license         = { text = "AGPL-3.0-only" }
 
 [tool.maturin]

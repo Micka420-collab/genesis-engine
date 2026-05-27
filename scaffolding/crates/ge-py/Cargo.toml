@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 ge-core  = { path = "../ge-core" }
 ge-world = { path = "../ge-world" }
 # extension-module piloté par [features] ci-dessous, pas ici.
-pyo3     = { version = "0.22" }
+pyo3     = { version = "0.23" }
 
 [features]
 # Activé automatiquement par maturin lors du build wheel.
