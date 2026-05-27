@@ -54,10 +54,20 @@ impl WorldCoord {
     #[inline]
     #[must_use]
     pub const fn local(self) -> LocalCoord {
+        // `i32::clamp` is still unstable in `const fn` on stable Rust 1.85
+        // (rust-lang/rust#115107), so we inline a manual clamp to keep
+        // `local()` callable in const contexts.
+        let z = if self.z < 0 {
+            0
+        } else if self.z >= CHUNK_SIZE_Z {
+            CHUNK_SIZE_Z - 1
+        } else {
+            self.z
+        };
         LocalCoord {
             x: self.x.rem_euclid(CHUNK_SIZE_X) as u8,
             y: self.y.rem_euclid(CHUNK_SIZE_Y) as u8,
-            z: self.z.clamp(0, CHUNK_SIZE_Z - 1) as u8,
+            z: z as u8,
         }
     }
 }
