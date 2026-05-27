@@ -1,0 +1,23 @@
+[package]
+name = "ge-py"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Bindings Python pour Genesis Engine — module genesis_world."
+
+# cdylib produit le .pyd/.so importable par Python.
+[lib]
+name = "genesis_world"
+crate-type = ["cdylib"]
+
+[dependencies]
+ge-core  = { path = "../ge-core" }
+ge-world = { path = "../ge-world" }
+# extension-module piloté par [features] ci-dessous, pas ici.
+pyo3     = { version = "0.22" }
+
+[features]
+# Activé automatiquement par maturin lors du build wheel.
+# En dev (cargo check), on ne l'active PAS — ça permet de compiler
+# ge-py sans linker Python (pratique pour CI lint).
+extension-module = ["pyo3/extension-module"]

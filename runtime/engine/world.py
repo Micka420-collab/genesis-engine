@@ -324,25 +324,53 @@ def invalidate_resource_masks(chunk: "Chunk") -> None:
 
 
 def generate_chunk(seed: int, coord: Tuple[int, int, int],
-                    params: TerrainParams, *, genesis=None) -> Chunk:
+                    params: TerrainParams, *, genesis=None,
+                    rust_world=None) -> Chunk:
     """Generate a single chunk.
 
-    If ``genesis`` is a :class:`engine.world_genesis.GenesisAnchor`, the
-    chunk is anchored to a continental macro field (tectonics + erosion
-    + orographic precip). Otherwise the legacy pure-FBM ``sample_terrain``
-    is used — bit-for-bit identical to pre-Wave-16 behaviour.
+    Priority order for heightmap/biome sampling:
+    1. ``rust_world`` (Phase 2): native Rust backend via ``genesis_world.PyWorld``.
+       Falls back silently to Python if the call fails.
+    2. ``genesis`` anchor (Wave 16+): tectonics + erosion macro field.
+    3. Pure-FBM Python (legacy, pre-Wave-16 compatible).
+
+    Resources (stone/wood/metal/water/food) are always computed in Python
+    regardless of the backend — they depend on prf_rng which is already
+    deterministic and fast enough.
     """
     cx, cy, cz = coord
     ox = cx * CHUNK_SIDE_M
     oy = cy * CHUNK_SIDE_M
-    xs = (ox + (np.arange(CHUNK_SIZE) + 0.5) * VOXEL_SIZE_M).astype(np.float32)
-    ys = (oy + (np.arange(CHUNK_SIZE) + 0.5) * VOXEL_SIZE_M).astype(np.float32)
-    XX, YY = np.meshgrid(xs, ys, indexing="xy")
-    if genesis is None:
-        elev, temp, precip = sample_terrain(seed, params, XX, YY)
-    else:
-        elev, temp, precip = sample_terrain_with_genesis(
-            seed, params, XX, YY, genesis)
+
+    _rust_ok = False
+    if rust_world is not None and genesis is None:
+        try:
+            d = rust_world.sample_terrain_chunk(cx, cy)
+            elev = np.array(d["elev"], dtype=np.float32).reshape(CHUNK_SIZE, CHUNK_SIZE)
+            temp = np.array(d["temp"], dtype=np.float32).reshape(CHUNK_SIZE, CHUNK_SIZE)
+            precip = np.array(d["precip"], dtype=np.float32).reshape(CHUNK_SIZE, CHUNK_SIZE)
+            _rust_ok = True
+        except Exception:
+            # Log the first failure once, then stay quiet.
+            if not getattr(generate_chunk, "_rust_warned", False):
+                import warnings
+                warnings.warn(
+                    "Rust backend sample_terrain_chunk failed; falling back to Python. "
+                    "This warning appears only once.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                generate_chunk._rust_warned = True
+
+    if not _rust_ok:
+        xs = (ox + (np.arange(CHUNK_SIZE) + 0.5) * VOXEL_SIZE_M).astype(np.float32)
+        ys = (oy + (np.arange(CHUNK_SIZE) + 0.5) * VOXEL_SIZE_M).astype(np.float32)
+        XX, YY = np.meshgrid(xs, ys, indexing="xy")
+        if genesis is None:
+            elev, temp, precip = sample_terrain(seed, params, XX, YY)
+        else:
+            elev, temp, precip = sample_terrain_with_genesis(
+                seed, params, XX, YY, genesis)
     biome = classify_biome_array(temp, precip, elev)
 
     # Resources (vectorized + small deterministic noise)
@@ -407,15 +435,29 @@ def generate_chunk(seed: int, coord: Tuple[int, int, int],
 class ChunkStreamer:
     def __init__(self, seed: int, params: TerrainParams,
                  keep_alive_ticks: int = 10_000,
-                 genesis=None):
+                 genesis=None,
+                 use_rust_backend: bool = False):
         self.seed = seed
         self.params = params
         self.keep_alive_ticks = keep_alive_ticks
         self.cache: Dict[Tuple[int, int, int], Chunk] = {}
         self.last_touch: Dict[Tuple[int, int, int], int] = {}
-        # Optional GenesisAnchor — when set, chunks are anchored to a
-        # continental macro map. Mutate at runtime via :meth:`set_genesis`.
         self.genesis = genesis
+        # Phase 2 — opt-in Rust backend for heightmap/biome sampling.
+        # When True and genesis_world native wheel is installed, terrain
+        # sampling is delegated to ge-py; resources remain Python-side.
+        # When the wheel is absent, _rust_world stays None and we silently
+        # fall back to the Python path (no MockPyWorld created).
+        self.use_rust_backend = use_rust_backend
+        self._rust_world = None
+        if use_rust_backend:
+            try:
+                from engine.rust_bridge import try_import_genesis_world
+                gw, native = try_import_genesis_world()
+                if native:
+                    self._rust_world = gw.PyWorld(seed=seed)
+            except Exception:
+                pass
 
     def set_genesis(self, genesis) -> None:
         """Attach (or clear) a :class:`GenesisAnchor` for chunk generation.
@@ -431,17 +473,28 @@ class ChunkStreamer:
         self.cache.clear()
         self.last_touch.clear()
 
+    def _rust_world_for_gen(self):
+        """Return the Rust world handle only when backend is active and genesis
+        is absent (the Rust backend does not yet handle macro anchoring)."""
+        if self.use_rust_backend and self.genesis is None:
+            return self._rust_world
+        return None
+
     def touch_area(self, tick: int, coords: Iterable[Tuple[int, int, int]]) -> None:
+        rw = self._rust_world_for_gen()
         for c in coords:
             self.last_touch[c] = tick
             if c not in self.cache:
                 self.cache[c] = generate_chunk(self.seed, c, self.params,
-                                                genesis=self.genesis)
+                                                genesis=self.genesis,
+                                                rust_world=rw)
 
     def get(self, tick: int, coord: Tuple[int, int, int]) -> Chunk:
         if coord not in self.cache:
+            rw = self._rust_world_for_gen()
             self.cache[coord] = generate_chunk(self.seed, coord, self.params,
-                                                genesis=self.genesis)
+                                                genesis=self.genesis,
+                                                rust_world=rw)
         self.last_touch[coord] = tick
         return self.cache[coord]
 

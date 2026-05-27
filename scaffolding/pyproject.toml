@@ -1,0 +1,29 @@
+# pyproject.toml — maturin build config pour le wheel genesis_world
+#
+# Usage (depuis le répertoire scaffolding/) :
+#   pip install maturin
+#   maturin develop --release          # installe genesis_world dans le venv courant
+#   maturin build   --release          # produit un .whl dans target/wheels/
+#
+# Phase 1 : maturin develop installe le wheel natif; engine.rust_bridge
+#            détecte automatiquement genesis_world via try_import_genesis_world().
+# Phase 2 : world.py utilise PyWorld.sample_terrain_chunk via use_rust_backend=True.
+
+[build-system]
+requires    = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name            = "genesis_world"
+version         = "0.1.0"
+description     = "Rust world backend for Genesis Engine (heightmap + biome)."
+requires-python = ">=3.11,<3.14"
+license         = { text = "AGPL-3.0-only" }
+
+[tool.maturin]
+# Pointe vers le crate PyO3 dans le workspace Rust.
+manifest-path    = "crates/ge-py/Cargo.toml"
+# Features à activer pour le build wheel.
+features         = ["extension-module"]
+# Profil release par défaut (debug pour dev + benchmarks).
+profile          = "release"

@@ -10,6 +10,7 @@ members = [
     "crates/ge-cognition",
     "crates/ge-ann",
     "crates/ge-api",
+    "crates/ge-py",
 ]
 
 [workspace.package]
@@ -61,6 +62,9 @@ ring        = "0.17"
 ed25519-dalek = "2"
 # Post-quantum (via liboqs-rust binding)
 oqs         = "0.10"
+
+# Python bindings
+pyo3        = { version = "0.22", features = ["extension-module"] }
 
 # Compression
 zstd        = "0.13"
