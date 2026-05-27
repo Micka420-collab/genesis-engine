@@ -44,6 +44,45 @@ pub enum Biome {
 }
 
 impl Biome {
+    /// All variants, in numeric-discriminant order. Single source of truth
+    /// for `COUNT` and `from_index`. Adding a new biome means adding it
+    /// both as an enum variant *and* in this array — the test
+    /// `variants_match_discriminants` guards the invariant.
+    pub const VARIANTS: [Biome; 16] = [
+        Biome::Ocean,
+        Biome::CoastalSea,
+        Biome::Ice,
+        Biome::Tundra,
+        Biome::BorealForest,
+        Biome::TemperateForest,
+        Biome::TemperateRainforest,
+        Biome::Grassland,
+        Biome::HotDesert,
+        Biome::ColdDesert,
+        Biome::Savanna,
+        Biome::TropicalDryForest,
+        Biome::TropicalRainforest,
+        Biome::Shrubland,
+        Biome::Wetland,
+        Biome::AlpineRock,
+    ];
+
+    /// Total number of Biome variants — sized lookup tables use this.
+    pub const COUNT: usize = Self::VARIANTS.len();
+
+    /// Convert a `u8` discriminant back to its `Biome`. Returns `None`
+    /// for indices outside `0..COUNT`. Prefer this over a hand-rolled
+    /// `match Some(0) => Biome::Ocean, …` — those silently default new
+    /// variants to a catch-all branch and rot quietly.
+    #[must_use]
+    pub const fn from_index(i: u8) -> Option<Biome> {
+        if (i as usize) < Self::COUNT {
+            Some(Self::VARIANTS[i as usize])
+        } else {
+            None
+        }
+    }
+
     /// Classify by temperature (°C), humidity in `[0,1]`, elevation in metres,
     /// and sea level in metres.
     #[must_use]
@@ -196,6 +235,19 @@ mod tests {
     #[test]
     fn hot_desert_at_low_humidity() {
         assert_eq!(Biome::classify(30.0, 0.05, 100.0, 0.0), Biome::HotDesert);
+    }
+
+    #[test]
+    fn variants_match_discriminants() {
+        // If a new variant is added to the enum but not to VARIANTS, or if
+        // someone reorders them, this test catches it. The discriminant is
+        // the canonical numeric identity used by every consumer.
+        for (i, b) in Biome::VARIANTS.iter().enumerate() {
+            assert_eq!(*b as u8 as usize, i, "variant {b:?} at slot {i} has mismatched discriminant");
+            assert_eq!(Biome::from_index(i as u8), Some(*b));
+        }
+        assert_eq!(Biome::from_index(Biome::COUNT as u8), None);
+        assert_eq!(Biome::from_index(255), None);
     }
 
     #[test]

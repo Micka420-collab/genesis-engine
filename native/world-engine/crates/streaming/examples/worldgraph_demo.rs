@@ -11,7 +11,7 @@
 use genesis_cache::Cache;
 use genesis_core::{ChunkCoord, Prf, Tick, WorldSeed};
 use genesis_terrain::TerrainParams;
-use genesis_worldgraph::{ContentAddressable, Pass, PassCtx, PassId, Pipeline, Scheduler};
+use genesis_worldgraph::{hash_f32, ContentAddressable, Pass, PassCtx, PassId, Pipeline, Scheduler};
 use serde::{Deserialize, Serialize};
 
 /// Initial input: just the chunk coord packed.
@@ -37,7 +37,7 @@ impl ContentAddressable for HeightOut {
         h.update(&self.width.to_le_bytes());
         h.update(&self.height.to_le_bytes());
         for v in &self.data {
-            h.update(&v.to_le_bytes());
+            hash_f32(h, *v);
         }
     }
 }
@@ -89,9 +89,9 @@ struct Summary {
 
 impl ContentAddressable for Summary {
     fn hash_into(&self, h: &mut blake3::Hasher) {
-        h.update(&self.min.to_le_bytes());
-        h.update(&self.max.to_le_bytes());
-        h.update(&self.mean.to_le_bytes());
+        hash_f32(h, self.min);
+        hash_f32(h, self.max);
+        hash_f32(h, self.mean);
     }
 }
 

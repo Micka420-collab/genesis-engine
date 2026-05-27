@@ -15,6 +15,7 @@ Writes ``runtime/artifacts/civilization_run_manifest.json`` on success.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -44,6 +45,7 @@ from engine.koeppen_grid import export_fair_koeppen_from_sim  # noqa: E402
 from engine.chunk_hydrology import chunk_hydrology_state, genesis_anchor_from_sim  # noqa: E402
 from engine.rust_bridge import bridge_status  # noqa: E402
 from engine.rust_worldgraph_tick import rust_worldgraph_snapshot  # noqa: E402
+from engine.experiment_manifest import experimental_run  # noqa: E402
 
 
 def _parse_seed(raw: str) -> int:
@@ -241,6 +243,12 @@ def main() -> int:
                    help="Skip bootstrap; isolated macro (not civilization emergence)")
     p.add_argument("--renders", action="store_true",
                    help="Optional macro PNG render")
+    p.add_argument("--experiment", default=None, metavar="NAME",
+                   help="Wrap the run in engine.experiment_manifest.experimental_run "
+                        "with the given name. Produces runtime/experiments/<NAME>_<UTC>/ "
+                        "with provenance manifest + state fingerprint. Without this "
+                        "flag, behaviour is unchanged (only the legacy "
+                        "civilization_run_manifest.json under artifacts/ is written).")
     p.add_argument("-q", "--quiet", action="store_true")
     args = p.parse_args()
 
@@ -254,25 +262,62 @@ def main() -> int:
         print("  WARNING: --synthetic-only (not civilization emergence path)")
     print("=" * 78)
 
-    try:
-        manifest = run_civilization_pipeline(
-            seed=seed,
-            ticks=args.ticks,
-            founders=args.founders,
-            max_agents=args.max_agents,
-            resolution=args.resolution,
-            artifacts_dir=artifacts,
-            synthetic_only=args.synthetic_only,
-            renders=args.renders,
-            verbose=not args.quiet,
-        )
-    except Exception:
-        traceback.print_exc()
-        return 1
+    # When --experiment NAME is given, wrap the run in experimental_run so a
+    # full provenance manifest (git commit, pyproject hash, state fingerprint)
+    # is written under runtime/experiments/<NAME>_<UTC>/. Without the flag,
+    # behaviour is unchanged: only the legacy
+    # `artifacts/civilization_run_manifest.json` is produced.
+    if args.experiment is not None:
+        ctx_mgr: Any = experimental_run(args.experiment)
+    else:
+        ctx_mgr = contextlib.nullcontext(None)
+
+    with ctx_mgr as exp_ctx:
+        try:
+            manifest = run_civilization_pipeline(
+                seed=seed,
+                ticks=args.ticks,
+                founders=args.founders,
+                max_agents=args.max_agents,
+                resolution=args.resolution,
+                artifacts_dir=artifacts,
+                synthetic_only=args.synthetic_only,
+                renders=args.renders,
+                verbose=not args.quiet,
+            )
+        except Exception:
+            traceback.print_exc()
+            if exp_ctx is not None:
+                # Record the crash in the manifest. attach() is not called,
+                # so summary stays None and state_fingerprint stays None —
+                # which is correct: there is no valid final state to hash.
+                exp_ctx.note(
+                    "exception during run_civilization_pipeline — "
+                    "see traceback in stderr"
+                )
+            return 1
+
+        if exp_ctx is not None:
+            # Attach the full manifest as the summary payload. The
+            # state_fingerprint will hash over seed, ticks, n_alive, koeppen
+            # checksums, etc. — anything already in the legacy manifest.
+            exp_ctx.attach(manifest)
+            exp_ctx.note(
+                f"seed={seed:#x} ticks={args.ticks} founders={args.founders} "
+                f"max_agents={args.max_agents} resolution={args.resolution} "
+                f"synthetic_only={args.synthetic_only}"
+            )
 
     print(f"  manifest: {manifest['manifest_path']}")
     print(f"  alive={manifest['n_alive']} agents_active={manifest['n_agents_active']}")
     print(f"  koeppen: {manifest['artifacts']['koeppen_fair']}")
+    if args.experiment is not None:
+        # The experimental_run wrote its own files under runtime/experiments/.
+        # Surface where so the operator can locate the fingerprint.
+        exp_dir = Path(REPO) / "runtime" / "experiments"
+        latest = sorted(exp_dir.glob(f"{args.experiment}_*"))
+        if latest:
+            print(f"  experiment: {latest[-1]}")
     print("=" * 78)
     if manifest["n_alive"] <= 0:
         print("FAIL — no alive agents at end of run")

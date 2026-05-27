@@ -14,7 +14,7 @@ Ces entrées ne définissent plus la vision produit. Référence active : **[`EM
 
 - `docs/sprints/*` — journal de livraison
 - `NEXT-SPRINT.md` — file de travail agents
-- Audits datés (`AUDIT-REPORT-2026-05-16.md`, etc.)
+- Audits datés ([`docs/audits/`](audits/) — déplacés de la racine 2026-05-27)
 
 **Ne pas utiliser** pour nouvelles features :
 

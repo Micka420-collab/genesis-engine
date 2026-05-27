@@ -267,6 +267,46 @@ Le script doit :
 
 `p12_integration_full.py` teste les 5 sub-systems ensemble. Si ton change touche un de ces sub-systems, **vérifie que p12 passe toujours** (4/5 ou 5/5).
 
+### Runs longs : utiliser `experimental_run`
+
+Tout run de simulation **> 1000 ticks** destiné à valider une hypothèse, produire une métrique citable, ou alimenter une comparaison cross-seed doit passer par
+[`engine.experiment_manifest.experimental_run`](runtime/engine/experiment_manifest.py).
+Il capture la provenance (git commit, hash du `pyproject.toml`, version Python,
+plateforme), l'horodatage début/fin, le `world.summary()` final, et un
+**fingerprint sha256** de l'état final — ce qui permet de comparer deux runs
+bit-pour-bit dans un ledger de falsifiabilité.
+
+```python
+from engine.experiment_manifest import experimental_run
+from engine.world_builder import WorldBuilder
+
+with experimental_run("lausanne-baseline") as ctx:
+    world = WorldBuilder("demo").anchor(46.51, 6.63).founders(20).build()
+    world.run(2000)
+    ctx.attach(world)
+    ctx.note("baseline — aucune perturbation, seed défaut")
+
+# → runtime/experiments/lausanne-baseline_<ISO_UTC>/
+#     ├── manifest.json   (provenance + summary + fingerprint)
+#     └── summary.json    (world.summary() brut)
+```
+
+Un crash dans le bloc `with` écrit quand même le manifest, avec une note
+recensant l'exception — utile pour diagnostiquer les runs interrompus.
+
+#### Pré-enregistrement (runs visant à valider une hypothèse)
+
+Si le run vise à **tester une hypothèse** (et pas juste à mesurer une perf
+ou à itérer sur un bug), copier
+[`runtime/experiments/PREREGISTRATION_TEMPLATE.md`](runtime/experiments/PREREGISTRATION_TEMPLATE.md)
+vers `runtime/experiments/<run_name>/preregistration.md`, le remplir **avant**
+le `world.run()`, et le committer. Sans pré-enregistrement, le résultat est
+une observation — pas une prédiction validée.
+
+Une fois le run terminé et l'analyse faite, si la prédiction tenait, ajoute
+une ligne dans [`FALSIFIABILITY.md`](FALSIFIABILITY.md) avec le
+`state_fingerprint` du `manifest.json`.
+
 ---
 
 ## 🧪 Tests obligatoires avant PR

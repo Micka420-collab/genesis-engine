@@ -15,7 +15,7 @@
 use genesis_climate::ClimateSample;
 use genesis_core::{Prf, CHUNK_SIZE_X, CHUNK_SIZE_Y};
 use genesis_noise::{fbm2, FbmParams};
-use genesis_worldgraph::{ContentAddressable, Pass, PassCtx, PassId};
+use genesis_worldgraph::{hash_f32, ContentAddressable, Pass, PassCtx, PassId};
 use serde::{Deserialize, Serialize};
 
 /// Per-cell weather state.
@@ -44,11 +44,11 @@ impl ContentAddressable for WeatherField {
     fn hash_into(&self, h: &mut blake3::Hasher) {
         h.update(&self.tick.to_le_bytes());
         for c in &self.cells {
-            h.update(&c.precipitation_mm_h.to_le_bytes());
-            h.update(&c.temperature_c.to_le_bytes());
-            h.update(&c.wind_ms[0].to_le_bytes());
-            h.update(&c.wind_ms[1].to_le_bytes());
-            h.update(&c.cloud_cover.to_le_bytes());
+            hash_f32(h, c.precipitation_mm_h);
+            hash_f32(h, c.temperature_c);
+            hash_f32(h, c.wind_ms[0]);
+            hash_f32(h, c.wind_ms[1]);
+            hash_f32(h, c.cloud_cover);
         }
     }
 }
@@ -63,10 +63,10 @@ pub struct ClimateInput {
 impl ContentAddressable for ClimateInput {
     fn hash_into(&self, h: &mut blake3::Hasher) {
         for c in &self.cells {
-            h.update(&c.temperature_c.to_le_bytes());
-            h.update(&c.humidity.to_le_bytes());
-            h.update(&c.wind_ms[0].to_le_bytes());
-            h.update(&c.wind_ms[1].to_le_bytes());
+            hash_f32(h, c.temperature_c);
+            hash_f32(h, c.humidity);
+            hash_f32(h, c.wind_ms[0]);
+            hash_f32(h, c.wind_ms[1]);
         }
     }
 }

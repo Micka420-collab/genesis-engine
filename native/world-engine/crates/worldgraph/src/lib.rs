@@ -22,6 +22,6 @@ pub mod scheduler;
 pub use branch::{BranchId, CounterfactualBranch};
 pub use ctx::PassCtx;
 pub use lineage::{Lineage, LineageNode};
-pub use pass::{ContentAddressable, Pass, PassId};
+pub use pass::{hash_f32, hash_f64, ContentAddressable, Pass, PassId};
 pub use pipeline::{Pipeline, Step};
 pub use scheduler::{Scheduler, SchedulerStats};

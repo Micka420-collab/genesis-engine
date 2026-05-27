@@ -166,7 +166,7 @@ Voir [`docs/EARTH-CONSOLE.md`](../docs/EARTH-CONSOLE.md).
 
 Observation artifacts post-run : `make observe` (ouvre `dashboard.html` + SSE sur le port 8765).
 
-Inventaire partiel : [`../TESTS_INVENTORY.md`](../TESTS_INVENTORY.md).
+Inventaire partiel : [`../docs/TESTS_INVENTORY.md`](../docs/TESTS_INVENTORY.md).
 
 ---
 

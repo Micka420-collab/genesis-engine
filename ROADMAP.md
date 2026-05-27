@@ -83,7 +83,7 @@ date avec manifest, journals et summary unique.
 **Objectif :** separer les claims prouves, les hypotheses et les plans.
 
 - README limite aux capacites verifiees.
-- `TESTS_INVENTORY.md` garde les observations chiffrees.
+- [`docs/TESTS_INVENTORY.md`](docs/TESTS_INVENTORY.md) garde les observations chiffrees.
 - Les limitations connues restent visibles : conflits absents, stress 100
   fragile, topographie plate dans certaines regions, mortalite Phase 5 a
   recalibrer.

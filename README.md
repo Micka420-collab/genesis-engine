@@ -2,66 +2,128 @@
 
 # Genesis Engine
 
-**Laboratoire de simulation civilisationnelle autonome** — mondes déterministes, agents IA, émergence observée.
+**Laboratoire de simulation civilisationnelle autonome** — mondes déterministes, agents IA, émergence observée et **réfutable**.
 
 🌐 **Langues** :
 [🇫🇷 Français](README.md) · [🇬🇧 English](README.en.md) · [🇪🇸 Español](README.es.md) · [🇩🇪 Deutsch](README.de.md) · [🇵🇹 Português](README.pt.md) · [🇮🇹 Italiano](README.it.md) · [🇨🇳 中文](README.zh-CN.md) · [🇯🇵 日本語](README.ja.md) · [🇷🇺 Русский](README.ru.md) · [🇰🇷 한국어](README.ko.md) · [🇮🇳 हिन्दी](README.hi.md) · [🇳🇱 Nederlands](README.nl.md) · [🇵🇱 Polski](README.pl.md) · [🇸🇦 العربية](README.ar.md)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+[![Python 3.11–3.13](https://img.shields.io/badge/python-3.11–3.13-blue.svg)](https://www.python.org/)
+[![Rust 1.85](https://img.shields.io/badge/rust-1.85-orange.svg)](https://rust-lang.org/)
 [![Earth realism ~76%](https://img.shields.io/badge/r%C3%A9alisme_Terre-~76%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
-[![Deterministic](https://img.shields.io/badge/deterministic-PRF-purple.svg)](#déterminisme)
-[![CI](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/genesis-engine/genesis-engine/actions/workflows/ci.yml)
+[![Deterministic](https://img.shields.io/badge/deterministic-PRF-purple.svg)](FALSIFIABILITY.md#engine-level-invariants)
+[![CI](https://github.com/Micka420-collab/genesis-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/Micka420-collab/genesis-engine/actions/workflows/ci.yml)
 
-[EMERGENCE SIM v2](docs/EMERGENCE-SIM-v2.md) · [Master prompt](docs/MASTER-SCALE-PROMPT-v2.md) · [État du projet](PROJECT-STATUS.md) · [Earth Console](docs/EARTH-CONSOLE.md) · [Runtime](runtime/README.md) · [Rust](native/world-engine/README.md)
+[Vision EMERGENCE SIM v2](docs/EMERGENCE-SIM-v2.md) · [État du projet](PROJECT-STATUS.md) · [Falsifiability ledger](FALSIFIABILITY.md) · [Source-tree canonique](docs/RUNTIME-LAYOUT.md) · [Earth Console](docs/EARTH-CONSOLE.md)
 
 </div>
 
 ---
 
-## Vision — EMERGENCE SIM v2.0
+## En une phrase
 
-**ZERO PRE-SCRIPT** : seules les lois physiques sont hardcodées. Langage, outils, civilisation et terraformation doivent **émerger** des agents — jamais être des quêtes scriptées.
+**EMERGENCE SIM v2** — laboratoire **ZERO PRE-SCRIPT** : seules les lois physiques sont hardcodées. Langage, outils, civilisation, monnaie et effondrement doivent **émerger** des agents — jamais être des quêtes scriptées. Chaque prétention émergente est inscrite dans un ledger réfutable avec sa condition de falsification.
 
 Manifeste complet : **[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
 
 | Layer | Contenu |
 |-------|---------|
 | **L0** Physics | Thermo, gravité, hydrologie, érosion |
-| **L1** World | Genesis, climat, biomes, ressources |
-| **L2** Biology | ADN 256-D, métabolisme, sélection |
-| **L3** Cognition | Perception locale, plasticité (NEAT = cible) |
+| **L1** World | Genesis, climat (Köppen), biomes, ressources |
+| **L2** Biology | ADN 256-D, métabolisme, sélection sexuelle |
+| **L3** Cognition | Perception locale, plasticité (NEAT) |
 | **L4** Civilization | Commerce, construction, polity, langage |
-
-**Observer :** `.\earth-console.ps1` → http://127.0.0.1:8090/ · KPIs : `/api/emergence_metrics`
-
-Implémentation : tout émerge de `Simulation.step()` + `sim_emergence.py` — pas de pipeline orchestrateur. Voir [`PROJECT-STATUS.md`](PROJECT-STATUS.md).
 
 ---
 
-## Où en est le projet ?
+## 🟢 Vérifié et reproductible aujourd'hui
 
-| Axe | Statut | Détail |
-|-----|--------|--------|
-| Phases 0–2 (vie, société) | ✅ | Cognition, reproduction, lexique |
-| Phase 4 (émergence civ.) | ✅ | Agriculture, écriture, polity, métallurgie |
-| Phase 5 (Genesis-α) | ⏳ | Long-run 10k sim-yr en cours |
-| **Waves 16–41** (monde réaliste) | ✅ | Genesis → climat → settlements → render → atmosphère → observateurs |
-| **Réalisme Terre (global)** | **~76 %** | Moyenne 7 dimensions → [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) (objectif **80 %**) |
-| **Tests** | ✅ | **157** pytest · smokes **p72–p87** (`make validate-all`) |
+> Tout ce qui suit est ancré dans un smoke vert ou un test pytest qui tourne dans la CI. La règle est : **aucun claim public sans son test correspondant**. Pour les chiffres précis, voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md) et le ledger [`FALSIFIABILITY.md`](FALSIFIABILITY.md).
 
-Synthèse maintenue : **[`PROJECT-STATUS.md`](PROJECT-STATUS.md)** · file de travail : **[`NEXT-SPRINT.md`](NEXT-SPRINT.md)**.
+### Substrat moteur (4 invariants gravés)
 
-### Capacités phares (runtime Python)
+| ID | Invariant | Test gardien |
+|----|-----------|--------------|
+| **I-1** | Même `(seed, config)` → chunks bit-pour-bit identiques (mono- et multi-threadé) | `genesis_streaming::tests::determinism::same_seed_same_chunk_*` |
+| **I-2** | Hash NaN-safe cross-plateforme dans tout `ContentAddressable` | `genesis_worldgraph::pass::hash_helper_tests::*` |
+| **I-3** | Coalescing concurrent : 1 seul `generate()` pour N callers parallèles sur le même coord (panic-safe via RAII) | `genesis_streaming::tests::concurrent_get_or_generate_coalesces_to_one_generation` |
+| **I-4** | Chunks mutés survivent à l'éviction et au snapshot/restore | `genesis_agent_api::tests::mutated_chunks_survive_eviction_pressure` |
 
-| Domaine | Exemples livrés |
-|---------|-----------------|
-| Substrat | Earth-anchored (Copernicus + WorldCover), géologie 36 minéraux, hydrologie D8 |
-| Bio | Photosynthèse Farquhar, 39 clades végétaux, 47 espèces Lotka-Volterra |
-| **Biosphère émergente** | Protocellules → microbes → faune → sapients ([`docs/BIOSPHERE-EMERGENCE.md`](docs/BIOSPHERE-EMERGENCE.md)) |
-| Civilisation | Métallurgie émergente, bâtiments par statics, écriture sur matériaux vieillissants |
-| Monde & rendu | `GenesisWorld` (W16+), hillshade / iso (W27/36), atmosphère jour/nuit (W41) |
-| Infra | Persistance SHA-256, time-warp, dashboard `/api/*`, exports GeoTIFF/PNG/OBJ |
+Chaque échec de `I-*` suspend toutes les claims émergentes de [`FALSIFIABILITY.md`](FALSIFIABILITY.md) — c'est la fondation, pas un bonus.
+
+### Émergence observée (smokes verts)
+
+- **173 tests pytest** (`make test-python`) — 42 fichiers `runtime/tests/test_*.py` (dont 15 nouveaux pour l'infra `experimental_run`)
+- **17 smokes** dans `make validate-all` (p72–p87), **116 smokes** livrés au total (`p0`–`p112`, certains gated par la wheel Rust)
+- **Waves 1–41** intégrées au tick principal — index dans [`docs/sprints/README.md`](docs/sprints/README.md)
+
+Quelques chiffres-clés mesurés par leurs smokes (cf. [`NEXT-SPRINT.md`](NEXT-SPRINT.md) sessions 34*) :
+
+| Phénomène émergent | Mesure observée | Smoke gardien | Wave |
+|--------------------|-----------------|---------------|------|
+| Coefficient consanguinité (Wright F, incest siblings) | **exactement 0.2500** | `p71_lineage_observer_smoke` 9/9 | 40 |
+| R₀ épidémique sur réseau de contact | **0.750** (cholera empirique) | `p70_epidemic_observer_smoke` 9/9 | 39 |
+| Polities émergentes (gouvernance locale) | observable cross-seed | `p32_polity_smoke` PASS | 32 |
+| Diffusion culturelle (memetic) | gradient mesurable | Wave 31 (smokes session 34o) | 31 |
+| Réseau de routes par footprints | densité corrélée biome | Wave 29 (smokes session 34m) | 29 |
+| Anatomie + blessures + sang 5L | 10 body parts × 4 wound kinds | Wave 34 (smokes session 34r) | 34 |
+| Atmosphère temporelle (saisons + solaire) | day_PNG ≠ night_PNG byte-different | `p72_world_atmosphere_smoke` 9/9 | 41 |
+
+**Non-régression actuelle : 31 smokes consécutifs verts (p44–p72)** au snapshot du 2026-05-18 (NEXT-SPRINT session 34z).
+
+### Réalisme Terre — score chiffré par dimension
+
+**Score global : ~76 %** (moyenne 7 dimensions). Cible : **80 %**. Source de vérité unique : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md).
+
+| Dimension | % | Piste principale |
+|-----------|---|------------------|
+| Climat / biomes | 80 | GraphCast-lite + colonne 3D + circulation L1 |
+| Géologie / relief | 55 | Tectonique live, stratigraphie légère |
+| Écologie / hydrologie | 68 | `hydrology_mode` sv1d ; Earth Console overlay |
+| Sociétés / agents | 76 | NEAT + construction émergente + memetic |
+| Rendu visuel | 82 | Globe + iso 2.5D + ombres + atmosphère |
+| Observation IA | 86 | Earth Console SSE, replay, WebGPU |
+| Pont Python ↔ Rust | 82 | GENM + mutations write-back + snapshot |
+
+### Infra scientifique (méthodologie Cluster C)
+
+- **`experimental_run`** (`runtime/engine/experiment_manifest.py`) — capture provenance (git commit, sha256 du `pyproject.toml`, version Python, plateforme), timing, `world.summary()`, **state_fingerprint SHA-256**. Manifest écrit même sur crash. 14 tests.
+- **`PREREGISTRATION_TEMPLATE.md`** ([`runtime/experiments/`](runtime/experiments/PREREGISTRATION_TEMPLATE.md)) — déclaration hypothèse + prédictions chiffrées + conditions d'arrêt **avant** le run.
+- **[`FALSIFIABILITY.md`](FALSIFIABILITY.md)** — ledger poppérien : confirmed / pending / null / refuted / superseded + 4 invariants moteur `I-*`.
+
+### Source-tree canonique
+
+- **Python runtime** : [`runtime/engine/`](runtime/engine/) (package officiel, `pyproject.toml` setuptools)
+- **Rust workspace canonique** : [`native/world-engine/`](native/world-engine/) — 22 crates, build wheel `genesis_world` via `make maturin-dev`
+- **Rust workspace legacy** : `scaffolding/crates/` (toujours utilisé par les smokes p88-p112, migration B planifiée Q3 2026)
+- **Décision complète + conflit deux-wheels documenté** : [`docs/RUNTIME-LAYOUT.md`](docs/RUNTIME-LAYOUT.md)
+
+---
+
+## 🟡 En cours
+
+| Travail | Statut | Référence |
+|---------|--------|-----------|
+| **Wave 42** — Rust↔Python integration (PyO3 wheel `genesis_world`) | actif | `runtime/engine/rust_bridge.py` + `make maturin-dev` |
+| **Phase 5 Genesis-α** (long-run public, LLM tier-2) | 9/10 prérequis livrés — GO/NO-GO **2026-06-02** | `../Genesis_Engine_2026-05-23_Phase5_Unlock_Brief.md` |
+| **Migration B** — absorber `scaffolding/ge-py` (1762 l) dans `native/world-engine/pybindings` (369 l) | scoping (3 mois) | [`docs/RUNTIME-LAYOUT.md`](docs/RUNTIME-LAYOUT.md) §2.3 |
+| **Réalisme 76 % → 80 %** | géologie (55→70), hydrologie cross-chunk | [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) |
+| **Délétion code mort** : `runtime/genesis/` (ImportError), `runtime-phase5/` (fork archéologique) | prêt, attend OK destructif | [`docs/RUNTIME-LAYOUT.md`](docs/RUNTIME-LAYOUT.md) §3 |
+
+---
+
+## 🟠 Hypothèses (à tester, **PAS** prouvées)
+
+Mécanismes que le projet *cherche* à faire émerger. Aucun de ces points ne peut être cité comme "fait" tant qu'un run préenregistré ne l'a pas validé dans [`FALSIFIABILITY.md`](FALSIFIABILITY.md).
+
+- **Monnaie endogène** : un item devient médian d'échange via observation des trades — *aucun hardcode "le sel est la monnaie"*.
+- **Spécialisation des métiers** : skill accumulation × opportunity cost → distribution actions-par-agent dont l'entropie chute mesurablement.
+- **Effondrement Tainter** : rendements marginaux décroissants → refus de BUILD/INVENT, retour à la subsistance.
+- **Sélection sexuelle** : courtship + `mate_preference` dérivée de Big-Five → corrélation parents-enfants observable sur traits visibles.
+- **Bulles épistémiques** : COMMUNICATE avec `veracity ∈ [0,1]` + consistency check → clusters de confiance émergents, liars isolés.
+- **Niche construction bidirectionnelle** : feu de camp déboise, agriculture épuise le sol, urbain bloque le runoff → pression sélective sur les agents.
+
+Pour ajouter un test : copier [`PREREGISTRATION_TEMPLATE.md`](runtime/experiments/PREREGISTRATION_TEMPLATE.md), remplir avant le run, lancer avec `experimental_run`, inscrire le `state_fingerprint` dans [`FALSIFIABILITY.md`](FALSIFIABILITY.md) si la prédiction tient sur ≥ 3 seeds.
 
 ---
 
@@ -90,16 +152,20 @@ flowchart TB
   end
   subgraph Native["Rust — native/world-engine"]
     WG[WorldGraph + Köppen]
-    Stream[streaming / GPU]
+    Stream[streaming / GPU / snapshot]
+  end
+  subgraph Sci["Méthodologie"]
+    Manifest[experiment_manifest]
+    Falsif[FALSIFIABILITY.md]
   end
   L1 --> L2 --> L3 --> L4
   Native -.->|rust_bridge / PyO3| L1
   L4 --> Render[world_render + dashboard]
+  L4 -.-> Manifest
+  Manifest -.-> Falsif
 ```
 
-- **Spec contractuelle** : [`Genesis_Engine_Architecture_v1.0.docx`](Genesis_Engine_Architecture_v1.0.docx) (53 sections)
-- **ADR & specs** : [`adr/`](adr/), [`architecture/`](architecture/), [`specs/`](specs/)
-- **Rust détaillé** : [`architecture/world-engine-rust.md`](architecture/world-engine-rust.md)
+Détail Rust : [`native/world-engine/README.md`](native/world-engine/README.md) · ADR & specs : [`adr/`](adr/), [`architecture/`](architecture/), [`specs/`](specs/).
 
 ---
 
@@ -107,7 +173,7 @@ flowchart TB
 
 ### Prérequis
 
-- **Python 3.12+** (3.13 recommandé)
+- **Python 3.11–3.13**
 - **Optionnel** : Rust 1.85+ (`rustup`) pour `native/world-engine`
 - **Optionnel** : `rasterio` + `pyproj` pour Terre réelle (`pip install -e ".[earth]"`)
 
@@ -124,20 +190,10 @@ python -m pip install -e ".[dev]"
 # Terre réelle :
 # python -m pip install -e ".[earth,dev]"
 
-make doctor
-make smoke          # p0 — doit finir par PASSED
-make test-python
-```
-
-`PYTHONPATH` : le package `engine` vit sous `runtime/`. Les commandes `make` et `pytest` le configurent ; en manuel :
-
-```bash
-# Windows PowerShell
-$env:PYTHONPATH = "runtime"
-python runtime/scripts/p0_smoke.py
-
-# Linux/macOS
-PYTHONPATH=runtime python runtime/scripts/p0_smoke.py
+make doctor          # outils + imports
+make smoke           # p0 — doit finir par PASSED
+make test-python     # 173 tests pytest
+make validate-all    # smokes p72–p87 + SSE
 ```
 
 ### Hello World (30 s)
@@ -157,44 +213,33 @@ world.run(500)
 print(world.summary())
 ```
 
-### Philosophie : émergence civilisationnelle
+### Run reproductible (recommandé pour toute validation d'hypothèse)
 
-Rien de « scripté » en fin de partie : climat Köppen, hydrologie des chunks,
-graphe de contacts épidémiques et exports observables doivent **émerger du
-même monde** que les agents (`bootstrap_genesis_sim` → ticks → observers).
-Le pipeline déterministe `runtime/scripts/civilization_pipeline.py`
-(`make civilization`) enchaîne bootstrap, coupler multi-taux, simulation et
-manifeste FAIR — pas de grille macro factice sauf opt-in `--synthetic-only`.
+```bash
+PYTHONPATH=runtime python runtime/scripts/civilization_pipeline.py \
+    --experiment baseline-lausanne \
+    --seed 0xC1A71CE0 --ticks 1000 --founders 12
+```
 
-### Biosphère 100 % émergente (`origins`)
+Produit `runtime/experiments/baseline-lausanne_<UTC>/{manifest.json, summary.json}` avec provenance complète (git commit, hash `pyproject.toml`, platform, timing) + `state_fingerprint` SHA-256 citable dans `FALSIFIABILITY.md`. Voir [`CONTRIBUTING.md`](CONTRIBUTING.md) §"Runs longs".
+
+### Biosphère 100 % émergente
 
 ```bash
 cd runtime
 python run.py origins
 ```
 
-Pas de fondateurs scriptés : substrat → protocellules → cyanobactéries → O₂ → faune
-→ primates → ≤2 sapients. Documentation : [`docs/BIOSPHERE-EMERGENCE.md`](docs/BIOSPHERE-EMERGENCE.md).
-
-### Smokes récents (réalisme session mai 2026)
-
-```bash
-make civilization          # pipeline complet + artifacts/
-make validate-fair         # Köppen FAIR + checksums
-make observe               # dashboard + SSE
-cd runtime && python scripts/p82_civilization_pipeline_smoke.py
-PYTHONPATH=runtime python -m pytest runtime/tests/test_life_emergence.py -q
-```
+Pas de fondateurs scriptés : substrat → protocellules → cyanobactéries → O₂ → faune → primates → ≤2 sapients. Documentation : [`docs/BIOSPHERE-EMERGENCE.md`](docs/BIOSPHERE-EMERGENCE.md).
 
 ### Rust (world-engine)
 
 ```bash
 cd native/world-engine
-cargo test
+cargo test                                    # core + nouveaux invariants I-*
 cargo run --release -p genesis-streaming --example demo_world
+make maturin-dev                              # wheel `genesis_world` (depuis racine)
 ```
-
-Voir [`native/world-engine/README.md`](native/world-engine/README.md).
 
 ---
 
@@ -202,35 +247,46 @@ Voir [`native/world-engine/README.md`](native/world-engine/README.md).
 
 ```
 genesis-engine/
-├── runtime/                 # Simulation Python (package engine)
-│   ├── engine/              # Modules sim, monde, civilisation, rendu
-│   ├── scripts/             # Smokes p0 … p79, démos
-│   └── tests/               # pytest
-├── native/world-engine/     # Moteur Rust (WorldGraph, biome, streaming)
-├── scaffolding/             # Crates Rust historiques (ECS proto)
-├── docs/                    # Index doc, sprints, renders, roadmap réalisme
-├── architecture/ adr/ specs/ ethics/ ops/   # Specs & gouvernance
-├── PROJECT-STATUS.md        # Synthèse statut (ce qu’il faut lire en premier)
-├── NEXT-SPRINT.md           # Journal de priorités détaillé
-├── CONTRIBUTING.md          # Guide contributeur
-└── README.md                # Ce fichier
+├── runtime/                            # ✅ Canonique Python
+│   ├── engine/                         #    package officiel
+│   ├── scripts/                        #    smokes p0…p112
+│   ├── tests/                          #    158 tests pytest
+│   ├── experiments/                    #    PREREGISTRATION_TEMPLATE + runs
+│   └── run.py                          #    launcher unifié
+├── native/world-engine/                # ✅ Canonique Rust (22 crates)
+│   └── crates/pybindings/              #    wheel `genesis_world`
+├── scaffolding/                        # ⚠ Legacy Rust (migration B en cours)
+│   └── crates/ge-py/                   #    wheel concurrente — cf RUNTIME-LAYOUT.md
+├── docs/
+│   ├── RUNTIME-LAYOUT.md               #    📜 source de vérité source-tree
+│   ├── ROADMAP-REALISME-TERRE.md       #    📊 grille réalisme par dimension
+│   ├── EMERGENCE-SIM-v2.md             #    📜 manifeste produit
+│   ├── audits/                         #    audits archivés
+│   └── sprints/                        #    journaux session-par-session
+├── FALSIFIABILITY.md                   # 🔬 ledger poppérien (invariants + claims)
+├── PROJECT-STATUS.md                   # synthèse statut
+├── NEXT-SPRINT.md                      # file de priorités
+├── ROADMAP.md                          # phases produit 0–5
+├── CONTRIBUTING.md  ETHICS.md  SECURITY.md
+└── pyproject.toml  Makefile  LICENSE
 ```
 
-**Arborescence détaillée runtime** : [`runtime/README.md`](runtime/README.md).
+Arborescence runtime détaillée : [`runtime/README.md`](runtime/README.md). Décisions historiques : [`docs/OBSOLETE.md`](docs/OBSOLETE.md).
 
 ---
 
-## Documentation
+## Méthodologie scientifique
 
-| Document | Rôle |
-|----------|------|
-| [`docs/README.md`](docs/README.md) | Index de toute la documentation |
-| [`docs/sprints/README.md`](docs/sprints/README.md) | Historique des sessions (Waves, phases) |
-| [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md) | Grille réalisme **~76 %** (source de vérité) + commandes vérif |
-| [`ROADMAP.md`](ROADMAP.md) | Phases produit 0–5 |
-| [`ETHICS.md`](ETHICS.md) · [`SECURITY.md`](SECURITY.md) | Gouvernance |
+1. **Tout run > 1000 ticks visant une hypothèse** passe par `experimental_run` (cf. [`CONTRIBUTING.md`](CONTRIBUTING.md) §"Runs longs").
+2. **Toute prétention émergente publique** doit être inscrite dans [`FALSIFIABILITY.md`](FALSIFIABILITY.md) avec sa condition de réfutation chiffrée, *avant* d'être citée dans une présentation ou un préprint.
+3. **Confirmation** demande ≥ 3 seeds distincts produisant le même observable au-delà du seuil de réfutation, sur le même git commit.
+4. **Aucun retro-fit** : la préenregistration doit être committée **avant** le run. Le graphe git est l'audit trail.
 
-**Renders** (ne pas supprimer sans accord) : [`docs/compliance/renders/`](docs/compliance/renders/), [`docs/renders/`](docs/renders/).
+---
+
+## Déterminisme — règle d'or
+
+Même `(seed, config, région)` → même monde et même trajectoire. Validation par SHA-256 sur `world.summary()` (cf. `state_fingerprint`). Source unique d'aléa : `engine.core.prf_rng`. Les invariants moteur `I-1`…`I-4` ci-dessus sont gardés par des tests Rust **bloquants** en CI.
 
 ---
 
@@ -238,18 +294,13 @@ genesis-engine/
 
 Le projet accueille chercheurs alife, ingénieurs Python/Rust, géographes et contributeurs doc.
 
-1. Lire **[`CONTRIBUTING.md`](CONTRIBUTING.md)** (premier jour, matrice « où coder », déterminisme PRF).
+1. Lire [`CONTRIBUTING.md`](CONTRIBUTING.md) (matrice « où coder », règle PRF, méthodologie expérimentale).
 2. Fork → branche `feature/...` ou `fix/...`.
 3. `make smoke` + smokes liés à ton domaine.
-4. Pull Request (template dans [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)).
+4. Pour les runs hypothèse-pilotés : préenregistrer via [`PREREGISTRATION_TEMPLATE.md`](runtime/experiments/PREREGISTRATION_TEMPLATE.md).
+5. Pull Request (template : [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md)).
 
-**Règle d’or** : pas de `random.*` non seedé — uniquement `engine.core.prf_rng`. Pas d’imports inline en milieu de fichier.
-
----
-
-## Déterminisme
-
-Même `(seed, config, région)` → même monde et même trajectoire. Validation par SHA-256 sur états agents ; smokes `p0`, `p12`, et vagues `p44+` vérifient la reproductibilité.
+**Règle d'or** : pas de `random.*` non seedé — uniquement `engine.core.prf_rng`. Pas d'imports inline en milieu de fichier.
 
 ---
 

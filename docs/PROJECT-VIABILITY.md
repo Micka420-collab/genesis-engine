@@ -8,11 +8,16 @@ New features should wait behind this contract when they would add ambiguity.
 
 ## Authoritative Entry Points
 
+> Source of truth: [`RUNTIME-LAYOUT.md`](./RUNTIME-LAYOUT.md). Decisions changed
+> between 2026-05-16 (initial draft of this doc) and 2026-05-27 (Rust workspace
+> migration). The summary below is reconciled to current `Makefile` + CI.
+
 - Python operational runtime: `runtime/engine`
 - Python smoke tests: `runtime/scripts/p*_*.py`
 - Python unit tests: `runtime/tests`
-- Rust long-term core: `scaffolding/crates`
-- Deprecated prototype: `runtime/genesis`
+- Rust workspace (CANONICAL, builds the `genesis_world` wheel): `native/world-engine/`
+- Rust workspace (LEGACY, to be absorbed): `scaffolding/crates/` — see RUNTIME-LAYOUT.md §3
+- Deprecated, slated for deletion: `runtime/genesis/` (raises `ImportError`), `runtime-phase5/` (excluded from pytest)
 
 ## Required Local Checks
 
@@ -30,7 +35,16 @@ python -m pip install -e ".[earth,dev]"
 python runtime/scripts/p3_earth_smoke.py
 ```
 
-For Rust scaffolding:
+For the canonical Rust workspace (`native/world-engine/`):
+
+```bash
+cd native/world-engine
+cargo check --workspace
+cargo test --workspace
+```
+
+For the legacy `scaffolding/` workspace (still required for smokes p89-p111
+until migration B lands — see [`RUNTIME-LAYOUT.md`](./RUNTIME-LAYOUT.md) §2):
 
 ```bash
 cd scaffolding
@@ -48,8 +62,10 @@ cargo test --workspace --all-features
    artifact, audit report, or sprint note.
 4. **Generated data out of source control.** Journals, exports, local JSONL
    streams, and profile logs should be ignored or regenerated.
-5. **Rust must compile continuously.** `scaffolding/` is allowed to lag behind
-   Python feature parity, but not behind basic `cargo check`.
+5. **Rust must compile continuously.** Both `native/world-engine/` (canonical)
+   and `scaffolding/` (legacy) must pass `cargo check`. `scaffolding/` is
+   allowed to lag in features behind the canonical workspace, but must not
+   regress its current API surface until the smoke suite has been migrated.
 
 ## Current Known Risks
 

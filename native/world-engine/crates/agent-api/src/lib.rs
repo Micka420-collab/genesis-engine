@@ -435,4 +435,68 @@ mod tests {
         client2.restore_snapshot_bytes(&bytes).unwrap();
         assert_eq!(client2.voxel(pos), Some(stone));
     }
+
+    #[test]
+    fn mutated_chunks_survive_eviction_pressure() {
+        // Mutate many more chunks than the cache can hold. Without the
+        // mutation-pin in maybe_evict, the LRU scanner could drop chunks
+        // whose mutations exist nowhere else, silently losing data at
+        // snapshot time.
+        use genesis_core::{Material, Voxel, WorldSeed};
+
+        let cfg = ChunkManagerConfig {
+            erosion_droplets: 4,
+            erosion_passes: 0,
+            cache_capacity: 4, // tiny — forces eviction on every new chunk
+            ..Default::default()
+        };
+        let mgr = ChunkManager::new(WorldSeed::from_u64(2026), cfg.clone());
+        let client = WorldClient::new(mgr);
+
+        let stone = Voxel(Material::Stone as u16);
+        // 16 mutations across 16 distinct chunks (one mutation per chunk).
+        let mutations: Vec<WorldCoord> = (0..16)
+            .map(|i| {
+                // Offset by CHUNK_SIZE so each WorldCoord lands in a different chunk.
+                WorldCoord::new((i as i32) * (CHUNK_SIZE_X as i32) + 1, 1, 2)
+            })
+            .collect();
+        for pos in &mutations {
+            client
+                .submit(Mutation::SetVoxel {
+                    pos: *pos,
+                    value: stone,
+                    actor: EntityId(1),
+                })
+                .unwrap();
+            client.apply_pending(); // triggers maybe_evict each round
+        }
+
+        // Sanity: all writes are still readable on the live client (i.e.
+        // not evicted under our feet).
+        for pos in &mutations {
+            assert_eq!(
+                client.voxel(*pos),
+                Some(stone),
+                "mutation at {pos:?} was lost in-process"
+            );
+        }
+
+        // Snapshot must contain every mutation.
+        let bytes = client.snapshot_bytes().expect("snapshot bytes");
+
+        // Fresh manager + client, restore, and re-verify.
+        let mgr2 = ChunkManager::new(WorldSeed::from_u64(2026), cfg);
+        let client2 = WorldClient::new(mgr2);
+        client2
+            .restore_snapshot_bytes(&bytes)
+            .expect("restore snapshot");
+        for pos in &mutations {
+            assert_eq!(
+                client2.voxel(*pos),
+                Some(stone),
+                "mutation at {pos:?} lost in snapshot/restore round-trip"
+            );
+        }
+    }
 }

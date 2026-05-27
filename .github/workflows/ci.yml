@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -90,6 +90,17 @@ jobs:
         working-directory: native/world-engine
         run: |
           cargo test -p genesis-core -p genesis-biome -p genesis-worldgraph -- --nocapture
+
+      # Extended workspace tests cover the determinism + concurrency fixes
+      # (`streaming` race coalesce + InflightGuard panic safety, `weather`
+      # NaN-safe hash, `agent-api` mutation pinning across snapshot/restore).
+      # Hard gate: failure here means an I-* invariant from
+      # `FALSIFIABILITY.md` is no longer holding and merging would propagate
+      # a non-deterministic engine into the falsifiability ledger.
+      - name: Cargo test (extended workspace)
+        working-directory: native/world-engine
+        run: |
+          cargo test -p genesis-streaming -p genesis-agent-api -p genesis-weather -p genesis-terrain -- --nocapture
 
   maturin-pybindings:
     runs-on: ubuntu-latest

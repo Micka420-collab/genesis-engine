@@ -7,6 +7,7 @@
 //!  - A second map tracks in-flight generations to coalesce duplicate reqs.
 
 use crate::chunk::{Chunk, ChunkMeta, SharedChunk};
+use dashmap::mapref::entry::Entry;
 use dashmap::DashMap;
 use genesis_biome::Biome;
 use parking_lot::RwLock;
@@ -20,6 +21,7 @@ use genesis_macro_bridge::{align_heightmap, MacroGrid};
 use genesis_hydrology::compute as compute_hydro;
 use genesis_terrain::{generate as generate_heightmap, hydraulic_erode, thermal_erode, TerrainParams};
 use smallvec::smallvec;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use tracing::{debug, instrument};
@@ -66,6 +68,60 @@ impl Default for ChunkManagerConfig {
     }
 }
 
+/// RAII cleanup for the leader of a `get_or_generate` race.
+///
+/// Inserted into the inflight map by the leader, holds a back-reference to
+/// the map so it can remove its own entry deterministically:
+///
+/// * On normal completion, [`complete`] is called explicitly: the leader
+///   removes its entry and notifies all queued waiters with the freshly
+///   built `SharedChunk`.
+/// * On panic / early return / cancellation, [`Drop`] removes the entry
+///   so the next caller can re-leader. Waiters' senders are dropped, which
+///   surfaces as `rx.await.is_err()`. `get_or_generate` loops on that
+///   error and retries, so a panicking generator does not deadlock the
+///   rest of the system.
+///
+/// Without this guard the inflight map would leak the entry forever and
+/// every subsequent caller for the same coord would block in
+/// `Entry::Occupied` indefinitely.
+struct InflightGuard {
+    inflight: Arc<DashMap<ChunkCoord, Vec<oneshot::Sender<SharedChunk>>>>,
+    coord: ChunkCoord,
+    completed: bool,
+}
+
+impl InflightGuard {
+    fn new(
+        inflight: Arc<DashMap<ChunkCoord, Vec<oneshot::Sender<SharedChunk>>>>,
+        coord: ChunkCoord,
+    ) -> Self {
+        Self { inflight, coord, completed: false }
+    }
+
+    /// Successful leader path: pop the inflight entry and forward `shared`
+    /// to every waiter that joined while we were generating.
+    fn complete(mut self, shared: &SharedChunk) {
+        self.completed = true;
+        if let Some((_, waiters)) = self.inflight.remove(&self.coord) {
+            for w in waiters {
+                let _ = w.send(Arc::clone(shared));
+            }
+        }
+    }
+}
+
+impl Drop for InflightGuard {
+    fn drop(&mut self) {
+        if !self.completed {
+            // Failure path: remove our marker so the next caller can re-leader.
+            // Any senders inside the Vec get dropped → their rx.await returns
+            // Err, which get_or_generate's loop catches.
+            self.inflight.remove(&self.coord);
+        }
+    }
+}
+
 /// Async chunk manager.
 #[derive(Clone)]
 pub struct ChunkManager {
@@ -74,6 +130,7 @@ pub struct ChunkManager {
     cache: Arc<DashMap<ChunkCoord, SharedChunk>>,
     inflight: Arc<DashMap<ChunkCoord, Vec<oneshot::Sender<SharedChunk>>>>,
     seed_tree: SeedTree,
+    generate_calls: Arc<AtomicU64>,
 }
 
 impl ChunkManager {
@@ -86,12 +143,20 @@ impl ChunkManager {
             cache: Arc::new(DashMap::with_capacity(1024)),
             inflight: Arc::new(DashMap::new()),
             seed_tree: SeedTree::new(seed),
+            generate_calls: Arc::new(AtomicU64::new(0)),
         }
     }
 
     /// Number of cached chunks.
     pub fn cached_count(&self) -> usize {
         self.cache.len()
+    }
+
+    /// How many times `generate()` has been invoked since construction.
+    /// Useful for asserting coalescing under concurrent load.
+    #[must_use]
+    pub fn generate_call_count(&self) -> u64 {
+        self.generate_calls.load(Ordering::Relaxed)
     }
 
     /// Root seed as u64 (Python / snapshot interchange).
@@ -121,62 +186,113 @@ impl ChunkManager {
     }
 
     /// Drop chunks if we're over capacity.
+    ///
+    /// **Mutated chunks are pinned** — any chunk whose `mutation_version > 0`
+    /// is never evicted, because we have no other durable record of agent
+    /// writes. Without this guard, snapshots taken after a long run could
+    /// silently lose mutations whose chunks were evicted by the crude
+    /// scanner. A proper LRU that promotes mutated chunks to a separate
+    /// pinned tier is the next step; for now we just skip them entirely.
+    /// If the cache fills with mutated chunks it will exceed `cache_capacity`
+    /// — the alternative (dropping a mutated chunk) is data loss, which is
+    /// worse than a soft cap.
     pub fn maybe_evict(&self) {
         let cap = self.config.cache_capacity;
         if self.cache.len() > cap {
             let excess = self.cache.len() - cap;
-            // Crude: drop the first `excess` we iterate. A real LRU comes
-            // later; for now this prevents unbounded growth.
             let mut to_drop = Vec::with_capacity(excess);
-            for kv in self.cache.iter().take(excess) {
-                to_drop.push(*kv.key());
+            for kv in self.cache.iter() {
+                if to_drop.len() >= excess {
+                    break;
+                }
+                let chunk = kv.value().read();
+                if chunk.meta.mutation_version == 0 {
+                    to_drop.push(*kv.key());
+                }
             }
-            for k in to_drop {
-                self.cache.remove(&k);
+            for k in &to_drop {
+                self.cache.remove(k);
             }
-            debug!("evicted {} chunks", excess);
+            if to_drop.is_empty() {
+                debug!(
+                    "cache over capacity ({} > {}) but all chunks pinned by mutations",
+                    self.cache.len(),
+                    cap
+                );
+            } else {
+                debug!("evicted {} chunks", to_drop.len());
+            }
         }
     }
 
     /// Get a chunk, generating it asynchronously if needed.
     /// Multiple concurrent requests for the same chunk coalesce.
+    ///
+    /// Coalescing protocol: the inflight DashMap entry is the leader/waiter
+    /// discriminator. A Vacant slot means no generation is in flight — the
+    /// caller inserts an empty waiter list and becomes the leader. An
+    /// Occupied slot means another caller is already generating — we push
+    /// a oneshot sender into the waiter list and await it.
+    ///
+    /// Panic safety: the leader holds an [`InflightGuard`] that clears the
+    /// inflight entry on drop. If `generate` panics, the leader's stack
+    /// unwinds, the guard fires, and queued waiters observe
+    /// `rx.await.is_err()`. The outer `loop` retries those waiters as
+    /// fresh callers — they hit the cache (if a different attempt
+    /// succeeded) or try to re-leader.
     #[instrument(skip(self), fields(cx = coord.cx, cy = coord.cy))]
     pub async fn get_or_generate(&self, coord: ChunkCoord) -> SharedChunk {
-        if let Some(c) = self.cache.get(&coord) {
-            return Arc::clone(c.value());
-        }
-
-        // Coalesce duplicate concurrent requests for the same chunk.
-        // Only the first caller actually performs the generation; others
-        // wait on a oneshot.
-        let should_generate = {
-            let mut entry = self.inflight.entry(coord).or_default();
-            if entry.is_empty() {
-                // We're the leader.
-                true
-            } else {
-                let (tx, rx) = oneshot::channel();
-                entry.push(tx);
-                drop(entry);
-                return rx.await.expect("inflight sender dropped");
+        loop {
+            if let Some(c) = self.cache.get(&coord) {
+                return Arc::clone(c.value());
             }
-        };
 
-        let _ = should_generate;
-        let me = self.clone();
-        let chunk = tokio::task::spawn_blocking(move || me.generate(coord))
-            .await
-            .expect("generate panicked");
-        let shared = Arc::new(RwLock::new(chunk));
-        self.cache.insert(coord, Arc::clone(&shared));
-
-        if let Some((_, waiters)) = self.inflight.remove(&coord) {
-            for w in waiters {
-                let _ = w.send(Arc::clone(&shared));
+            match self.inflight.entry(coord) {
+                Entry::Occupied(mut slot) => {
+                    // Re-check cache before we commit to waiting: the leader
+                    // may have completed between our cache miss and our
+                    // acquisition of this slot.
+                    if let Some(c) = self.cache.get(&coord) {
+                        return Arc::clone(c.value());
+                    }
+                    let (tx, rx) = oneshot::channel();
+                    slot.get_mut().push(tx);
+                    drop(slot);
+                    match rx.await {
+                        Ok(shared) => return shared,
+                        Err(_) => {
+                            // Leader panicked or was cancelled before
+                            // notifying. The InflightGuard already cleared
+                            // the map entry; loop back to attempt re-leader.
+                            continue;
+                        }
+                    }
+                }
+                Entry::Vacant(slot) => {
+                    // Same double-check: a previous leader may have just
+                    // removed its inflight entry after populating the cache.
+                    if let Some(c) = self.cache.get(&coord) {
+                        return Arc::clone(c.value());
+                    }
+                    slot.insert(Vec::new());
+                    // Fall out of the match — we are the leader. The slot
+                    // guard drops at end of arm, releasing the shard lock.
+                }
             }
+
+            // Leader path. The guard cleans up `inflight` on any path out
+            // (panic, early return) unless we successfully call `.complete`.
+            let guard = InflightGuard::new(Arc::clone(&self.inflight), coord);
+            let me = self.clone();
+            let chunk = tokio::task::spawn_blocking(move || me.generate(coord))
+                .await
+                .expect("generate panicked");
+            let shared = Arc::new(RwLock::new(chunk));
+            self.cache.insert(coord, Arc::clone(&shared));
+            guard.complete(&shared);
+            self.maybe_evict();
+            return shared;
         }
-        self.maybe_evict();
-        shared
     }
 
     /// Synchronous fetch or generate (uses cache; required for agent write-back).
@@ -203,6 +319,7 @@ impl ChunkManager {
 
     /// Synchronous chunk generation (CPU-bound).
     pub fn generate(&self, coord: ChunkCoord) -> Chunk {
+        self.generate_calls.fetch_add(1, Ordering::Relaxed);
         let prf_terrain = self.seed_tree.prf("terrain");
         let prf_climate = self.seed_tree.prf("climate");
         let prf_ecology = self.seed_tree.prf("ecology");
@@ -340,31 +457,19 @@ impl ChunkManager {
 }
 
 fn dominant_biome(biomes: &[Biome]) -> Biome {
-    use std::collections::HashMap;
-    let mut counts: HashMap<u8, u32> = HashMap::new();
+    // Fixed-size histogram on the stack — no allocation, no HashMap, no
+    // hand-rolled discriminant match (the old code silently mapped any
+    // future variant ≥ 16 to Grassland).
+    let mut counts = [0u32; Biome::COUNT];
     for b in biomes {
-        *counts.entry(*b as u8).or_insert(0) += 1;
+        counts[*b as usize] += 1;
     }
-    let best = counts.iter().max_by_key(|(_, v)| *v).map(|(k, _)| *k);
-    match best {
-        Some(0) => Biome::Ocean,
-        Some(1) => Biome::CoastalSea,
-        Some(2) => Biome::Ice,
-        Some(3) => Biome::Tundra,
-        Some(4) => Biome::BorealForest,
-        Some(5) => Biome::TemperateForest,
-        Some(6) => Biome::TemperateRainforest,
-        Some(7) => Biome::Grassland,
-        Some(8) => Biome::HotDesert,
-        Some(9) => Biome::ColdDesert,
-        Some(10) => Biome::Savanna,
-        Some(11) => Biome::TropicalDryForest,
-        Some(12) => Biome::TropicalRainforest,
-        Some(13) => Biome::Shrubland,
-        Some(14) => Biome::Wetland,
-        Some(15) => Biome::AlpineRock,
-        _ => Biome::Grassland,
-    }
+    let (best_idx, _) = counts
+        .iter()
+        .enumerate()
+        .max_by_key(|(_, c)| *c)
+        .expect("Biome::COUNT is non-zero");
+    Biome::from_index(best_idx as u8).expect("index from VARIANTS bounds is always valid")
 }
 
 #[inline]
@@ -426,6 +531,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn dominant_biome_picks_majority() {
+        let mut v = vec![Biome::Grassland; 100];
+        v.extend(vec![Biome::Ocean; 200]);
+        assert_eq!(dominant_biome(&v), Biome::Ocean);
+
+        let all_tundra = vec![Biome::Tundra; 64];
+        assert_eq!(dominant_biome(&all_tundra), Biome::Tundra);
+
+        // Single dominant biome over a noisy background.
+        let mut noisy = vec![Biome::HotDesert; 50];
+        noisy.extend(vec![Biome::Savanna; 5]);
+        noisy.extend(vec![Biome::Shrubland; 3]);
+        assert_eq!(dominant_biome(&noisy), Biome::HotDesert);
+    }
+
+    #[test]
     fn manager_generates_chunk_sync() {
         let mgr = ChunkManager::new(
             WorldSeed::from_u64(42),
@@ -463,6 +584,102 @@ mod tests {
         let shared = mgr.get_or_generate_blocking(pos.chunk());
         assert_eq!(shared.read().voxel_at(pos.local()), stone);
         assert!(shared.read().meta.mutation_version >= 1);
+    }
+
+    #[test]
+    fn inflight_guard_clears_entry_on_drop_without_complete() {
+        // The crucial panic-safety property: if the leader fails before
+        // calling complete(), the inflight entry must vanish so the next
+        // caller can re-leader instead of blocking forever in Entry::Occupied.
+        let inflight: Arc<DashMap<ChunkCoord, Vec<oneshot::Sender<SharedChunk>>>> =
+            Arc::new(DashMap::new());
+        let coord = ChunkCoord { cx: 1, cy: 2 };
+        inflight.insert(coord, Vec::new());
+        assert!(inflight.contains_key(&coord));
+        {
+            let _guard = InflightGuard::new(Arc::clone(&inflight), coord);
+            // Drop happens at end of scope without calling complete().
+        }
+        assert!(
+            !inflight.contains_key(&coord),
+            "InflightGuard::Drop must clear the entry when complete() was not called"
+        );
+    }
+
+    #[test]
+    fn inflight_guard_drop_after_complete_is_a_noop() {
+        // After complete(), the guard has already removed the entry; the
+        // Drop impl must not double-remove or panic.
+        let inflight: Arc<DashMap<ChunkCoord, Vec<oneshot::Sender<SharedChunk>>>> =
+            Arc::new(DashMap::new());
+        let coord = ChunkCoord { cx: 9, cy: -5 };
+        inflight.insert(coord, Vec::new());
+
+        let guard = InflightGuard::new(Arc::clone(&inflight), coord);
+
+        // Build a minimal SharedChunk for `complete` to forward. We don't
+        // actually have any waiter to receive it; the test only verifies
+        // that complete + drop are consistent.
+        let mgr = ChunkManager::new(
+            WorldSeed::from_u64(1),
+            ChunkManagerConfig {
+                erosion_droplets: 4,
+                erosion_passes: 0,
+                cache_capacity: 4,
+                ..Default::default()
+            },
+        );
+        let dummy = mgr.get_or_generate_blocking(ChunkCoord { cx: 0, cy: 0 });
+
+        guard.complete(&dummy); // consumes guard, marks completed, removes entry
+        assert!(!inflight.contains_key(&coord));
+        // Re-inserting and dropping a fresh guard should still clear it.
+        inflight.insert(coord, Vec::new());
+        drop(InflightGuard::new(Arc::clone(&inflight), coord));
+        assert!(!inflight.contains_key(&coord));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+    async fn concurrent_get_or_generate_coalesces_to_one_generation() {
+        // Hammers a single coord with many concurrent get_or_generate calls
+        // and asserts only one underlying `generate` ran. Without the
+        // Vacant/Occupied entry discriminator, two callers could both observe
+        // an empty waiter list and race through as duplicate leaders.
+        let mgr = ChunkManager::new(
+            WorldSeed::from_u64(2026),
+            ChunkManagerConfig {
+                erosion_droplets: 8,
+                erosion_passes: 1,
+                cache_capacity: 32,
+                ..Default::default()
+            },
+        );
+        let coord = ChunkCoord { cx: 7, cy: -3 };
+        let mut handles = Vec::with_capacity(64);
+        for _ in 0..64 {
+            let m = mgr.clone();
+            handles.push(tokio::spawn(async move { m.get_or_generate(coord).await }));
+        }
+        let mut chunks = Vec::with_capacity(64);
+        for h in handles {
+            chunks.push(h.await.expect("join"));
+        }
+        // Exactly one generation must have happened.
+        assert_eq!(
+            mgr.generate_call_count(),
+            1,
+            "expected one generate(), got {}",
+            mgr.generate_call_count()
+        );
+        // All returned Arcs point to the same chunk instance.
+        let first = Arc::as_ptr(&chunks[0]) as usize;
+        for (i, c) in chunks.iter().enumerate() {
+            assert_eq!(
+                Arc::as_ptr(c) as usize,
+                first,
+                "caller {i} got a different chunk Arc — coalescing leaked"
+            );
+        }
     }
 
     #[test]
