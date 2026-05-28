@@ -314,7 +314,15 @@ impl ChunkManager {
         }
         let coord = pos.chunk();
         let shared = self.get_or_generate_blocking(coord);
-        shared.write().set_voxel_world(pos, value)
+        // Bind the result before the tail expression so the RwLockWriteGuard
+        // drops *before* `shared` does. Newer Rust drop-scope rules treat
+        // the guard as a tail-expression temporary outliving the block's
+        // locals — returning the bare expression triggers E0597 because
+        // shared (the Arc) is dropped first while the guard still borrows
+        // its inner RwLock. Capturing into `result` forces the guard to
+        // drop at this statement's end, before shared.
+        let result = shared.write().set_voxel_world(pos, value);
+        result
     }
 
     /// Synchronous chunk generation (CPU-bound).
