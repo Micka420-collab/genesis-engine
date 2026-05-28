@@ -69,3 +69,7 @@ Cargo.lock.bak
 *.log
 *.log.*
 logs/
+
+# --- Generated experiment run outputs (machine-specific, non-deterministic) ---
+# Keep templates/runners/configs; ignore the timestamped <name>_<UTC>Z run dirs.
+runtime/experiments/*_*T*Z/

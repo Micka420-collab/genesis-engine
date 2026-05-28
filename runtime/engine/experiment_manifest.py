@@ -142,8 +142,50 @@ def capture_provenance(repo_root: Optional[Path] = None) -> dict:
     }
 
 
+# Keys that describe the *host/run* rather than the *simulation state*:
+# wall-clock timing, throughput, ISO timestamps, run labels, and absolute
+# paths. Including them poisons the fingerprint with non-reproducible noise —
+# two identical-seed runs on the same commit would never match, defeating the
+# whole "citable, bit-comparable identity" promise. Stripped recursively (by
+# key name, at any depth) before hashing so the fingerprint reflects only the
+# deterministic state, even across machines.
+_VOLATILE_FINGERPRINT_KEYS = frozenset({
+    "tps",
+    "wall_clock_s",
+    "wall_clock",
+    "duration_s",
+    "duration_seconds",
+    "elapsed_s",
+    "elapsed",
+    "started_at",
+    "ended_at",
+    "captured_at_iso",
+    "timestamp",
+    "run_id",
+    "manifest_path",
+})
+
+
+def _strip_volatile(value: Any) -> Any:
+    """Recursively drop volatile (host/timing) keys from a JSON-like value."""
+    if isinstance(value, dict):
+        return {
+            k: _strip_volatile(v)
+            for k, v in value.items()
+            if k not in _VOLATILE_FINGERPRINT_KEYS
+        }
+    if isinstance(value, list):
+        return [_strip_volatile(v) for v in value]
+    return value
+
+
 def compute_state_fingerprint(summary: Any) -> str:
-    """Deterministic sha256 over a JSON-serializable payload.
+    """Deterministic sha256 over the simulation state of a payload.
+
+    Volatile host/timing keys (see :data:`_VOLATILE_FINGERPRINT_KEYS`) are
+    stripped recursively first, so wall-clock noise and absolute paths never
+    enter the hash — two identical-seed runs on the same commit produce the
+    same fingerprint, even on different machines.
 
     ``sort_keys=True`` makes the hash invariant under dict iteration order.
     ``default=str`` is a last-resort serializer for stray dataclasses or
@@ -152,7 +194,7 @@ def compute_state_fingerprint(summary: Any) -> str:
     types we don't recognize. Keep summary payloads to plain JSON types
     when you want cross-process bit-identity.
     """
-    canonical = json.dumps(summary, sort_keys=True, default=str)
+    canonical = json.dumps(_strip_volatile(summary), sort_keys=True, default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 

@@ -69,6 +69,25 @@ def test_state_fingerprint_changes_on_value_change():
     assert compute_state_fingerprint(base) != compute_state_fingerprint(diff)
 
 
+def test_state_fingerprint_ignores_volatile_keys():
+    # Same simulation state, different wall-clock/host noise → same hash.
+    # This is what makes a fingerprint a reproducible, citable identity.
+    a = {"tick": 100, "n_alive": 5, "tps": 19.84, "wall_clock_s": 16.1,
+         "manifest_path": "/home/alice/genesis/run.json"}
+    b = {"tick": 100, "n_alive": 5, "tps": 12.07, "wall_clock_s": 27.9,
+         "manifest_path": "C:\\Users\\bob\\genesis\\run.json"}
+    assert compute_state_fingerprint(a) == compute_state_fingerprint(b)
+
+
+def test_state_fingerprint_strips_volatile_keys_at_depth():
+    a = {"summary": {"n_alive": 5, "tps": 1.0}, "epidemic": {"r0": 0.75}}
+    b = {"summary": {"n_alive": 5, "tps": 99.0}, "epidemic": {"r0": 0.75}}
+    assert compute_state_fingerprint(a) == compute_state_fingerprint(b)
+    # but a real observable still moves the hash
+    c = {"summary": {"n_alive": 6, "tps": 1.0}, "epidemic": {"r0": 0.75}}
+    assert compute_state_fingerprint(a) != compute_state_fingerprint(c)
+
+
 class _FakeWorld:
     """Minimal stand-in for engine.world_builder.World — same .summary()
     surface, no dependencies."""
