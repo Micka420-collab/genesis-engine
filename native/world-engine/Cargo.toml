@@ -23,6 +23,7 @@ members = [
     "crates/scenario",
     "crates/studio",
     "crates/macro-bridge",
+    "crates/geology",
 ]
 
 [workspace.package]
