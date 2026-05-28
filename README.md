@@ -286,7 +286,12 @@ Arborescence runtime détaillée : [`runtime/README.md`](runtime/README.md). Dé
 
 ## Déterminisme — règle d'or
 
-Même `(seed, config, région)` → même monde et même trajectoire. Validation par SHA-256 sur `world.summary()` (cf. `state_fingerprint`). Source unique d'aléa : `engine.core.prf_rng`. Les invariants moteur `I-1`…`I-4` ci-dessus sont gardés par des tests Rust **bloquants** en CI.
+Même `(seed, config, région)` → même monde et même trajectoire. Validation par SHA-256 sur `world.summary()` (cf. `state_fingerprint`). Source unique d'aléa : `engine.core.prf_rng`.
+
+Les invariants moteur `I-1`…`I-4` (cf. [`FALSIFIABILITY.md`](FALSIFIABILITY.md)) sont couverts par des tests Rust, mais leur niveau d'application en CI diffère aujourd'hui :
+
+- **`I-2`** (hash NaN-safe dans `worldgraph`) tourne dans le job **bloquant** `cargo test (core, biome, worldgraph)` — un échec casse la CI.
+- **`I-1`, `I-3`, `I-4`** (crates `streaming` / `agent-api`) tournent dans le job `cargo test (extended workspace)` actuellement marqué `continue-on-error: true` dans [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Ils sont donc **advisory** (un échec est rapporté mais ne casse pas la CI), en attendant la levée du `continue-on-error` après un `cargo test` vert local. Tant que ce flag est présent, ne pas les présenter comme garantis par la CI.
 
 ---
 

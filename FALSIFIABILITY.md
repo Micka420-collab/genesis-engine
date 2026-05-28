@@ -111,6 +111,19 @@ Failure of any I-* item is a **stop the world** event for the falsifiability
 ledger: every claim that relied on the substrate gets a `pending re-verification`
 note added until I-* passes again.
 
+**CI enforcement status (2026-05-28).** Not all four invariants are equally
+guarded yet. Only **I-2** runs in a blocking CI job (`cargo test -p genesis-core
+-p genesis-biome -p genesis-worldgraph`): a failure there fails the build.
+**I-1, I-3 and I-4** live in the `streaming` / `agent-api` crates, exercised by the
+`cargo test (extended workspace)` job, which is presently marked
+`continue-on-error: true` in [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+— a failure there is reported but does **not** fail the build. Until that flag is
+removed (after a green local `cargo test` on the streaming + agent-api crates),
+treat **I-1/I-3/I-4 as advisory, not CI-guaranteed**, and do not cite them in
+public claims as enforced by CI. This is itself a falsifiability obligation: the
+fix is to make the extended-workspace job blocking, not to soften the wording
+permanently.
+
 ---
 
 ## Process notes
