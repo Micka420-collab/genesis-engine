@@ -109,7 +109,11 @@ class IntegrationRiskyTests(unittest.TestCase):
         from engine.cognition import apply_decision, decide, perceive
 
         obs = perceive(sim.agents, 0, sim.streamer, tick=sim.tick)
-        obs.drives[int(DriveKind.THERMAL)] = 0.6
+        # Wave 55: `obs.drives` is now a tuple (immutable) for perf; replace
+        # via reassignment instead of indexed mutation.
+        drives = list(obs.drives)
+        drives[int(DriveKind.THERMAL)] = 0.6
+        obs.drives = tuple(drives)
         d = decide(sim.agents, obs, sim)
         self.assertEqual(int(d.action), int(ActionKind.BUILD))
         ev = apply_decision(sim.agents, 0, d, sim.streamer, sim.tick)

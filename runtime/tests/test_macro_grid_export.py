@@ -42,4 +42,6 @@ def test_genm_elevation_payload_size():
     raw = export_macro_grid_bytes(world)
     header = 4 + 4 + 4 + 4 + 4 + 8  # magic ver w h cell origin
     n = 4 * 4
-    assert len(raw) == header + n * 4 + n
+    # GENM v2 payload is `elev [f32;n] | temp [f32;n] | precip [f32;n] | biome [u8;n]`
+    # (see engine.macro_grid_export module docstring).
+    assert len(raw) == header + 3 * (n * 4) + n
