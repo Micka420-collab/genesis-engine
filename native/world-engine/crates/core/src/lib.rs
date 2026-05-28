@@ -15,7 +15,10 @@ pub mod tick;
 pub mod tick_domain;
 pub mod voxel;
 
-pub use coord::{ChunkCoord, LocalCoord, WorldCoord, CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z};
+pub use coord::{
+    ChunkCoord, LocalCoord, WorldCoord, CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z,
+    CHUNK_VOXEL_COUNT,
+};
 pub use coupler::{CouplerStep, DomainConfig, MultiRateCoupler};
 pub use prf::Prf;
 pub use seed::{SeedTree, WorldSeed};

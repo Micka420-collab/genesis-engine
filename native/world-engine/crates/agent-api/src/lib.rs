@@ -271,7 +271,12 @@ impl WorldView for WorldClient {
 
     fn voxel(&self, p: WorldCoord) -> Option<Voxel> {
         let shared = self.ensure_chunk_blocking(p.chunk());
-        Some(shared.read().voxel_at(p.local()))
+        // Bind the read guard explicitly so it drops before `shared` (the
+        // Arc) at end of function — newer Rust tail-expression drop scope
+        // rules otherwise trigger E0597. The other WorldView methods below
+        // already use this `let chunk = shared.read();` pattern; align.
+        let chunk = shared.read();
+        Some(chunk.voxel_at(p.local()))
     }
 
     fn biome(&self, p: WorldCoord) -> Option<Biome> {
