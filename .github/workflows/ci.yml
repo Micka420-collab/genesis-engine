@@ -130,6 +130,11 @@ jobs:
         working-directory: native/world-engine
         run: |
           pip install target/wheels/genesis_world-*.whl
+          # p73 imports engine.rust_bridge → numpy. The maturin-pybindings
+          # job sets up its own Python isolated from the main `python` job's
+          # env, so install runtime deps explicitly. Use the project's
+          # editable install (mirrors `make doctor`'s expectations).
+          pip install -e ../..
           PYTHONPATH=../../runtime python ../../runtime/scripts/p73_rust_worldgraph_smoke.py
 
   rust-scaffolding:
