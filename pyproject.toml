@@ -23,6 +23,11 @@ earth = [
 ]
 dev = [
   "pytest>=8",
+  # PIL (Pillow) is needed by the realism smoke suite — render_macro_with_atmosphere
+  # writes PNGs and p72/p78 assert their existence. world_render._save_png is a
+  # silent no-op if Pillow is missing, so without it the smokes pass internally
+  # but the file checks fail. Listing here keeps `make doctor` + CI honest.
+  "Pillow>=10",
 ]
 
 [tool.setuptools]
