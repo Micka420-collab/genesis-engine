@@ -7,6 +7,15 @@ pytest.importorskip("genesis_world", reason="run: cd native/world-engine/crates/
 
 import genesis_world as gw  # noqa: E402
 
+from engine.rust_bridge import is_canonical_pyworld  # noqa: E402
+
+if not is_canonical_pyworld(gw):
+    pytest.skip(
+        "Imported `genesis_world` is the legacy scaffolding/ge-py wheel, not the "
+        "canonical native build; run `make maturin-dev` to install it.",
+        allow_module_level=True,
+    )
+
 from engine.genesis_bootstrap import bootstrap_genesis_sim
 from engine.macro_grid_export import export_macro_grid_bytes
 from engine.sim import Simulation, SimConfig

@@ -1,6 +1,7 @@
 """Python ↔ Rust bridge — native ``genesis_world`` or Genesis-anchored mock."""
 from __future__ import annotations
 
+import warnings
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
@@ -9,6 +10,21 @@ from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 
 PIPELINE_LAYER = "Genesis-L0 Core"
 WORLD_MODEL_CAPABILITY = "paper-L1 Predictor"
+
+# Both the canonical `native/world-engine/pybindings` crate and the legacy
+# `scaffolding/ge-py` crate compile to a Python module literally named
+# `genesis_world`, so a stale legacy wheel can shadow the canonical build in
+# site-packages. They expose incompatible APIs (the legacy `observe_chunk`
+# requires a 3rd positional `cz`, and it lacks the mutation/snapshot surface),
+# which previously surfaced as a cryptic ``TypeError`` deep in the bridge.
+# Treat a module as the native backend only when it satisfies this contract.
+_CANONICAL_PYWORLD_API = (
+    "set_voxel",
+    "apply_pending",
+    "save_snapshot",
+    "restore_snapshot",
+)
+_warned_non_canonical = False
 
 
 class MockPyWorld:
@@ -86,13 +102,41 @@ class MockPyWorld:
         return int(h % 10)
 
 
+def is_canonical_pyworld(module: Any) -> bool:
+    """True when ``module`` exposes the canonical native ``PyWorld`` contract."""
+    pyworld = getattr(module, "PyWorld", None)
+    if pyworld is None:
+        return False
+    return all(hasattr(pyworld, name) for name in _CANONICAL_PYWORLD_API)
+
+
 def try_import_genesis_world() -> Tuple[Any, bool]:
-    """Return ``(module_or_mock, is_native)``."""
+    """Return ``(module_or_mock, is_native)``.
+
+    A module named ``genesis_world`` is accepted as the native backend only
+    when it satisfies the canonical ``PyWorld`` contract. A legacy ``ge-py``
+    wheel shadowing the name falls back to the API-compatible mock with a
+    one-time warning, rather than crashing the bridge downstream.
+    """
+    global _warned_non_canonical
     try:
         import genesis_world as gw  # type: ignore
-        return gw, True
     except ImportError:
         return MockPyWorld, False
+    if is_canonical_pyworld(gw):
+        return gw, True
+    if not _warned_non_canonical:
+        _warned_non_canonical = True
+        warnings.warn(
+            "Imported `genesis_world` lacks the canonical PyWorld API ("
+            + ", ".join(_CANONICAL_PYWORLD_API)
+            + ") — this is the legacy scaffolding/ge-py wheel shadowing the "
+            "native build. Falling back to the Genesis-anchored mock. Rebuild "
+            "the canonical wheel with `make maturin-dev`.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    return MockPyWorld, False
 
 
 def _macro_kwargs(genesis_world: Any = None,
@@ -204,6 +248,7 @@ def bridge_status(sim=None) -> Dict[str, Any]:
 
 __all__ = [
     "MockPyWorld",
+    "is_canonical_pyworld",
     "try_import_genesis_world",
     "create_py_world",
     "create_py_world_from_sim",
