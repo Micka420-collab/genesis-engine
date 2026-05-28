@@ -107,4 +107,9 @@ soit explicitement rejete (justification 1 ligne).
 | **X-Wing KEM hybride X25519 x ML-KEM-768** | Platform | draft-ietf-mls-pq-ciphersuites + Cloudflare PQC TLS | un seul KEM standardise pour TLS / gRPC future-proof | conditionne a la sortie d'un endpoint reseau Genesis (~4h une fois necessaire) |
 | **Neo4j Native Vector Type** | Observatory | neo4j.com/blog (mai 2026) | vecteurs natifs sans helpers, contraintes de shape/dtype | conditionne au deploiement Neo4j (Observatory Phase 5+) |
 | **AgentSociety / Synthetic Social Graph** | Social | arxiv 2502.08691 + 2604.27271 | metriques d'emergence (cohesion + divergence) | **INTEGRE Wave 13 (2026-05-17)** -- `engine.social_resonance` |
+| **AI Metropolis Out-of-Order Execution** | Agentic | arxiv 2411.03519 (veille 2026-05-28) | parallelisme tick LLM tier-2 par detection de fausses dependances inter-agents | conditionne a l'activation Phase 5 LLM tier-2 (~5h une fois LLM actif) |
+| **Project Sid civilization benchmark** | Social | arxiv 2411.00114 (veille 2026-05-28) | comparaison externe metriques emergence (specialisation roles, transmission culturelle) | document `docs/benchmarks/PROJECT-SID.md` a programmer (~3h) |
+| **Collusion / conformity observer** | Social | arxiv 2603.27771v2 (veille 2026-05-28) | detection emergence collusion-like / conformity sous contrainte ressources | overlap Wave 13 `social_resonance` -- a ouvrir si delta mesurable (~4h) |
+
+Toutes les veilles matinales sont archivees dans [`docs/veille/`](docs/veille/).
 
