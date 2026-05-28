@@ -31,10 +31,14 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod chemical;
 pub mod mineral;
 pub mod rock;
 pub mod visual;
 
+pub use chemical::{
+    emission_at, emission_for_mineral, intensity_at, ChemicalEmission, SignalKind,
+};
 pub use mineral::{Mineral, MineralDeposit, MINERAL_COUNT};
 pub use rock::{RockType, ROCK_TYPE_COUNT};
 pub use visual::{
