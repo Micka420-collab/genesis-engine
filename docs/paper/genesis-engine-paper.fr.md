@@ -309,10 +309,119 @@ comme résultat tant qu'une exécution préenregistrée ne l'a pas validé sur �
 5. **Construction de niche bidirectionnelle.** L'activité des agents (feu, agriculture,
    urbanisation) altère le substrat, qui à son tour exerce une pression sélective sur les
    agents.
+6. **L'incarnation comme voie vers une émergence plus forte.** Ancrer les agents dans une
+   physique terrestre suffisamment complète (gravité, thermodynamique, hydrologie, climat,
+   biologie) sous des contraintes analogues à celles de la Terre — *en remplaçant la
+   fitness externe par une viabilité intrinsèque* — augmente l'autonomie mesurable des
+   agents et la nouveauté ouverte par rapport à une base de référence pilotée par
+   récompense scénarisée. (Développé en §8.3 ; l'expérience phénoménale / la sentience est
+   explicitement **hors champ**.)
 
 ---
 
-## 8. Comment reproduire
+## 8. Positionnement épistémologique : vie artificielle faible contre forte
+
+Cette section situe le projet par rapport à la distinction fondatrice faible/forte en vie
+artificielle (VA) et par rapport à l'objection philosophique permanente à la VA « forte »,
+puis énonce — honnêtement et de façon falsifiable — le pari du projet sur l'incarnation
+profonde.
+
+### 8.1 La distinction faible/forte et le verrou de la clôture sémantique
+
+Suivant la définition fondatrice de Langton et les *Sciences de l'artificiel* de Simon, le
+domaine sépare la VA **faible** (des simulations qui *imitent* la dynamique des systèmes
+vivants pour étudier « la vie telle qu'elle pourrait être ») de la VA **forte**
+(l'affirmation plus forte selon laquelle les propriétés nécessaires et suffisantes de la
+vie sont *purement formelles*, de sorte qu'un substrat informatique peut non seulement
+simuler mais *instancier* un système réellement vivant).
+
+Une objection ancienne — affinée par le principe de **clôture sémantique** de Pattee et
+formulée pour la VA par Tournay (2003) — vise directement l'affirmation forte. Les systèmes
+vivants reposent sur une interdépendance circulaire entre un niveau *dynamique/fonctionnel*
+(p. ex. les protéines) et un niveau *symbolique/informationnel* (p. ex. les acides
+nucléiques), chacun constituant l'autre. Tout encodage informatique de la dualité
+génotype/phénotype, dit l'objection, réduit celle-ci à « un niveau unique de signes
+dépourvus de dynamiques intrinsèques », et — de façon décisive — les configurations
+comptées comme *fonctionnelles* sont le sous-ensemble qui paraît fonctionnel **pour un
+observateur donné**. Le sens est imposé de l'extérieur plutôt que généré par le système.
+Selon Canguilhem, la vie est une activité **normative** : elle institue son propre milieu
+et sa propre frontière de viabilité ; un mécanisme, non.
+
+### 8.2 Où se situe honnêtement Genesis Engine
+
+Genesis Engine est sans ambiguïté un **appareil de VA faible, à base d'agents** : la
+physique est codée en dur ; seule la culture doit émerger. Il n'instancie pas — et la
+science actuelle ne peut l'en rendre capable — de vie artificielle forte. Ce qu'il apporte
+est précisément un antidote au mode d'échec que prédit l'objection. De Tournay (2003) à
+l'ère des *foundation models*, le problème persistant du domaine est *qui décide qu'un motif
+est vivant ou intéressant ?* — et l'état de l'art **automatise souvent l'observateur** au
+lieu de le supprimer (p. ex. ASAL utilise un modèle vision-langage comme juge du caractère
+vivant). Le déterminisme du projet, ses empreintes SHA-256 par exécution et son registre de
+falsifiabilité préenregistré sont un remède partiel à cette relativité à l'observateur :
+une affirmation d'émergence doit franchir un seuil quantitatif sur ≥ 3 graines et se
+reproduire bit à bit, indépendamment du jugement a posteriori d'un humain selon lequel « ça
+a l'air vivant ».
+
+### 8.3 L'hypothèse de l'incarnation (feuille de route vers une émergence plus forte)
+
+Le pari à long terme du projet — et la voie computationnelle la plus défendable vers une
+émergence *plus forte* — est l'**incarnation profonde** : recréer un monde terrestre
+suffisamment complet (gravité, thermodynamique, hydrologie, climat, géologie, biologie)
+sous les mêmes contraintes qui ont façonné la vie terrestre, de sorte que les besoins, les
+perceptions et les actions d'un agent soient ancrés dans cette physique plutôt que dans des
+récompenses fournies par le concepteur. Ceci est cohérent avec la tradition de la cognition
+énactive / incarnée (Varela, Thompson, Rosch), pour laquelle le sens et la cognition
+naissent du couplage incarné d'un système autonome avec son environnement. L'encouragement
+empirique complémentaire est le résultat d'Agüera y Arcas et al. (2024) : des auto-
+répliquants émergent **sans aucune fonction de fitness** à partir de programmes aléatoires
+— preuve que l'organisation de type vivant peut être un *attracteur* dynamique plutôt
+qu'une cible conçue.
+
+Nous l'énonçons comme une **hypothèse, non comme un résultat**, et nous sommes explicites
+sur ses limites :
+
+- **H-incarnation (forme falsifiable).** Augmenter la fidélité et la clôture du substrat
+  incarné, *tout en supprimant la fitness externe pour la remplacer par une viabilité
+  intrinsèque* (auto-maintien de type homéostasie / empowerment), augmente l'autonomie
+  mesurable des agents et leur individuation (métriques d'open-endedness et de croissance de
+  complexité indépendantes de l'observateur) par rapport à une base de référence pilotée par
+  récompense scénarisée, sur ≥ 3 graines.
+- **Ce que l'incarnation ne règle pas.** Ajouter gravité et biologie à un substrat
+  *informatique* ne dissout pas à lui seul l'objection de clôture sémantique de Pattee : le
+  génome doit être matériellement couplé à — et réinscriptible par — la dynamique propre de
+  l'agent, et non lu une fois comme un vecteur de paramètres statique. Refermer cette boucle
+  information↔dynamique est le travail théorique profond, pas la seule construction du monde.
+- **Hors champ par construction.** Savoir si un tel agent *ressentirait* quelque chose
+  (« comme un humain, de l'intérieur ») relève du problème difficile de la conscience ; ce
+  n'est **pas** mesurable par cet appareil et c'est donc exclu de toute affirmation
+  falsifiable. Genesis Engine peut tester l'autonomie, la normativité et la nouveauté
+  ouverte — des indicateurs d'une vie *plus forte* — mais il ne peut trancher la question de
+  la sentience.
+
+### 8.4 Leviers concrets (par ordre de défendabilité scientifique)
+
+1. **Supprimer la fitness externe** partout où la survie/reproduction peut au contraire être
+   une conséquence d'un budget énergie/métabolisme émergent (la leçon BFF).
+2. **Sens intrinsèque** : remplacer les récompenses du concepteur par des objectifs
+   auto-générés — homéostasie, empowerment, une frontière de viabilité auto-définie
+   (normativité de Canguilhem).
+3. **Refermer la boucle information↔dynamique** : plonger le génome 256-D dans la dynamique
+   de l'agent afin qu'il soit lu *et réécrit* par le comportement, approchant la clôture
+   sémantique plutôt qu'une consultation unique.
+4. **Métriques d'open-endedness indépendantes de l'observateur** : ajouter des mesures de
+   nouveauté / croissance de complexité qui ne dépendent pas de seuils choisis par le
+   concepteur.
+5. **Inverser ASAL** : utiliser un foundation model comme *explorateur* de configurations
+   surprenantes, tandis que le registre de falsifiabilité reste le garde-fou contre une
+   « vie » décidée par l'observateur.
+6. **Couche origine-de-la-vie** : laisser des protocellules / répliquants *émerger* d'une
+   chimie plutôt que de semer des fondateurs — en appliquant le résultat BFF au substrat
+   Genesis. C'est la seule voie qui rapprocherait Genesis Engine de l'extrémité *forte* du
+   spectre.
+
+---
+
+## 9. Comment reproduire
 
 ```bash
 git clone https://github.com/Micka420-collab/genesis-engine.git
@@ -332,7 +441,7 @@ l'exécution, puis consignez le résultat dans `FALSIFIABILITY.md`.
 
 ---
 
-## 9. Conclusion et appel à collaboration
+## 10. Conclusion et appel à collaboration
 
 La contribution de Genesis Engine est un *appareil épistémique* : un monde déterministe,
 ancré sur la Terre, dans lequel l'émergence à l'échelle d'une civilisation peut être
@@ -363,8 +472,17 @@ ne peut être réfutée n'est pas un résultat — alors venez essayer de réfut
 8. J. A. Tainter, *The Collapse of Complex Societies*, 1988.
 9. S. Wright, « Coefficients of inbreeding and relationship », *The American Naturalist*, 1922.
 10. W. Köppen, « Das geographische System der Klimate », 1936.
+11. C. G. Langton, « Artificial Life », dans *Artificial Life* (SFI Studies VI), Addison-Wesley, 1989.
+12. H. A. Simon, *Les Sciences de l'artificiel*, 1969 (trad. fr. Gallimard, 2004).
+13. H. H. Pattee, « The physics of symbols: bridging the epistemic cut », *BioSystems*, 2001.
+14. V. Tournay, « La vie artificielle. Entre vie naturelle et système technique », *Cités* 15, PUF, 2003.
+15. F. J. Varela, E. Thompson & E. Rosch, *L'Inscription corporelle de l'esprit*, Seuil, 1993 (éd. orig. *The Embodied Mind*, MIT Press, 1991).
+16. G. Canguilhem, *Le normal et le pathologique*, PUF, 1966.
+17. A. Kumar et al., « Automating the Search for Artificial Life with Foundation Models » (ASAL), *Artificial Life* / arXiv:2412.17799, 2024.
+18. B. Agüera y Arcas et al., « Computational Life: How Well-formed, Self-replicating Programs Emerge from Simple Interaction », arXiv:2406.19108, 2024.
+19. E. Hughes et al., « Open-Endedness is Essential for Artificial Superhuman Intelligence », *ICML* / arXiv:2406.04268, 2024.
 
 *Ce document fait partie du dépôt Genesis Engine et est versionné aux côtés du code qu'il
 décrit. Les empreintes et les décomptes sont valides à la date du commit référencé dans le
-dépôt au moment de la publication ; réexécutez les commandes de la §8 pour vérifier par
+dépôt au moment de la publication ; réexécutez les commandes de la §9 pour vérifier par
 rapport à l'arbre courant.*
