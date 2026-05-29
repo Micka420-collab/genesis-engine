@@ -48,7 +48,7 @@ Détail des **Waves 16–41** (genesis, tectonique, climat, NCA, settlements, ro
 | Dimension | % | Piste principale |
 |-----------|---|------------------|
 | Climat / biomes | 80 | GraphCast-lite + colonne 3D + circulation L1 + vent 2D |
-| Géologie / relief | 58 | Tectonique live, stratigraphie + datation relative (superposition, âges émergents) |
+| Géologie / relief | 61 | Tectonique live, stratigraphie + datation relative ; **Wave 50 cryoclastie** (FCI Walder & Hallet, permafrost / talus / alpine actifs) |
 | Écologie / hydrologie | 70 | `hydrology_mode` sv1d ; Earth Console overlay flux ; **Wave 49 quantification réseau** (Strahler + Horton + drainage density) |
 | Sociétés / agents | 76 | NEAT + construction émergente + memetic + `/api/audio` |
 | Rendu visuel | 82 | Globe + iso 2.5D + humains + ombres + 2D lite |
