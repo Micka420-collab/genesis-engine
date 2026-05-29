@@ -1,10 +1,90 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 18 mai 2026 (session 34 — Waves 16 → 41 + atmosphère temporelle).
+**Dernière mise à jour :** 29 mai 2026 (session 49 — Wave 49 watershed observer : Strahler + Horton + drainage density).
 
 > **Synthèse contributeur** (phases, réalisme **~76 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré session 49 (2026-05-29) — Wave 49 watershed observer
+
+**Motivation (gap hydrologie 68 %).** La veille du jour
+([`docs/veille/2026-05-29_VEILLE.md`](docs/veille/2026-05-29_VEILLE.md))
+identifiait *bassins versants* comme cible du palier suivant en
+hydrologie. Wave 49 prend l'angle quantification émergente : on exploite
+le graphe D8 déjà émergent (`flow_dir`, `flow_acc`, `river_mask`,
+`watershed_id` de `engine.world_genesis`) pour fournir les mesures
+géomorphologiques classiques sans nouveau substrat physique. L'érosion
+GPU compute (DÉCOUVERTE_2 de la veille) reste backlog pour Wave 50, en
+sprint dédié.
+
+**Mesures (toutes émergentes, aucune ontologie scriptée) :**
+
+```
+Strahler stream order (1957)  → ordre topologique sur D8 restreint
+                                aux cellules river_mask, via Kahn.
+Horton ratios (1932-1957)     → Rb = N_k / N_{k+1}      bifurcation
+                                Rl = L̄_{k+1} / L̄_k       longueur
+Drainage density              → Dd = L_river / A_basin   (km / km²)
+                                global + par bassin
+Hypsometric integral          → (mean − min) / (max − min) ∈ [0,1]
+                                proxy stade d'érosion par bassin
+```
+
+**Livré :**
+
+- `runtime/engine/watershed_observer.py` (~420 LOC) :
+  * `WatershedConfig`, `BasinStats`, `WatershedSnapshot`,
+    `WatershedHistory`, `WatershedState` (frozen dataclasses).
+  * `compute_strahler_order(flow_dir, river_mask)` pure-function,
+    Kahn topologique row-major déterministe.
+  * `compute_horton_ratios(stream_order, flow_dir, river_mask, cell_km)`
+    pure-function → (Rb, Rl, counts, lengths).
+  * `observe_watersheds(sim)` read-only, signature SHA-256 canonique.
+  * `install_watershed_observer / uninstall_watershed_observer`
+    idempotents, wrap unique de `sim.step`.
+  * `watershed_summary(sim)` reporter dashboard.
+
+- `runtime/scripts/p118_watershed_smoke.py` — **10/10 PASS** dont :
+  * step 2 : chaîne droite → ordre 1 partout (8/8 cellules)
+  * step 3 : Y-confluence → ordre 2 au stem (junction + outlet)
+  * step 6 : déterminisme cross-sim (signature byte-identical)
+  * step 7 : sur monde réel (res=64, threshold=8) **Rb=6.63, Rl=0.52**
+  * step 8 : drainage density positive (Dd=0.0006 km/km² global)
+  * step 9 : install idempotent / uninstall restaure step
+
+- `runtime/tests/test_watershed_observer.py` — **17/17** verts.
+
+**Run réel (sim seed 0xCAFE_01184, res=64, threshold=8.0) :**
+
+```
+river_cells              : 206
+total_river_length_km    : 10 064
+n_basins_total           : 773  (154 ≥ 4 cells)
+global_drainage_density  : 0.0006 km/km²
+stream_order_counts      : {1: 179, 2: 27}
+top basin                : #247  area=160 156 km²  Strahler=2
+                                  river=640 km  Dd=0.0040 km/km²
+                                  hypso=0.354
+```
+
+**Non-régression : 217 pytest verts, 0 fail, 1 skip.**
+
+Voir [`docs/sprints/2026-05-29_Wave49_watershed_observer.md`](docs/sprints/2026-05-29_Wave49_watershed_observer.md).
+
+---
+
+## ⏭️ Backlog priorisé (veille 2026-05-29)
+
+| Piste | Wave cible | Effort | Risque | Note |
+|-------|-----------|--------|--------|------|
+| Érosion GPU compute shallow-water | 50 | L | Moyen-élevé | Gap géologie principal (55 %). Crate `genesis-gpu` + WGSL kernels. |
+| PyO3 free-threading + maturin | 51 | M | Moyen | Hot path Rust no-GIL. Conditionné migration ABI. |
+| ASAL novelty observer (VLM) | 52 | M | Moyen | Métrique « intéressant » alignée perception humaine. Hors hot path. |
+| WebGPU Earth Console (Three.js r171+) | 53 | S | Faible | Compute client + densité agents. Fallback WebGL nécessaire. |
+| Downscaling diffusion km-scale (CPMGEM) | post-Phase 5 | L | Élevé | Demande données d'entraînement, coût inférence. |
 
 ---
 

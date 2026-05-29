@@ -1,7 +1,7 @@
 # Roadmap réalisme Terre — Genesis Engine
 
 **Source de vérité** pour tous les pourcentages « réalisme Terre » du dépôt.  
-**Dernière mise à jour :** 29 mai 2026 (Wave 48 — datation relative / chronostratigraphie : loi de superposition émergente).
+**Dernière mise à jour :** 29 mai 2026 (Wave 49 — quantification réseau hydro émergent : Strahler + Horton + drainage density).
 
 ---
 
@@ -14,7 +14,7 @@
 | **~76 %** | **Moyenne des 7 dimensions** ci-dessous (référence unique) |
 
 **Recalcul transparent :**  
-(80 + 58 + 68 + 76 + 82 + 86 + 82) ÷ 7 = **76,0 %** → arrondi **~76 %**.
+(80 + 58 + 70 + 76 + 82 + 86 + 82) ÷ 7 = **76,3 %** → arrondi **~76 %** (Hydrologie 68 → 70 après Wave 49, palier *quantification* atteint ; le saut « biogeochimie + bassins versants complets » reste pour 75 % et +).
 
 > L’objectif **80 % global** (simulation « publication-grade ») reste une **cible** : il faudrait NWP 3D, hydrologie bassin complet, géologie dynamique GPU, et WorldGraph Rust en hot path production.
 
@@ -26,7 +26,7 @@
 |-----------|---|---------------|---------------|
 | Climat / biomes | **80** | Circulation L1 + colonne 3D + GraphCast-lite prior + vent 2D | NWP 3D numérique, validation Beck 2018 |
 | Géologie / relief | **58** | Tectonique live + stratigraphie + **datation relative** (loi de superposition, âges émergents `age_ma`) | Érosion GPU dynamique, **datation absolue** (radiométrie) |
-| Écologie / hydrologie | **68** | Earth Console `sv1d` + overlay flux 2D ; cross-chunk près des agents | Biogeochimie, bassins versants complets |
+| Écologie / hydrologie | **70** | Earth Console `sv1d` + overlay flux 2D ; cross-chunk près des agents ; **Wave 49 quantification réseau** (Strahler order, Horton Rb/Rl, drainage density par bassin, intégrale hypsométrique) | Biogeochimie, bassins versants dynamiques, érosion GPU |
 | Sociétés / agents | **76** | NEAT + latent_action ; memetic + lexique ; construction émergente ; parole `/api/audio` | `ActionKind` encore enum ; pas de LLM tier-2 |
 | Rendu visuel | **82** | Earth Console globe + iso 2.5D + humains + ombres soleil + 2D lite | Volumétrique GPU, photoréalisme |
 | Observation IA | **86** | Earth Console SSE + replay JSONL + observer_feed + WebGPU agents | Fog-of-war mmap Rust, multi-tenant |
@@ -53,6 +53,7 @@
 | Parole agents → SoundField | ✅ | `speech_audio_bridge.py`, `/api/audio`, `/api/languages` |
 | GraphCast-lite + prior monde | ✅ | `deepmind_world_prior.py` |
 | Datation relative (chronostratigraphie, superposition) | ✅ | `geology.py` (`age_ma`, `stratigraphic_chronology`, `superposition_ok`), smoke `p34` |
+| Watershed observer (Strahler + Horton + drainage density) | ✅ | `watershed_observer.py`, smoke `p118`, tests `test_watershed_observer.py` |
 | Köppen FAIR + MultiRateCoupler | ✅ | `koeppen_grid.py`, `multi_rate_coupler.py` |
 | Pont Rust GENM + write-back | ✅ | `macro-bridge`, `macro_grid_export.py` |
 

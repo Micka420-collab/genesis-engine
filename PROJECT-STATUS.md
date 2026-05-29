@@ -43,13 +43,13 @@ Détail des **Waves 16–41** (genesis, tectonique, climat, NCA, settlements, ro
 
 ## Réalisme Terre (grille scientifique)
 
-**Score global : ~76 %** (moyenne 7 dimensions). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
+**Score global : ~76 %** (moyenne 7 dimensions, recalcul 76,3 % après Wave 49). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
 
 | Dimension | % | Piste principale |
 |-----------|---|------------------|
 | Climat / biomes | 80 | GraphCast-lite + colonne 3D + circulation L1 + vent 2D |
 | Géologie / relief | 58 | Tectonique live, stratigraphie + datation relative (superposition, âges émergents) |
-| Écologie / hydrologie | 68 | `hydrology_mode` sv1d ; Earth Console overlay flux |
+| Écologie / hydrologie | 70 | `hydrology_mode` sv1d ; Earth Console overlay flux ; **Wave 49 quantification réseau** (Strahler + Horton + drainage density) |
 | Sociétés / agents | 76 | NEAT + construction émergente + memetic + `/api/audio` |
 | Rendu visuel | 82 | Globe + iso 2.5D + humains + ombres + 2D lite |
 | Observation IA | 86 | Earth Console SSE, replay, observer_feed, WebGPU |
