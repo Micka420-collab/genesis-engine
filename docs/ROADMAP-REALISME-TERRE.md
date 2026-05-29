@@ -1,7 +1,7 @@
 # Roadmap réalisme Terre — Genesis Engine
 
 **Source de vérité** pour tous les pourcentages « réalisme Terre » du dépôt.  
-**Dernière mise à jour :** 19 mai 2026 (post Earth Console : écoute, iso chantiers, monde autonome).
+**Dernière mise à jour :** 29 mai 2026 (Wave 48 — datation relative / chronostratigraphie : loi de superposition émergente).
 
 ---
 
@@ -14,7 +14,7 @@
 | **~76 %** | **Moyenne des 7 dimensions** ci-dessous (référence unique) |
 
 **Recalcul transparent :**  
-(80 + 55 + 68 + 76 + 82 + 86 + 82) ÷ 7 = **75,6 %** → arrondi **~76 %**.
+(80 + 58 + 68 + 76 + 82 + 86 + 82) ÷ 7 = **76,0 %** → arrondi **~76 %**.
 
 > L’objectif **80 % global** (simulation « publication-grade ») reste une **cible** : il faudrait NWP 3D, hydrologie bassin complet, géologie dynamique GPU, et WorldGraph Rust en hot path production.
 
@@ -25,7 +25,7 @@
 | Dimension | % | Justification | Gap vers 80 % |
 |-----------|---|---------------|---------------|
 | Climat / biomes | **80** | Circulation L1 + colonne 3D + GraphCast-lite prior + vent 2D | NWP 3D numérique, validation Beck 2018 |
-| Géologie / relief | **55** | Tectonique live + stratigraphie légère | Érosion GPU dynamique, datation absolue |
+| Géologie / relief | **58** | Tectonique live + stratigraphie + **datation relative** (loi de superposition, âges émergents `age_ma`) | Érosion GPU dynamique, **datation absolue** (radiométrie) |
 | Écologie / hydrologie | **68** | Earth Console `sv1d` + overlay flux 2D ; cross-chunk près des agents | Biogeochimie, bassins versants complets |
 | Sociétés / agents | **76** | NEAT + latent_action ; memetic + lexique ; construction émergente ; parole `/api/audio` | `ActionKind` encore enum ; pas de LLM tier-2 |
 | Rendu visuel | **82** | Earth Console globe + iso 2.5D + humains + ombres soleil + 2D lite | Volumétrique GPU, photoréalisme |
@@ -52,6 +52,7 @@
 | Monde autonome (dynamo, plaques, construction émergente) | ✅ | `autonomous_world.py`, `emergent_construction.py` |
 | Parole agents → SoundField | ✅ | `speech_audio_bridge.py`, `/api/audio`, `/api/languages` |
 | GraphCast-lite + prior monde | ✅ | `deepmind_world_prior.py` |
+| Datation relative (chronostratigraphie, superposition) | ✅ | `geology.py` (`age_ma`, `stratigraphic_chronology`, `superposition_ok`), smoke `p34` |
 | Köppen FAIR + MultiRateCoupler | ✅ | `koeppen_grid.py`, `multi_rate_coupler.py` |
 | Pont Rust GENM + write-back | ✅ | `macro-bridge`, `macro_grid_export.py` |
 
@@ -62,7 +63,7 @@
 1. **CI maturin** : wheel + smoke verts → monter WorldGraph en prod.
 2. **Köppen** : validation 50 stations (Beck 2018).
 3. **Hydrologie** : LBM 2D ou D8 accumulation cross-macro.
-4. **Géologie** : érosion GPU + datation relative.
+4. **Géologie** : datation relative ✅ (Wave 48) → reste **érosion GPU** + **datation absolue** (radiométrie).
 5. **Observation** : fog mmap Rust ; reste JSONL live ✅.
 
 **Earth Console (live) :**

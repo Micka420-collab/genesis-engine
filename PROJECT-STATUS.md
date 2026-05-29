@@ -1,6 +1,6 @@
 # Genesis Engine — État du projet
 
-**Dernière mise à jour :** 19 mai 2026  
+**Dernière mise à jour :** 29 mai 2026  
 **Synthèse courte** pour contributeurs et reviewers GitHub. Pour le détail session par session, voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md).
 
 ---
@@ -48,7 +48,7 @@ Détail des **Waves 16–41** (genesis, tectonique, climat, NCA, settlements, ro
 | Dimension | % | Piste principale |
 |-----------|---|------------------|
 | Climat / biomes | 80 | GraphCast-lite + colonne 3D + circulation L1 + vent 2D |
-| Géologie / relief | 55 | Tectonique live, stratigraphie légère |
+| Géologie / relief | 58 | Tectonique live, stratigraphie + datation relative (superposition, âges émergents) |
 | Écologie / hydrologie | 68 | `hydrology_mode` sv1d ; Earth Console overlay flux |
 | Sociétés / agents | 76 | NEAT + construction émergente + memetic + `/api/audio` |
 | Rendu visuel | 82 | Globe + iso 2.5D + humains + ombres + 2D lite |
