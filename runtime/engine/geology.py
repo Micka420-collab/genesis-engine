@@ -13,6 +13,18 @@ realistic stratigraphic principles :
   - **Igneous bedrock** (200+ m) — granite or basalt baseline. Deep
     mining hits metamorphic gneiss in mountain biomes.
 
+Relative dating (Wave 48)
+-------------------------
+Each layer carries an emergent ``age_ma`` (millions of years) derived
+*deterministically from the column geometry itself* — never scripted.
+Ages obey the **law of superposition** : walking top→bottom the age is
+monotonically non-decreasing. Unconsolidated soil/regolith stay
+Quaternary-young, sedimentary cover accumulates at a rock-type
+deposition rate (m per Ma), and igneous / metamorphic basement floors
+to crustal ages with per-chunk ``prf_rng`` jitter. This gives the
+geology dimension a verifiable chronostratigraphy (oldest unit, span,
+superposition invariant) without adding any imperative timeline.
+
 Ore deposits are seeded inside layers based on the mineral's
 ``biome_affinity``, ``elevation_bias``, depth range, and chunk seed.
 Each layer carries a ``Dict[mineral_name → mass_fraction]`` describing
@@ -80,6 +92,35 @@ DENSITY_METAMORPHIC = 2850.0
 # can't drain a layer instantly — agents must mine repeatedly.
 MAX_EXTRACT_KG_PER_CALL = 50.0
 
+# ---------------------------------------------------------------------------
+# Relative dating (Wave 48) — chronostratigraphy constants
+# ---------------------------------------------------------------------------
+
+# Effective accumulation rate per rock type (metres of preserved column
+# per million years). Lower rate ⇒ a given thickness represents *more*
+# time. Unconsolidated cover accumulates fast (stays young) ; lithified
+# sediments preserve far less per Ma once hiatuses + compaction are
+# folded in. Values are order-of-magnitude geological, not precise.
+ROCK_DEPOSITION_M_PER_MA: Dict[str, float] = {
+    "shale": 80.0,        # topsoil proxy / fine clastics
+    "sandstone": 60.0,    # regolith proxy / coarse clastics
+    "limestone": 3.0,     # slow carbonate platform accumulation
+}
+
+# Crustal "floor" age (Ma) assigned to igneous / metamorphic basement
+# units before per-chunk jitter. Superposition still enforced on top.
+BASEMENT_AGE_MA: Dict[str, float] = {
+    "basalt": 200.0,      # younger volcanic / oceanic-style basement
+    "granite": 540.0,     # continental crystalline basement (Phanerozoic+)
+    "gneiss": 1100.0,     # deep metamorphic core — Precambrian
+}
+
+# Cap so unconsolidated soil/regolith stays Quaternary (≤ 2.6 Ma).
+QUATERNARY_CAP_MA = 2.6
+# Minimum age increment between successive layers (keeps superposition
+# strictly readable even when two units are geologically close).
+MIN_SUPERPOSITION_STEP_MA = 0.05
+
 
 @dataclass
 class StrataLayer:
@@ -93,6 +134,9 @@ class StrataLayer:
     ore_mix: Dict[str, float] = field(default_factory=dict)
     # Mass budget that mining has already drained from this layer (kg).
     extracted_kg: float = 0.0
+    # Emergent formation age (Ma) — see _assign_layer_ages. Obeys the law
+    # of superposition (non-decreasing top→bottom). 0.0 until assigned.
+    age_ma: float = 0.0
 
     def thickness_m(self) -> float:
         return self.depth_bottom_m - self.depth_top_m
@@ -198,6 +242,78 @@ def _select_ore_mix(rng, biome: int, elevation_m: float,
     return selected
 
 
+def _assign_layer_ages(rng, layers: List[StrataLayer]) -> None:
+    """Assign an emergent ``age_ma`` to each layer in place.
+
+    Relative dating from the column geometry — *no scripted timeline*.
+    Walking top→bottom we accumulate elapsed time:
+
+      * **Unconsolidated / sedimentary** units add
+        ``thickness / deposition_rate`` Ma (older toward the bottom).
+        Soil + regolith are capped to the Quaternary.
+      * **Igneous / metamorphic** basement floors to a crustal age
+        (``BASEMENT_AGE_MA``) with a small per-chunk ``prf_rng`` jitter,
+        but never younger than the unit directly above it.
+
+    The **law of superposition** is enforced as a hard invariant: each
+    layer's age is ``>=`` the previous layer's age + a minimum step.
+    """
+    clock = 0.0          # running depositional clock (bottom of last unit)
+    prev_reported = -1.0  # last layer's reported age (superposition floor)
+    for layer in layers:
+        rock = layer.rock_type
+        if rock in BASEMENT_AGE_MA:
+            # Crystalline / metamorphic basement: floor to a crustal age
+            # plus +/- 8 % deterministic jitter from the chunk RNG.
+            base = BASEMENT_AGE_MA[rock]
+            jitter = 1.0 + (rng.random() - 0.5) * 0.16
+            age = base * jitter
+            # Deeper basement (greater top depth) skews slightly older.
+            age += layer.depth_top_m * 0.02
+            clock = max(clock, age)
+        else:
+            # Accumulating cover: time = thickness / deposition rate.
+            rate = ROCK_DEPOSITION_M_PER_MA.get(rock, 50.0)
+            elapsed = layer.thickness_m() / max(rate, 1e-6)
+            # Mid-point age is what we report for the unit.
+            age = clock + elapsed * 0.5
+            # Young unconsolidated cover stays Quaternary.
+            if layer.depth_bottom_m <= 5.5:
+                age = min(age, QUATERNARY_CAP_MA)
+            # Advance the clock to the bottom of this unit.
+            clock = clock + elapsed
+        # Hard superposition invariant: never younger than the unit above.
+        if prev_reported >= 0.0:
+            age = max(age, prev_reported + MIN_SUPERPOSITION_STEP_MA)
+        layer.age_ma = round(age, 4)
+        prev_reported = layer.age_ma
+        clock = max(clock, layer.age_ma)
+
+
+def stratigraphic_chronology(g: "ChunkGeology") -> List[Dict[str, object]]:
+    """Ordered chronostratigraphy (shallow->deep) for one chunk column.
+
+    Returns a list of ``{rock_type, depth_top_m, depth_bottom_m,
+    age_ma}`` dicts. Pure read — handy for smokes and observation.
+    """
+    return [
+        {
+            "rock_type": L.rock_type,
+            "depth_top_m": L.depth_top_m,
+            "depth_bottom_m": L.depth_bottom_m,
+            "age_ma": L.age_ma,
+        }
+        for L in g.layers
+    ]
+
+
+def superposition_ok(g: "ChunkGeology") -> bool:
+    """True iff the column obeys the law of superposition (ages
+    non-decreasing with depth)."""
+    ages = [L.age_ma for L in g.layers]
+    return all(b >= a for a, b in zip(ages, ages[1:]))
+
+
 def _generate_layers(rng, biome: int, elevation_m: float) -> List[StrataLayer]:
     """Build the stratigraphic column appropriate for the chunk."""
     layers: List[StrataLayer] = []
@@ -278,6 +394,8 @@ def _generate_layers(rng, biome: int, elevation_m: float) -> List[StrataLayer]:
                                     max_minerals=3),
         ))
 
+    # Relative dating — assign emergent ages obeying superposition.
+    _assign_layer_ages(rng, layers)
     return layers
 
 
@@ -472,6 +590,15 @@ def geology_state(sim) -> Dict[str, object]:
     # Top minerals extracted globally.
     top = sorted(state.cumulative_extracted.items(),
                  key=lambda kv: -kv[1])[:8]
+    # Chronostratigraphy roll-up (relative dating, Wave 48).
+    oldest_age_ma = 0.0
+    superposition_clean = True
+    for g in state.chunks.values():
+        if g.layers:
+            oldest_age_ma = max(oldest_age_ma,
+                                max(L.age_ma for L in g.layers))
+        if not superposition_ok(g):
+            superposition_clean = False
     return {
         "n_chunks_with_geology": len(state.chunks),
         "total_layers": total_layers,
@@ -480,6 +607,8 @@ def geology_state(sim) -> Dict[str, object]:
                           for k, v in top],
         "cumulative_extracted_total_kg":
             round(sum(state.cumulative_extracted.values()), 2),
+        "oldest_layer_age_ma": round(oldest_age_ma, 3),
+        "superposition_ok": superposition_clean,
     }
 
 
@@ -503,7 +632,8 @@ def save_geology_state(sim, target_dir: str) -> bool:
                      "rock_type": L.rock_type,
                      "density_kg_m3": L.density_kg_m3,
                      "ore_mix": L.ore_mix,
-                     "extracted_kg": L.extracted_kg}
+                     "extracted_kg": L.extracted_kg,
+                     "age_ma": L.age_ma}
                     for L in g.layers
                 ],
             }
@@ -539,7 +669,8 @@ def load_geology_state(sim, target_dir: str) -> bool:
                 rock_type=str(L["rock_type"]),
                 density_kg_m3=float(L["density_kg_m3"]),
                 ore_mix={str(k): float(v) for k, v in L.get("ore_mix", {}).items()},
-                extracted_kg=float(L.get("extracted_kg", 0.0)))
+                extracted_kg=float(L.get("extracted_kg", 0.0)),
+                age_ma=float(L.get("age_ma", 0.0)))
             for L in d.get("layers", [])
         ]
         g = ChunkGeology(
@@ -560,8 +691,11 @@ __all__ = [
     "DENSITY_TOPSOIL", "DENSITY_REGOLITH", "DENSITY_SEDIMENT",
     "DENSITY_IGNEOUS", "DENSITY_METAMORPHIC",
     "MAX_EXTRACT_KG_PER_CALL",
+    "ROCK_DEPOSITION_M_PER_MA", "BASEMENT_AGE_MA",
+    "QUATERNARY_CAP_MA", "MIN_SUPERPOSITION_STEP_MA",
     "install_geology", "chunk_geology", "generate_chunk_geology",
     "mine_at",
     "geology_state",
+    "stratigraphic_chronology", "superposition_ok",
     "save_geology_state", "load_geology_state",
 ]

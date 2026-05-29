@@ -37,7 +37,8 @@ from engine.earth_streamer import (attach_earth_loader,     # noqa: E402
                                    attach_land_filter)
 from engine.geology import (                                # noqa: E402
     install_geology, chunk_geology, mine_at,
-    geology_state, save_geology_state, load_geology_state)
+    geology_state, save_geology_state, load_geology_state,
+    stratigraphic_chronology, superposition_ok)
 from engine.mineral_catalog import (                        # noqa: E402
     MINERALS, MINERAL_BY_NAME, all_mineral_names, audit_biome_ids)
 
@@ -99,7 +100,22 @@ def main() -> int:
             ores = ", ".join(f"{k} {v*100:.2f}%"
                              for k, v in L.ore_mix.items()) or "(barren)"
             print(f"          {L.depth_top_m:6.1f} – {L.depth_bottom_m:6.1f} m "
-                  f"{L.rock_type:12s}  ores=[{ores}]")
+                  f"{L.rock_type:12s}  age={L.age_ma:8.2f} Ma  ores=[{ores}]")
+
+    # Step 2b — relative dating: superposition + monotone ages + Quaternary cap
+    chrono = stratigraphic_chronology(g) if g is not None else []
+    ages = [c["age_ma"] for c in chrono]
+    monotone = all(b >= a for a, b in zip(ages, ages[1:]))
+    surface_young = (ages[0] <= 2.6) if ages else False
+    deepest_old = (ages[-1] > ages[0]) if len(ages) >= 2 else False
+    supok = superposition_ok(g) if g is not None else False
+    ok = bool(chrono) and monotone and supok and surface_young and deepest_old
+    print(_row("step 2b — relative dating obeys superposition",
+               ok,
+               f"superposition_ok={supok} surface={ages[0] if ages else None} Ma "
+               f"oldest={ages[-1] if ages else None} Ma"))
+    if not ok:
+        failures += 1
 
     # Step 3 — mining yields ore
     row = 0
@@ -163,10 +179,15 @@ def main() -> int:
         install_geology(sim2)
         ok_load = load_geology_state(sim2, tmp)
         state2 = sim2._geology_state
+        ages_preserved = True
+        for c, g1 in sim._geology_state.chunks.items():
+            for a, b in zip(g1.layers, state2.chunks[c].layers):
+                if round(a.age_ma, 4) != round(b.age_ma, 4):
+                    ages_preserved = False
         ok = (ok_load
               and len(state2.chunks) == len(sim._geology_state.chunks)
-              and state2.cumulative_extracted
-                  == sim._geology_state.cumulative_extracted)
+              and state2.cumulative_extracted == sim._geology_state.cumulative_extracted
+              and ages_preserved)
         print(_row("step 7 — persistence round-trip preserves geology",
                    ok,
                    f"chunks {len(state2.chunks)}/{len(sim._geology_state.chunks)}"
@@ -183,6 +204,8 @@ def main() -> int:
     print(f"  n_chunks_with_geology: {snap.get('n_chunks_with_geology')}")
     print(f"  total_layers: {snap.get('total_layers')}")
     print(f"  mine_events_total: {snap.get('mine_events_total')}")
+    print(f"  oldest_layer_age_ma: {snap.get('oldest_layer_age_ma')}")
+    print(f"  superposition_ok: {snap.get('superposition_ok')}")
     print(f"  top_extracted: {snap.get('top_extracted')}")
     print()
     if failures == 0:
