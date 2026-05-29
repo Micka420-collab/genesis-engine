@@ -3506,3 +3506,24 @@ Contraintes :
 | 2026-05-13 | Phase 4 audit + Phase 5 recherche + Phase 5c+5d+5e+5g foundations + fleet parallel | 16 modules, 6 docs de plan, 5 modules fleet | (cette session) |
 | 2026-05-13 (PM) | P0 — Smoke 5c+5d | 200 ticks ok, 7 innovations, 1 projet, journal écrit | SPRINT-2026-05-13.md |
 | 2026-05-13 (PM2) | P1 — God Avatar wiring | 11/11 checks, 3 endpoints OK, fall-through OK | SPRINT-2026-05-13.md |
+
+---
+
+## ✅ Livré 2026-05-29 — Wave 47 heritable G→P decoder (semantic closure)
+
+`engine/genome_decoder.py` : décodeur pur/déterministe qui met
+l'interpréteur **dans** le génome (région structurelle S `[0,192)` +
+région régulatrice R `[192,256)` héritée par le même crossover). Le map
+génotype→phénotype devient per-individu, héritable, sous sélection —
+fermeture sémantique côté description (Pattee). Émergent : pléiotropie +
+épistasie (jamais hand-assignées). Module **additif** (ne touche ni
+`engine.genome`, ni `engine.agent`, ni la boucle vivante).
+
+- Tests : `tests/test_genome_decoder.py` **13/13** · smoke
+  `scripts/p117_genome_decoder_smoke.py` **10/10 PASS**.
+- Détail : [`docs/sprints/2026-05-29_Wave47_genome_decoder.md`](docs/sprints/2026-05-29_Wave47_genome_decoder.md).
+- Continuité : finalise le commit d'un run nocturne précédent crashé avant
+  `git commit` (verrou `.git/index.lock` périmé nettoyé). Le « neutral-shadow »
+  Bedau–Packard reste un item backlog indépendant (non committé).
+- Gap restant (honnête) : côté **construction** (auto-reconstruction von
+  Neumann) non fermé — travail futur.
