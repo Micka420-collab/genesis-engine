@@ -114,6 +114,10 @@ class SimConfig:
     # Terre autonome : noyau, plaques, transform matériaux (sans script civilisation).
     autonomous_world: bool = False
     emergent_construction: bool = True
+    # Wave 52: decide on the heritable regulated genome view (decode_phenotype
+    # reinterprets the cognition slice). Default OFF → byte-identical legacy
+    # brain, determinism preserved. See engine.regulated_brain.
+    heritable_brain: bool = False
 
 
 @dataclass

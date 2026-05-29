@@ -1,10 +1,32 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 29 mai 2026 (session 49 — Wave 49 watershed observer : Strahler + Horton + drainage density).
+**Dernière mise à jour :** 29 mai 2026 (Wave 52 — décodeur héritable branché dans le cerveau génomique, gated).
 
 > **Synthèse contributeur** (phases, réalisme **~76 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-05-29) — Wave 52 : décodeur héritable → cerveau génomique (gated)
+
+Suite directe de la Wave 47 (`engine.genome_decoder`, laissé débranché). Le code
+régulateur héritable R = loci `[192,256)` réinterprète maintenant la tranche cognition
+`[64,128)` que lit la politique génomique, **derrière un flag** (`SimConfig.heritable_brain`,
+défaut **OFF** → chemin hérité inchangé, déterminisme préservé).
+
+- `runtime/engine/regulated_brain.py` (additif, pur) : `regulated_genome_view` module la
+  tranche cognition par `decode_phenotype(R)` ; gain ∈ (0.4, 1.6). Code neutre (P≡0.5) →
+  gain≡1 → **cerveau hérité récupéré octet-pour-octet** (base de la non-régression).
+- Hook gated unique dans `engine.neat_brain.genome_decide`.
+- **Fermeture sémantique comportementale** : S égal, R différent → logits hérités
+  *identiques* mais logits régulés *différents* (vérifié 8/8 founders réels).
+- `runtime/scripts/p121_regulated_brain_smoke.py` — **10/10 PASS**.
+- `runtime/tests/test_regulated_brain.py` — **11/11** verts. Suite complète : **245 passed**.
+- Doc : [`docs/sprints/2026-05-29_Wave52_regulated_brain.md`](docs/sprints/2026-05-29_Wave52_regulated_brain.md).
+- **Gaps honnêtes** : côté construction (von Neumann) non fermé ; offset EXPLORE lit encore
+  le latent brut ; `genome_decide` n'est pas (encore) atteint par `Simulation.step()`
+  (`sim.py` lie `decide` à l'import) — correctif pré-existant hors périmètre, signalé.
 
 ---
 

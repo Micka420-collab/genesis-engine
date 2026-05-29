@@ -183,6 +183,11 @@ def genome_decide(agents: AgentRegistry, obs: Observation, sim) -> Decision:
                 return d
 
     g = agents.genome[row]
+    # Wave 52 (gated): the heritable regulatory code reinterprets the
+    # cognition slice before the policy reads it. Default OFF → g unchanged.
+    if bool(getattr(sim.cfg, "heritable_brain", False)):
+        from engine.regulated_brain import regulated_genome_view
+        g = regulated_genome_view(g)
     feats = _obs_features(obs)
     from engine.core import prf_rng
     prf_u = float(prf_rng(int(sim.cfg.seed), ["brain", "act"], [int(sim.tick), row]).random())
