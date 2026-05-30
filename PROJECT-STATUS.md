@@ -43,12 +43,12 @@ Détail des **Waves 16–41** (genesis, tectonique, climat, NCA, settlements, ro
 
 ## Réalisme Terre (grille scientifique)
 
-**Score global : ~77 %** (moyenne 7 dimensions, recalcul 77,4 % après Wave 53 — hydrologie 70→72). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
+**Score global : ~78 %** (moyenne 7 dimensions, recalcul 77,7 % après Wave 54 — géologie 64→66). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
 
 | Dimension | % | Piste principale |
 |-----------|---|------------------|
 | Climat / biomes | 80 | GraphCast-lite + colonne 3D + circulation L1 + vent 2D |
-| Géologie / relief | 61 | Tectonique live, stratigraphie + datation relative ; **Wave 50 cryoclastie** (FCI Walder & Hallet, permafrost / talus / alpine actifs) |
+| Géologie / relief | 66 | Tectonique live, stratigraphie + datation relative + absolue (Wave 51) + cryoclastie (Wave 50) ; **Wave 54 compaction diagénétique** (pression lithostatique + contrainte effective de Terzaghi + porosité φ(σ′) décroissante) |
 | Écologie / hydrologie | 72 | `hydrology_mode` sv1d ; Earth Console overlay flux ; Wave 49 quantification réseau (Strahler + Horton + drainage density) ; **Wave 53 routage de débit LTI** (ruissellement D8, conservation de masse) |
 | Sociétés / agents | 76 | NEAT + construction émergente + memetic + `/api/audio` |
 | Rendu visuel | 82 | Globe + iso 2.5D + humains + ombres + 2D lite |

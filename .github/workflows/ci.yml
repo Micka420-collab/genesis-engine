@@ -61,6 +61,7 @@ jobs:
             p87_observer_sky_smoke.py
             p119_frost_weathering_smoke.py
             p122_discharge_routing_smoke.py
+            p123_compaction_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="
