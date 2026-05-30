@@ -117,6 +117,7 @@ validate-all: test-python
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p86_autonomous_world_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p87_observer_sky_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p119_frost_weathering_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p122_discharge_routing_smoke.py
 
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release

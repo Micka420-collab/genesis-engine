@@ -1,7 +1,7 @@
 # Roadmap réalisme Terre — Genesis Engine
 
 **Source de vérité** pour tous les pourcentages « réalisme Terre » du dépôt.  
-**Dernière mise à jour :** 29 mai 2026 (Wave 51 — géochronologie absolue émergente : datation radiométrique multi-systèmes + concordance superposition).
+**Dernière mise à jour :** 30 mai 2026 (Wave 53 — routage de débit LTI émergent : ruissellement climatique propagé sur le graphe D8, conservation de masse exacte).
 
 ---
 
@@ -15,7 +15,7 @@
 | **~77 %** | **Moyenne des 7 dimensions** ci-dessous (référence unique) |
 
 **Recalcul transparent :**  
-(80 + 64 + 70 + 76 + 82 + 86 + 82) ÷ 7 = **77,1 %** → arrondi **~77 %**. Géologie 58 → 61 (Wave 50 cryoclastie, livrée mais doc non reportée suite à un run nocturne interrompu) → **64** (Wave 51 datation absolue radiométrique). Le saut suivant (érosion GPU dynamique) reste pour 70 %+ sur cette dimension.
+(80 + 64 + 72 + 76 + 82 + 86 + 82) ÷ 7 = **77,4 %** → arrondi **~77 %**. Géologie 58 → 61 (Wave 50 cryoclastie, livrée mais doc non reportée suite à un run nocturne interrompu) → **64** (Wave 51 datation absolue radiométrique). Hydrologie 70 → **72** (Wave 53 : routage de débit LTI émergent, conservation de masse exacte). Le saut suivant (érosion GPU dynamique, hydrogramme transitif) reste pour 75 %+ sur ces dimensions.
 
 > L’objectif **80 % global** (simulation « publication-grade ») reste une **cible** : il faudrait NWP 3D, hydrologie bassin complet, géologie dynamique GPU, et WorldGraph Rust en hot path production.
 
@@ -27,7 +27,7 @@
 |-----------|---|---------------|---------------|
 | Climat / biomes | **80** | Circulation L1 + colonne 3D + GraphCast-lite prior + vent 2D | NWP 3D numérique, validation Beck 2018 |
 | Géologie / relief | **64** | Tectonique live + stratigraphie + **datation relative** (superposition, `age_ma`) + cryoclastie (Wave 50) + **datation absolue radiométrique** (Wave 51 : ¹⁴C / U-Th / K-Ar / U-Pb / Rb-Sr, fraction parent, ratio fille/parent, concordance superposition) | Érosion GPU dynamique, datation absolue ✅ |
-| Écologie / hydrologie | **70** | Earth Console `sv1d` + overlay flux 2D ; cross-chunk près des agents ; **Wave 49 quantification réseau** (Strahler order, Horton Rb/Rl, drainage density par bassin, intégrale hypsométrique) | Biogeochimie, bassins versants dynamiques, érosion GPU |
+| Écologie / hydrologie | **72** | Earth Console `sv1d` + overlay flux 2D ; cross-chunk près des agents ; **Wave 49 quantification réseau** (Strahler order, Horton Rb/Rl, drainage density, intégrale hypsométrique) ; **Wave 53 routage de débit LTI** (ruissellement `P−ET` propagé D8, débit par bassin, conservation de masse exacte) | Biogeochimie, hydrogramme transitif, érosion GPU |
 | Sociétés / agents | **76** | NEAT + latent_action ; memetic + lexique ; construction émergente ; parole `/api/audio` | `ActionKind` encore enum ; pas de LLM tier-2 |
 | Rendu visuel | **82** | Earth Console globe + iso 2.5D + humains + ombres soleil + 2D lite | Volumétrique GPU, photoréalisme |
 | Observation IA | **86** | Earth Console SSE + replay JSONL + observer_feed + WebGPU agents | Fog-of-war mmap Rust, multi-tenant |
@@ -57,6 +57,7 @@
 | Cryoclastie / frost weathering (Walder & Hallet) | ✅ | `frost_weathering.py`, smoke `p119` |
 | Datation absolue radiométrique (multi-systèmes + concordance) | ✅ | `radiometric_dating.py`, smoke `p120`, tests `test_radiometric_dating.py` (19) |
 | Watershed observer (Strahler + Horton + drainage density) | ✅ | `watershed_observer.py`, smoke `p118`, tests `test_watershed_observer.py` |
+| Routage de débit LTI (ruissellement D8, conservation de masse) | ✅ | `discharge_observer.py`, smoke `p122`, tests `test_discharge_observer.py` (11) |
 | Köppen FAIR + MultiRateCoupler | ✅ | `koeppen_grid.py`, `multi_rate_coupler.py` |
 | Pont Rust GENM + write-back | ✅ | `macro-bridge`, `macro_grid_export.py` |
 

@@ -1,10 +1,43 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 29 mai 2026 (Wave 52 — décodeur héritable branché dans le cerveau génomique, gated).
+**Dernière mise à jour :** 30 mai 2026 (Wave 53 — routage de débit LTI émergent sur le graphe D8, conservation de masse exacte).
 
-> **Synthèse contributeur** (phases, réalisme **~76 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
+> **Synthèse contributeur** (phases, réalisme **~77 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-05-30) — Wave 53 : routage de débit LTI émergent
+
+Suite directe de la Wave 49 (`watershed_observer`, qui **quantifiait** le réseau
+mais ne propageait aucun débit) et réponse à la **piste #1** de la veille du jour
+([`docs/veille/2026-05-30_VEILLE.md`](docs/veille/2026-05-30_VEILLE.md), DÉCOUVERTE_1 —
+routage de rivière différentiable LTI≡conv block-sparse, Hascoet et al. 2025).
+
+Wave 53 livre la **version CPU déterministe** de l'opérateur LTI : le débit
+stationnaire résout `Q = (I − Aᵀ)⁻¹ r` (A = adjacence aval D8), évalué **exactement**
+par un seul balayage topologique Kahn — pas d'inverse, O(N). Le champ de
+ruissellement `r = max(P − ET, 0)` est dérivé du climat émergent (`precip_mm`,
+`temp_c`). La variante **GPU/conv différentiable** reste explicitement backlog
+(dépendance torch/GPU hors cœur déterministe).
+
+- `runtime/engine/discharge_observer.py` (additif, pur, read-only strict) :
+  `route_runoff`, `runoff_field_m3s`, `observe_discharge`, install/uninstall
+  idempotents (wrap unique de `sim.step`), `discharge_summary`.
+- **Invariants prouvés** : conservation de masse (`Σ Q[puits] == Σ runoff`),
+  monotonie aval, identité ruissellement-unitaire ≡ aire contributrice D8,
+  confluence, déterminisme sha256, read-only.
+- `runtime/scripts/p122_discharge_routing_smoke.py` — **10/10 PASS** (résidu masse
+  réel = 0.00e+00, max discharge 2656 m³/s, mean runoff 251 mm/yr).
+- `runtime/tests/test_discharge_observer.py` — **11/11** verts. Suite cœur +
+  voisins (~120 tests) verts, 0 fail.
+- Câblé dans `make validate-all` + CI (alignement smokes, cf. commit p119).
+- Doc : [`docs/sprints/2026-05-30_Wave53_discharge_routing.md`](docs/sprints/2026-05-30_Wave53_discharge_routing.md).
+- **Impact réalisme** : Écologie/hydrologie **70 → 72 %** ; global ≈ **77 %**.
+- **Gaps honnêtes** : routage **stationnaire** (pas d'hydrogramme transitif /
+  réservoir linéaire) ; ruissellement `P−ET` minimal (pas de neige/infiltration) ;
+  variante GPU/conv différentiable non portée (parité CPU↔GPU à garantir avant smoke).
 
 ---
 
