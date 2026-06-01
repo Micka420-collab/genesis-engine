@@ -1,10 +1,50 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 30 mai 2026 (Wave 53 — routage de débit LTI émergent sur le graphe D8, conservation de masse exacte).
+**Dernière mise à jour :** 1er juin 2026 (Wave 55 — hydrogramme transitif : réservoir linéaire exact appliqué au débit stationnaire D8).
 
 > **Synthèse contributeur** (phases, réalisme **~77 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-01) — Wave 55 : hydrogramme transitif (réservoir linéaire)
+
+Suite directe de la Wave 53 (`discharge_observer`, qui routait le débit
+**stationnaire** `Q*` mais laissait explicitement en backlog
+l'**hydrogramme transitif / réservoir linéaire**). Wave 55 livre cette
+brique temporelle, sans nouveau substrat physique : chaque exutoire émergent
+de bassin est traité comme un **réservoir linéaire unique** (Maillet 1905 ;
+Nash 1957) `dS/dt = I − S/k`, `Q = S/k`, résolu par la **mise à jour
+analytique exacte** pour une entrée constante par morceaux
+(`a = exp(−Δt/k)` ; `S_{n+1} = S_n·a + I·k·(1−a)`) — inconditionnellement
+stable, sans intégration numérique, bit-déterministe. L'observateur excite ce
+réservoir par une **impulsion de pluie finie** (`storm_days`) dont le régime
+d'équilibre est le `Q*` émergent du bassin (Wave 53) : on obtient un vrai
+hydrogramme d'orage (montée → pic en fin d'orage → récession exponentielle de
+constante `k`).
+
+- `runtime/engine/hydrograph_observer.py` (additif, pur, read-only strict) :
+  `linear_reservoir_response`, `storm_hydrograph`, `half_recession_days`,
+  `observe_hydrograph`, install/uninstall idempotents (wrap unique de
+  `sim.step`), `hydrograph_summary`. Réutilise `engine.discharge_observer`
+  (aucune duplication du routage D8).
+- **Invariants prouvés** : fermeture de masse exacte du réservoir
+  (`s0 + ΣI·dt − out_cum == S`, résidu ≈ 1e-16), récession géométrique
+  `Q[n] = Q0·aⁿ` strictement décroissante, convergence de la réponse
+  indicielle vers `Q*` (lien Wave 53), demi-récession `≈ k·ln2`, read-only,
+  signature sha256 déterministe cross-sim.
+- `runtime/scripts/p124_hydrograph_smoke.py` — **10/10 PASS** (résidu masse
+  réel max = 8.6e-16 sur monde Genesis, pic max 1586 m³/s, t½ ≈ 3.5 j).
+- `runtime/tests/test_hydrograph_observer.py` — **11/11** verts. Voisins
+  hydrologie (discharge) verts, `ruff` clean.
+- Câblé dans `make validate-all` + CI (après p123), au format aligné Wave 53.
+- Doc : [`docs/sprints/2026-06-01_Wave55_hydrograph.md`](docs/sprints/2026-06-01_Wave55_hydrograph.md).
+- **Gaps honnêtes** : réservoir **unique** (cascade de Nash `n>1` / IUH
+  multi-réservoirs reste backlog) ; `k` et `storm_days` sont des constantes de
+  config (non dérivées d'une géomorphologie émergente — piste future :
+  `k ∝ longueur de drain / pente`) ; pas de couplage transitoire cellule-par-
+  cellule sur le graphe (l'hydrogramme est groupé à l'exutoire).
 
 ---
 

@@ -1,6 +1,6 @@
 # Genesis Engine — État du projet
 
-**Dernière mise à jour :** 30 mai 2026  
+**Dernière mise à jour :** 1er juin 2026 (Wave 55 — hydrogramme transitif réservoir linéaire, hydrologie)  
 **Synthèse courte** pour contributeurs et reviewers GitHub. Pour le détail session par session, voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md).
 
 ---
