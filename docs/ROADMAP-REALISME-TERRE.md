@@ -1,7 +1,7 @@
 # Roadmap réalisme Terre — Genesis Engine
 
 **Source de vérité** pour tous les pourcentages « réalisme Terre » du dépôt.  
-**Dernière mise à jour :** 30 mai 2026 (Wave 54 — compaction diagénétique émergente : pression lithostatique intégrée + contrainte effective de Terzaghi + porosité φ(σ′) décroissante avec la profondeur).
+**Dernière mise à jour :** 1er juin 2026 (Wave 56 — géotherme conductif T(z) + faciès métamorphiques émergents : grade Barrovien par bandes de température + branche haute-pression blueschist / éclogite ; boucle pression–température fermée avec la compaction Wave 54).
 
 ---
 
@@ -13,10 +13,10 @@
 | **~80 %** | **Objectif cible** utilisateur, ou score **climat / biomes** seul — **pas** le global |
 | **~76 %** | Ancienne moyenne (Wave 49) — **remplacée** par ~77 % après Waves 50–51 (géologie) |
 | **~77 %** | Moyenne Wave 53 — **remplacée** par ~78 % après Wave 54 (géologie 64→66) |
-| **~78 %** | **Moyenne des 7 dimensions** ci-dessous (référence unique) |
+| **~78 %** | **Moyenne des 7 dimensions** ci-dessous (référence unique) — 77,7 % (Wave 54) → **78,0 %** après Wave 56 (géologie 66→68) |
 
 **Recalcul transparent :**  
-(80 + 66 + 72 + 76 + 82 + 86 + 82) ÷ 7 = **77,7 %** → arrondi **~78 %**. Géologie 58 → 61 (Wave 50 cryoclastie, livrée mais doc non reportée suite à un run nocturne interrompu) → **64** (Wave 51 datation absolue radiométrique) → **66** (Wave 54 compaction diagénétique : pression lithostatique intégrée, contrainte effective de Terzaghi, porosité φ(σ′) décroissante). Hydrologie 70 → **72** (Wave 53 : routage de débit LTI émergent, conservation de masse exacte). Le saut suivant (érosion GPU dynamique, hydrogramme transitif) reste pour 75 %+ sur ces dimensions.
+(80 + 68 + 72 + 76 + 82 + 86 + 82) ÷ 7 = **78,0 %** → arrondi **~78 %**. Géologie 58 → 61 (Wave 50 cryoclastie, livrée mais doc non reportée suite à un run nocturne interrompu) → **64** (Wave 51 datation absolue radiométrique) → **66** (Wave 54 compaction diagénétique : pression lithostatique intégrée, contrainte effective de Terzaghi, porosité φ(σ′) décroissante) → **68** (Wave 56 géotherme conductif + faciès métamorphiques : axe température T(z), grade Barrovien, branche haute-P). Hydrologie 70 → **72** (Wave 53 : routage de débit LTI émergent, conservation de masse exacte). Le saut suivant (érosion GPU dynamique, hydrogramme transitif) reste pour 75 %+ sur ces dimensions.
 
 > L’objectif **80 % global** (simulation « publication-grade ») reste une **cible** : il faudrait NWP 3D, hydrologie bassin complet, géologie dynamique GPU, et WorldGraph Rust en hot path production.
 
@@ -27,14 +27,14 @@
 | Dimension | % | Justification | Gap vers 80 % |
 |-----------|---|---------------|---------------|
 | Climat / biomes | **80** | Circulation L1 + colonne 3D + GraphCast-lite prior + vent 2D | NWP 3D numérique, validation Beck 2018 |
-| Géologie / relief | **66** | Tectonique live + stratigraphie + **datation relative** (superposition, `age_ma`) + cryoclastie (Wave 50) + **datation absolue radiométrique** (Wave 51 : ¹⁴C / U-Th / K-Ar / U-Pb / Rb-Sr, fraction parent, ratio fille/parent, concordance superposition) + **compaction diagénétique** (Wave 54 : pression lithostatique intégrée, contrainte effective de Terzaghi σ′, porosité φ(σ′) ↓ avec la profondeur, densité bulk) | Érosion GPU dynamique (shallow-water / transport sédimentaire) |
+| Géologie / relief | **68** | Tectonique live + stratigraphie + **datation relative** (superposition, `age_ma`) + cryoclastie (Wave 50) + **datation absolue radiométrique** (Wave 51 : ¹⁴C / U-Th / K-Ar / U-Pb / Rb-Sr, fraction parent, ratio fille/parent, concordance superposition) + **compaction diagénétique** (Wave 54 : pression lithostatique intégrée, contrainte effective de Terzaghi σ′, porosité φ(σ′) ↓ avec la profondeur, densité bulk) + **géotherme + faciès métamorphiques** (Wave 56 : axe température T(z) = Tsurf + Γ·z, grade Barrovien diagenèse→zéolite→schiste vert→amphibolite→granulite, branche haute-P blueschist/éclogite ; boucle P–T fermée avec la compaction) | Érosion GPU dynamique (shallow-water / transport sédimentaire) |
 | Écologie / hydrologie | **72** | Earth Console `sv1d` + overlay flux 2D ; cross-chunk près des agents ; **Wave 49 quantification réseau** (Strahler order, Horton Rb/Rl, drainage density, intégrale hypsométrique) ; **Wave 53 routage de débit LTI** (ruissellement `P−ET` propagé D8, débit par bassin, conservation de masse exacte) | Biogeochimie, hydrogramme transitif, érosion GPU |
 | Sociétés / agents | **76** | NEAT + latent_action ; memetic + lexique ; construction émergente ; parole `/api/audio` | `ActionKind` encore enum ; pas de LLM tier-2 |
 | Rendu visuel | **82** | Earth Console globe + iso 2.5D + humains + ombres soleil + 2D lite | Volumétrique GPU, photoréalisme |
 | Observation IA | **86** | Earth Console SSE + replay JSONL + observer_feed + WebGPU agents | Fog-of-war mmap Rust, multi-tenant |
 | Pont Python↔Rust | **82** | GENM macro-bridge + mutations write-back + snapshot zstd | WorldGraph hot path prod |
 
-**Moyenne (global) :** **~77 %**
+**Moyenne (global) :** **~78 %** (78,0 % après Wave 56)
 
 ### Deux moteurs (ne pas confondre avec le global)
 
@@ -60,6 +60,7 @@
 | Watershed observer (Strahler + Horton + drainage density) | ✅ | `watershed_observer.py`, smoke `p118`, tests `test_watershed_observer.py` |
 | Routage de débit LTI (ruissellement D8, conservation de masse) | ✅ | `discharge_observer.py`, smoke `p122`, tests `test_discharge_observer.py` (11) |
 | Compaction diagénétique + pression lithostatique (Terzaghi, porosité φ(σ′)) | ✅ | `compaction_observer.py`, smoke `p123`, tests `test_compaction_observer.py` |
+| Géotherme conductif + faciès métamorphiques (P–T, grade Barrovien, blueschist/éclogite) | ✅ | `geotherm_observer.py`, smoke `p125`, tests `test_geotherm_observer.py` (15) |
 | Köppen FAIR + MultiRateCoupler | ✅ | `koeppen_grid.py`, `multi_rate_coupler.py` |
 | Pont Rust GENM + write-back | ✅ | `macro-bridge`, `macro_grid_export.py` |
 
@@ -70,7 +71,7 @@
 1. **CI maturin** : wheel + smoke verts → monter WorldGraph en prod.
 2. **Köppen** : validation 50 stations (Beck 2018).
 3. **Hydrologie** : LBM 2D ou D8 accumulation cross-macro.
-4. **Géologie** : datation relative ✅ (Wave 48), cryoclastie ✅ (Wave 50), datation absolue radiométrique ✅ (Wave 51), compaction diagénétique ✅ (Wave 54 : pression lithostatique + contrainte effective + porosité) → reste **érosion GPU dynamique** (shallow-water / sédiment transport) comme prochain palier.
+4. **Géologie** : datation relative ✅ (Wave 48), cryoclastie ✅ (Wave 50), datation absolue radiométrique ✅ (Wave 51), compaction diagénétique ✅ (Wave 54 : pression lithostatique + contrainte effective + porosité), géotherme + faciès métamorphiques ✅ (Wave 56 : axe température, grade Barrovien, branche haute-P) → reste **érosion GPU dynamique** (shallow-water / sédiment transport) comme prochain palier.
 5. **Observation** : fog mmap Rust ; reste JSONL live ✅.
 
 **Earth Console (live) :**
@@ -86,7 +87,7 @@ make earth-console
 
 ```bash
 # Python (depuis runtime/)
-python -m pytest tests/ -q          # 157 tests (mai 2026)
+python -m pytest tests/ -q          # 295 tests (juin 2026)
 python scripts/p74_koeppen_harness_smoke.py
 python scripts/p86_autonomous_world_smoke.py
 python scripts/p87_observer_sky_smoke.py

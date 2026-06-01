@@ -1,6 +1,6 @@
 # Genesis Engine — État du projet
 
-**Dernière mise à jour :** 1er juin 2026 (Wave 55 — hydrogramme transitif réservoir linéaire, hydrologie)  
+**Dernière mise à jour :** 1er juin 2026 (Wave 56 — géotherme conductif + faciès métamorphiques émergents, géologie 66→68)  
 **Synthèse courte** pour contributeurs et reviewers GitHub. Pour le détail session par session, voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md).
 
 ---
@@ -9,7 +9,7 @@
 
 **EMERGENCE SIM v2** — laboratoire ZERO PRE-SCRIPT : lois physiques L0–L4, agents autonomes, civilisation **non scriptée**, observable via Earth Console et métriques d'émergence.
 
-**Tests :** `pytest runtime/tests` — **157** tests · smokes **p72–p87** (+ `p87` observer) dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **295** tests · smokes **p72–p125** (+ `p87` observer) dans `validate-all`.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
@@ -43,12 +43,12 @@ Détail des **Waves 16–41** (genesis, tectonique, climat, NCA, settlements, ro
 
 ## Réalisme Terre (grille scientifique)
 
-**Score global : ~78 %** (moyenne 7 dimensions, recalcul 77,7 % après Wave 54 — géologie 64→66). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
+**Score global : ~78 %** (moyenne 7 dimensions, recalcul **78,0 %** après Wave 56 — géologie 66→68). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
 
 | Dimension | % | Piste principale |
 |-----------|---|------------------|
 | Climat / biomes | 80 | GraphCast-lite + colonne 3D + circulation L1 + vent 2D |
-| Géologie / relief | 66 | Tectonique live, stratigraphie + datation relative + absolue (Wave 51) + cryoclastie (Wave 50) ; **Wave 54 compaction diagénétique** (pression lithostatique + contrainte effective de Terzaghi + porosité φ(σ′) décroissante) |
+| Géologie / relief | 68 | Tectonique live, stratigraphie + datation relative + absolue (Wave 51) + cryoclastie (Wave 50) + compaction diagénétique (Wave 54) ; **Wave 56 géotherme + faciès métamorphiques** (axe température T(z), grade Barrovien, branche haute-P blueschist/éclogite ; boucle P–T fermée) |
 | Écologie / hydrologie | 72 | `hydrology_mode` sv1d ; Earth Console overlay flux ; Wave 49 quantification réseau (Strahler + Horton + drainage density) ; **Wave 53 routage de débit LTI** (ruissellement D8, conservation de masse) |
 | Sociétés / agents | 76 | NEAT + construction émergente + memetic + `/api/audio` |
 | Rendu visuel | 82 | Globe + iso 2.5D + humains + ombres + 2D lite |
