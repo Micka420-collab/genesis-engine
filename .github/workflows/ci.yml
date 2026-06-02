@@ -64,6 +64,7 @@ jobs:
             p123_compaction_smoke.py
             p124_hydrograph_smoke.py
             p125_geotherm_smoke.py
+            p126_sediment_exner_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="

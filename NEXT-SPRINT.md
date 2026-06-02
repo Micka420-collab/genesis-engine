@@ -1,10 +1,57 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 1er juin 2026 (Wave 55 — hydrogramme transitif : réservoir linéaire exact appliqué au débit stationnaire D8).
+**Dernière mise à jour :** 2 juin 2026 (Wave 57 — lit mobile / transport sédimentaire Exner : capacité stream-power sur le débit LTI, fermeture de masse exacte eau→sédiment→relief).
 
-> **Synthèse contributeur** (phases, réalisme **~77 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
+> **Synthèse contributeur** (phases, réalisme **~78 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-02) — Wave 57 : lit mobile / transport sédimentaire (Exner)
+
+Réponse directe à la **piste #1 de la veille du jour**
+([`docs/veille/2026-06-02_VEILLE.md`](docs/veille/2026-06-02_VEILLE.md),
+DÉCOUVERTE_1 — morphodynamique Shallow Water–Exner), qui nomme le **palier
+roadmap** : érosion dynamique / transport sédimentaire (géologie 68,
+hydrologie 72). La Wave 53 (`discharge_observer`) calcule déjà le débit `Q`
+par routage LTI exact D8, mais le **lit reste fixe**. Wave 57 ferme la boucle
+**eau → sédiment → relief** avec un opérateur **Exner** CPU déterministe, sans
+nouveau substrat physique, en réutilisant le débit émergent (aucune
+duplication du routage D8).
+
+- `runtime/engine/sediment_observer.py` (additif, pur, read-only strict) :
+  `downstream_slope`, `transport_capacity` (`k·Q^m·S^n`, stream power),
+  `route_sediment` (routage capacité-limité Kahn, érosion/dépôt),
+  `bed_change_rate` (Exner `∂z/∂t`), `observe_sediment`, install/uninstall
+  idempotents (wrap unique de `sim.step`), `sediment_summary`. Réutilise
+  `engine.discharge_observer` (`route_runoff`, `runoff_field_m3s`,
+  `_resolve_world`, `_field`).
+- **Invariants prouvés** : **fermeture de masse exacte**
+  `Σ érosion == Σ dépôt + export(puits)` (résidu = 0.00e+00, vrai pour toute
+  capacité — télescopage du routage à une arête sortante) ; identité tête de
+  bassin ; dépôt du surplus à capacité décroissante ; confluence ; limite de
+  détachement optionnelle ; pente aval ≥ 0 ; signe du lit
+  (érosion `∂z/∂t<0`, dépôt `∂z/∂t>0`) ; read-only ; signature sha256
+  déterministe cross-sim.
+- `runtime/scripts/p126_sediment_exner_smoke.py` — **10/10 PASS** (résidu
+  réel = 0.00e+00, incision max 10.6 mm/yr, aggradation max 11.2 mm/yr,
+  85/612 bassins sur monde Genesis 64²).
+- `runtime/tests/test_sediment_observer.py` — **13/13** verts. Voisins
+  géologie/hydrologie (compaction/geotherm/radiométrie/discharge/hydrograph/
+  watershed) verts (97 tests), `ruff` clean.
+- Câblé dans `make validate-all` + CI (après `p125`), format aligné Wave 53/55.
+- Doc : [`docs/sprints/2026-06-02_Wave57_sediment_exner.md`](docs/sprints/2026-06-02_Wave57_sediment_exner.md).
+- **Impact réalisme** : géologie **68 → 70 %**, hydrologie **72 → 73 %** ;
+  global ≈ **78,4 %**.
+- **Gaps honnêtes** : **transport-limité** par défaut (réserve de lit illimitée ;
+  transition socle via `detachment_limited` mais plafond simple, pas SPACE/SPIM) ;
+  régime **stationnaire** — le lit n'est **pas** rétro-injecté dans
+  `elevation_m` (observateur read-only), donc pas de couplage transitoire
+  morpho ↔ relief (mise à jour DEM + re-calcul D8) ; coefficients
+  (`k_transport`, `m_exp`, `n_exp`, `porosity`) constants de config (pas de
+  granulométrie émergente) ; variante **GPU shallow-water + Exner**
+  (sedExnerFoam) non portée — physique CPU = source de vérité.
 
 ---
 
