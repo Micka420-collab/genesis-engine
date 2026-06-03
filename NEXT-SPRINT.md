@@ -1,10 +1,61 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 2 juin 2026 (Wave 57 — lit mobile / transport sédimentaire Exner : capacité stream-power sur le débit LTI, fermeture de masse exacte eau→sédiment→relief).
+**Dernière mise à jour :** 3 juin 2026 (Wave 58 — open-endedness / activité évolutive Bedau–Packard : test falsifiable de nouveauté soutenue, pur observateur read-only hors chemin déterministe).
 
 > **Synthèse contributeur** (phases, réalisme **~78 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-03) — Wave 58 : open-endedness / activité évolutive (Bedau–Packard)
+
+Réponse directe à la **piste #2 de la veille du jour**
+([`docs/veille/2026-06-03_VEILLE.md`](docs/veille/2026-06-03_VEILLE.md),
+DÉCOUVERTE_2 — « A speciation simulation that partly passes open-endedness
+tests », de Pinho & Sinapayen 2026), qui propose une **métrique d'émergence
+vérifiable** alignée pile sur l'ADN du projet (**ZERO PRE-SCRIPT** +
+[`FALSIFIABILITY.md`](FALSIFIABILITY.md)). Wave 58 implémente les
+**statistiques d'activité évolutive de Bedau–Packard** comme **pur
+observateur** : à partir des innovations émergentes du run (inventions,
+recettes de construction, lexique), il calcule diversité `D(t)`, activité
+cumulée `A(t)`, activité moyenne `Ā(t)` (shadow neutre) et **taux
+d'innovation** `n_new(t)`, puis **classe** la dynamique en
+`none` / `bounded` / `unbounded` / `insufficient`. La classification est
+pilotée par la **nouveauté soutenue**, pas par l'activité cumulée brute (qui
+croît trivialement dès qu'un composant persiste).
+
+- `runtime/engine/evolutionary_activity.py` (additif, pur, read-only strict) :
+  cœur math world-free (`diversity_curve`, `new_component_curve`,
+  `component_activity`, `total_activity_curve`, `mean_activity_curve`,
+  `significance_threshold`, `n_significant_components`, `classify_dynamics`,
+  `evolutionary_activity_stats`) ; lecture émergente `component_usage`
+  (namespacée `inv:` / `rec:` / `lex:`, défensive) ; `observe_evolutionary_
+  activity` ; install/uninstall idempotents (wrap unique de `sim.step`) ;
+  `evolutionary_activity_summary`.
+- **Invariants prouvés** : fermeture additive `A(T) == Σ a_i(T)`
+  (résidu = 0.00e+00) ; diversité monotone et `Σ n_new == D_final` ;
+  classification falsifiable (figé ⇒ `none`, saturant ⇒ `bounded`, ouvert ⇒
+  `unbounded`, trop court ⇒ `insufficient`) ; seuil shadow neutre = facteur ·
+  activité moyenne ; read-only (tick + usage inchangés) ; signature sha256
+  déterministe cross-sim.
+- `runtime/scripts/p127_evolutionary_activity_smoke.py` — **10/10 PASS**.
+- `runtime/tests/test_evolutionary_activity.py` — **11/11** verts ; voisins
+  observateurs (sediment / hydrograph / discharge / compaction) verts ;
+  `ruff` clean.
+- Câblé dans `make validate-all` + CI (après `p126`), format aligné Wave 53/55/57.
+- Doc : [`docs/sprints/2026-06-03_Wave58_evolutionary_activity.md`](docs/sprints/2026-06-03_Wave58_evolutionary_activity.md).
+- **Impact** : nouvelle **métrique d'émergence falsifiable** (dimension
+  *Observation IA* / *Sociétés-agents*) — un run réellement non scripté doit,
+  sur long horizon, sortir de la classe `none` ; une classe `none` soutenue est
+  une réfutation observable de l'émergence ouverte.
+- **Gaps honnêtes** : shadow neutre **analytique** (pas Monte-Carlo
+  randomisé — délibéré pour rester déterministe sans dépendance) ;
+  composant = innovation *présente* (pondération par fréquence d'usage réelle =
+  backlog) ; classification par taux de queue (raffinement statistique des
+  classes de Bedau = backlog) ; pas encore exposé dans
+  `/api/emergence_metrics` / Earth Console (`evolutionary_activity_summary`
+  prêt pour le câblage).
 
 ---
 

@@ -1,6 +1,6 @@
 # Genesis Engine — État du projet
 
-**Dernière mise à jour :** 2 juin 2026 (Wave 57 — lit mobile / transport sédimentaire Exner, géologie 68→70, hydrologie 72→73)  
+**Dernière mise à jour :** 3 juin 2026 (Wave 58 — open-endedness / activité évolutive Bedau–Packard : métrique d'émergence falsifiable, pur observateur read-only)  
 **Synthèse courte** pour contributeurs et reviewers GitHub. Pour le détail session par session, voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md).
 
 ---
@@ -9,7 +9,7 @@
 
 **EMERGENCE SIM v2** — laboratoire ZERO PRE-SCRIPT : lois physiques L0–L4, agents autonomes, civilisation **non scriptée**, observable via Earth Console et métriques d'émergence.
 
-**Tests :** `pytest runtime/tests` — **308** tests · smokes **p72–p126** (+ `p87` observer) dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **319** tests · smokes **p72–p127** (+ `p87` observer) dans `validate-all`.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
