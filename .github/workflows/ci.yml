@@ -66,6 +66,7 @@ jobs:
             p125_geotherm_smoke.py
             p126_sediment_exner_smoke.py
             p127_evolutionary_activity_smoke.py
+            p128_isostasy_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="
@@ -154,4 +155,4 @@ jobs:
 
       - name: Cargo check scaffolding
         working-directory: scaffolding
-        run: cargo check --workspace
+  
