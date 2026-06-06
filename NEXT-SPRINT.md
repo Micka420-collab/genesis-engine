@@ -1,10 +1,51 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 3 juin 2026 (Wave 58 — open-endedness / activité évolutive Bedau–Packard : test falsifiable de nouveauté soutenue, pur observateur read-only hors chemin déterministe).
+**Dernière mise à jour :** 6 juin 2026 (Wave 60 — illumination comportementale / Quality-Diversity : couverture d'espace MAP-Elites + nouveauté comportementale, pur observateur read-only, complément spatial de la Wave 58).
 
 > **Synthèse contributeur** (phases, réalisme **~78 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-06) — Wave 60 : illumination comportementale / Quality-Diversity
+
+Réponse directe à la **piste #3 de la veille du jour**
+([`docs/veille/veille-2026-06-06.md`](docs/veille/veille-2026-06-06.md) — ASAL,
+*Automating the Search for Artificial Life*, qui formalise l'**illumination
+d'une diversité d'espace**). Là où la Wave 58 scorait l'axe **temporel** de
+l'open-endedness (la nouveauté continue-t-elle ? — Bedau–Packard), la Wave 60
+score l'axe **spatial** orthogonal : *quelle fraction de l'espace comportemental
+émergent est remplie, et avec quelle qualité ?* ASAL s'appuyant sur un VLM
+(dépendance non déterministe évitée), Wave 60 porte **la mesure** via les
+primitives CPU déterministes sous-jacentes — **MAP-Elites** (Mouret & Clune
+2015) + distance de **novelty search** (Lehman & Stanley 2011).
+
+- `runtime/engine/illumination_observer.py` (additif, pur, read-only strict) :
+  cœur world-free (`discretize`, `build_archive`, `coverage`, `qd_score`,
+  `niche_entropy`, `behavioral_novelty`, `illumination_stats`) ; adaptateur
+  émergent `agent_behaviors` (descripteur = traits `curiosity`×`aggression`,
+  qualité = `offspring_count`, agents `alive`, défensif) ;
+  `observe_illumination` ; install/uninstall idempotents (wrap unique de
+  `sim.step`) ; `illumination_summary`.
+- **Invariants prouvés** : discrétisation `floor`/clamp bit-déterministe ;
+  MAP-Elites garde le meilleur strict par niche (tie-break premier-vu) ;
+  coverage pleine=1.0/vide=0.0, `qd_score`=Σ élites ; entropie uniforme→1.0,
+  spike→bas, ≤1 niche→0 ; nouveauté étalé>cluster, `k` clampé ; read-only ;
+  signature sha256 déterministe cross-sim.
+- `runtime/scripts/p129_illumination_smoke.py` — **10/10 PASS** (run réel :
+  4 founders, coverage 0.0625, novelty 0.6168, monde Genesis 64²).
+- `runtime/tests/test_illumination_observer.py` — **16/16** verts ; voisins
+  observateurs (evolutionary_activity / sediment) verts ; `ruff` clean.
+- Câblé dans `make validate-all` + CI (après `p128`), format aligné Wave 58.
+- Doc : [`docs/sprints/2026-06-06_Wave60_illumination.md`](docs/sprints/2026-06-06_Wave60_illumination.md).
+- **Impact** : métrique d'émergence falsifiable (dimension *Observation IA* /
+  *Sociétés-agents*) — un run non scripté doit voir coverage/novelty croître ;
+  une coverage figée est une réfutation observable de la diversité émergente.
+- **Gaps honnêtes** : descripteur VLM ASAL non porté (délibéré) ; qualité =
+  `offspring_count` (autres proxies émergents = backlog) ; grille 2D fixe
+  (cœur N-D prêt, adaptateur 2D pour interprétabilité) ; pas de CVT-MAP-Elites ;
+  pas encore exposé dans `/api/emergence_metrics` / Earth Console.
 
 ---
 
