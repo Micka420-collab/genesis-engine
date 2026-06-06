@@ -1,6 +1,6 @@
 # Genesis Engine — État du projet
 
-**Dernière mise à jour :** 3 juin 2026 (Wave 59 — isostasie d'Airy / racine crustale : Moho, épaisseur de croûte et anti-racine océanique dérivées du champ d'altitude émergent ; invariant équipression à la profondeur de compensation, résidu ≈ 1e-16 ; pur observateur read-only)  
+**Dernière mise à jour :** 6 juin 2026 (Wave 61 — flexure lithosphérique élastique : généralisation d'Airy local vers Vening-Meinesz régional ; plaque mince D∇⁴w + Δρg·w = q résolue spectralement sur le relief émergent ; limite d'Airy exacte à Te=0, bilan de charge mode zéro résidu ≈ 1e-17, lissage régional prouvé ; pur observateur read-only)  
 **Synthèse courte** pour contributeurs et reviewers GitHub. Pour le détail session par session, voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md).
 
 ---
@@ -9,7 +9,7 @@
 
 **EMERGENCE SIM v2** — laboratoire ZERO PRE-SCRIPT : lois physiques L0–L4, agents autonomes, civilisation **non scriptée**, observable via Earth Console et métriques d'émergence.
 
-**Tests :** `pytest runtime/tests` — **331** tests · smokes **p72–p128** (+ `p87` observer) dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **361** tests · smokes **p72–p130** (+ `p87` observer) dans `validate-all`.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
@@ -43,12 +43,12 @@ Détail des **Waves 16–41** (genesis, tectonique, climat, NCA, settlements, ro
 
 ## Réalisme Terre (grille scientifique)
 
-**Score global : ~78,6 %** (moyenne 7 dimensions, recalcul **78,6 %** après Wave 59 — géologie 70→71 via isostasie d'Airy ; antérieur : 78,4 % Wave 57 géologie 68→70 + hydrologie 72→73). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
+**Score global : ~78,7 %** (moyenne 7 dimensions, recalcul **78,7 %** après Wave 61 — géologie 71→72 via flexure lithosphérique élastique ; antérieur : 78,6 % Wave 59 isostasie d'Airy géologie 70→71). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
 
 | Dimension | % | Piste principale |
 |-----------|---|------------------|
 | Climat / biomes | 80 | GraphCast-lite + colonne 3D + circulation L1 + vent 2D |
-| Géologie / relief | 71 | Tectonique live, stratigraphie + datation relative + absolue (Wave 51) + cryoclastie (Wave 50) + compaction diagénétique (Wave 54) + géotherme/faciès métamorphiques (Wave 56) + lit mobile Exner (Wave 57) ; **Wave 59 isostasie d'Airy** (racine crustale r = ρ_c/(ρ_m−ρ_c)·h, anti-racine océanique, Moho et épaisseur de croûte émergents, invariant équipression résidu ≈ 1e-16) |
+| Géologie / relief | 72 | Tectonique live, stratigraphie + datation relative + absolue (Wave 51) + cryoclastie (Wave 50) + compaction diagénétique (Wave 54) + géotherme/faciès métamorphiques (Wave 56) + lit mobile Exner (Wave 57) + isostasie d'Airy (Wave 59) ; **Wave 61 flexure lithosphérique élastique** (Vening-Meinesz régional : D∇⁴w + Δρg·w = q spectral, filtre Φ(k), α ≈ 89 km à Te 25 km, limite d'Airy exacte à Te=0) |
 | Écologie / hydrologie | 73 | `hydrology_mode` sv1d ; Earth Console overlay flux ; Wave 49 quantification réseau (Strahler + Horton + drainage density) ; Wave 53 routage de débit LTI ; **Wave 57 boucle eau→sédiment→relief fermée** (Exner sur graphe D8) |
 | Sociétés / agents | 76 | NEAT + construction émergente + memetic + `/api/audio` |
 | Rendu visuel | 82 | Globe + iso 2.5D + humains + ombres + 2D lite |
