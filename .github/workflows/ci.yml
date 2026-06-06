@@ -68,6 +68,7 @@ jobs:
             p127_evolutionary_activity_smoke.py
             p128_isostasy_smoke.py
             p129_illumination_smoke.py
+            p130_flexure_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="
