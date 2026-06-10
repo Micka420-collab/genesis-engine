@@ -1,6 +1,6 @@
 # Genesis Engine — État du projet
 
-**Dernière mise à jour :** 10 juin 2026 (Wave 62 — hypsométrie / maturité de paysage : courbe + intégrale hypsométriques de Strahler 1952 sur le relief émergent `elevation_m` ; invariant pivot **identité de Pike-Wilson** `trapz(courbe) == ratio élévation-relief` résidu réel 8,7e-05 ; invariance affine exacte de HI, rampe linéaire HI=0,5, étages youthful/mature/monadnock + skewness signée ; pur observateur read-only. Antérieur : Wave 61 flexure lithosphérique élastique, Vening-Meinesz régional, limite d'Airy exacte à Te=0)  
+**Dernière mise à jour :** 10 juin 2026 (Wave 63 — concavité de chenal / χ-steepness : **loi de Flint** pente–aire `S = k_s·A^−θ` (régression log-log → concavité θ = m/n + raideur k_s) + **méthode χ intégrale** de Perron & Royden 2013 sur le réseau D8 émergent (`flow_dir` + `flow_acc` + `elevation_m`) ; invariant pivot **récupération exacte de la loi de puissance** (θ, k_s à <1e-9, R²=1) + linéarité χ–z (ksn, R²=1) + invariance d'échelle de θ ; pur observateur read-only. Antérieur : Wave 62 hypsométrie / maturité de paysage Strahler 1952, identité de Pike-Wilson ; Wave 61 flexure lithosphérique élastique Vening-Meinesz)  
 **Synthèse courte** pour contributeurs et reviewers GitHub. Pour le détail session par session, voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md).
 
 ---
@@ -9,7 +9,7 @@
 
 **EMERGENCE SIM v2** — laboratoire ZERO PRE-SCRIPT : lois physiques L0–L4, agents autonomes, civilisation **non scriptée**, observable via Earth Console et métriques d'émergence.
 
-**Tests :** `pytest runtime/tests` — **376** tests · smokes **p72–p131** (+ `p87` observer) dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **389** tests · smokes **p72–p132** (+ `p87` observer) dans `validate-all`.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
@@ -43,12 +43,12 @@ Détail des **Waves 16–41** (genesis, tectonique, climat, NCA, settlements, ro
 
 ## Réalisme Terre (grille scientifique)
 
-**Score global : ~78,9 %** (moyenne 7 dimensions, recalcul **78,86 %** après Wave 62 — géologie 72→73 via hypsométrie / maturité de paysage ; antérieur : 78,7 % Wave 61 flexure lithosphérique élastique géologie 71→72). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
+**Score global : ~79,0 %** (moyenne 7 dimensions, recalcul **79,0 %** après Wave 63 — géologie 73→74 via concavité de chenal / χ-steepness ; antérieur : 78,86 % Wave 62 hypsométrie géologie 72→73). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
 
 | Dimension | % | Piste principale |
 |-----------|---|------------------|
 | Climat / biomes | 80 | GraphCast-lite + colonne 3D + circulation L1 + vent 2D |
-| Géologie / relief | 73 | Tectonique live, stratigraphie + datation relative + absolue (Wave 51) + cryoclastie (Wave 50) + compaction diagénétique (Wave 54) + géotherme/faciès métamorphiques (Wave 56) + lit mobile Exner (Wave 57) + isostasie d'Airy (Wave 59) + flexure lithosphérique élastique (Wave 61) ; **Wave 62 hypsométrie / maturité de paysage** (courbe + intégrale de Strahler 1952, identité de Pike-Wilson `HI = ratio élévation-relief` comme invariant falsifiable, étages youthful/mature/monadnock) |
+| Géologie / relief | 74 | Tectonique live, stratigraphie + datation relative + absolue (Wave 51) + cryoclastie (Wave 50) + compaction diagénétique (Wave 54) + géotherme/faciès métamorphiques (Wave 56) + lit mobile Exner (Wave 57) + isostasie d'Airy (Wave 59) + flexure lithosphérique élastique (Wave 61) + hypsométrie / maturité de paysage Strahler 1952 (Wave 62) ; **Wave 63 concavité de chenal / χ-steepness** (loi de Flint pente–aire `S = k_s·A^−θ`, méthode χ intégrale de Perron & Royden 2013, invariant pivot = récupération exacte de la loi de puissance + linéarité χ–z, bande gradée θ∈[0,40 ; 0,60]) |
 | Écologie / hydrologie | 73 | `hydrology_mode` sv1d ; Earth Console overlay flux ; Wave 49 quantification réseau (Strahler + Horton + drainage density) ; Wave 53 routage de débit LTI ; **Wave 57 boucle eau→sédiment→relief fermée** (Exner sur graphe D8) |
 | Sociétés / agents | 76 | NEAT + construction émergente + memetic + `/api/audio` |
 | Rendu visuel | 82 | Globe + iso 2.5D + humains + ombres + 2D lite |
