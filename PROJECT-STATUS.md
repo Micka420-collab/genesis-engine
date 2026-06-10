@@ -1,6 +1,6 @@
 # Genesis Engine — État du projet
 
-**Dernière mise à jour :** 6 juin 2026 (Wave 61 — flexure lithosphérique élastique : généralisation d'Airy local vers Vening-Meinesz régional ; plaque mince D∇⁴w + Δρg·w = q résolue spectralement sur le relief émergent ; limite d'Airy exacte à Te=0, bilan de charge mode zéro résidu ≈ 1e-17, lissage régional prouvé ; pur observateur read-only)  
+**Dernière mise à jour :** 10 juin 2026 (Wave 62 — hypsométrie / maturité de paysage : courbe + intégrale hypsométriques de Strahler 1952 sur le relief émergent `elevation_m` ; invariant pivot **identité de Pike-Wilson** `trapz(courbe) == ratio élévation-relief` résidu réel 8,7e-05 ; invariance affine exacte de HI, rampe linéaire HI=0,5, étages youthful/mature/monadnock + skewness signée ; pur observateur read-only. Antérieur : Wave 61 flexure lithosphérique élastique, Vening-Meinesz régional, limite d'Airy exacte à Te=0)  
 **Synthèse courte** pour contributeurs et reviewers GitHub. Pour le détail session par session, voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md).
 
 ---
@@ -9,7 +9,7 @@
 
 **EMERGENCE SIM v2** — laboratoire ZERO PRE-SCRIPT : lois physiques L0–L4, agents autonomes, civilisation **non scriptée**, observable via Earth Console et métriques d'émergence.
 
-**Tests :** `pytest runtime/tests` — **361** tests · smokes **p72–p130** (+ `p87` observer) dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **376** tests · smokes **p72–p131** (+ `p87` observer) dans `validate-all`.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle
@@ -43,12 +43,12 @@ Détail des **Waves 16–41** (genesis, tectonique, climat, NCA, settlements, ro
 
 ## Réalisme Terre (grille scientifique)
 
-**Score global : ~78,7 %** (moyenne 7 dimensions, recalcul **78,7 %** après Wave 61 — géologie 71→72 via flexure lithosphérique élastique ; antérieur : 78,6 % Wave 59 isostasie d'Airy géologie 70→71). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
+**Score global : ~78,9 %** (moyenne 7 dimensions, recalcul **78,86 %** après Wave 62 — géologie 72→73 via hypsométrie / maturité de paysage ; antérieur : 78,7 % Wave 61 flexure lithosphérique élastique géologie 71→72). **Objectif cible : 80 %** — voir explication des anciens chiffres (68 / 74 / 80) dans la roadmap.
 
 | Dimension | % | Piste principale |
 |-----------|---|------------------|
 | Climat / biomes | 80 | GraphCast-lite + colonne 3D + circulation L1 + vent 2D |
-| Géologie / relief | 72 | Tectonique live, stratigraphie + datation relative + absolue (Wave 51) + cryoclastie (Wave 50) + compaction diagénétique (Wave 54) + géotherme/faciès métamorphiques (Wave 56) + lit mobile Exner (Wave 57) + isostasie d'Airy (Wave 59) ; **Wave 61 flexure lithosphérique élastique** (Vening-Meinesz régional : D∇⁴w + Δρg·w = q spectral, filtre Φ(k), α ≈ 89 km à Te 25 km, limite d'Airy exacte à Te=0) |
+| Géologie / relief | 73 | Tectonique live, stratigraphie + datation relative + absolue (Wave 51) + cryoclastie (Wave 50) + compaction diagénétique (Wave 54) + géotherme/faciès métamorphiques (Wave 56) + lit mobile Exner (Wave 57) + isostasie d'Airy (Wave 59) + flexure lithosphérique élastique (Wave 61) ; **Wave 62 hypsométrie / maturité de paysage** (courbe + intégrale de Strahler 1952, identité de Pike-Wilson `HI = ratio élévation-relief` comme invariant falsifiable, étages youthful/mature/monadnock) |
 | Écologie / hydrologie | 73 | `hydrology_mode` sv1d ; Earth Console overlay flux ; Wave 49 quantification réseau (Strahler + Horton + drainage density) ; Wave 53 routage de débit LTI ; **Wave 57 boucle eau→sédiment→relief fermée** (Exner sur graphe D8) |
 | Sociétés / agents | 76 | NEAT + construction émergente + memetic + `/api/audio` |
 | Rendu visuel | 82 | Globe + iso 2.5D + humains + ombres + 2D lite |
