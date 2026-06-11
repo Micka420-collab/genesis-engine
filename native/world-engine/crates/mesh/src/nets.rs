@@ -13,7 +13,6 @@ use bytemuck::{Pod, Zeroable};
 use genesis_core::{CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z};
 use genesis_streaming::Chunk;
 use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
 use thiserror::Error;
 
 /// Mesh extraction errors.

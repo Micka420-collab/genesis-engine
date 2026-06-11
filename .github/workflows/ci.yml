@@ -104,13 +104,16 @@ jobs:
           cargo test -p genesis-core -p genesis-biome -p genesis-worldgraph -- --nocapture
 
       # Extended workspace tests (streaming + agent-api + weather + terrain)
-      # cover the N1/N3/N6 + B1 fixes. Currently `continue-on-error: true`
-      # because streaming/manager.rs and crates/terrain expose pre-existing
-      # compile errors (`genesis_terrain::generate` no longer in root,
-      # borrow-check on restore_chunk_voxels) from the active Wave 42 WIP
-      # that need a follow-up commit by the runtime owner. Once those land
-      # green locally, remove `continue-on-error` so the I-* invariants in
-      # FALSIFIABILITY.md are genuinely guarded by this job.
+      # cover the N1/N3/N6 fixes plus the mutation-pin / eviction-race fix in
+      # streaming/manager.rs (set_voxel + restore_chunk_voxels re-assert cache
+      # membership after the write pins the chunk). The previously-noted compile
+      # errors (genesis_terrain::generate, restore_chunk_voxels borrow-check)
+      # were addressed in the same change set — BUT those Rust diffs were
+      # validated by inspection only; no cargo toolchain was available in the
+      # authoring environment to run `cargo test` locally. Kept as
+      # `continue-on-error` so this CI run (which DOES have cargo) is the source
+      # of truth: once it goes green, drop `continue-on-error` so the I-*
+      # invariants in FALSIFIABILITY.md are genuinely blocking.
       - name: Cargo test (extended workspace)
         working-directory: native/world-engine
         continue-on-error: true

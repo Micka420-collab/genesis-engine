@@ -11,18 +11,25 @@ from engine.world import CHUNK_SIDE_M, CHUNK_SIZE, VOXEL_SIZE_M
 PIPELINE_LAYER = "Genesis-L0 Core"
 WORLD_MODEL_CAPABILITY = "paper-L1 Predictor"
 
-# Both the canonical `native/world-engine/pybindings` crate and the legacy
-# `scaffolding/ge-py` crate compile to a Python module literally named
-# `genesis_world`, so a stale legacy wheel can shadow the canonical build in
-# site-packages. They expose incompatible APIs (the legacy `observe_chunk`
-# requires a 3rd positional `cz`, and it lacks the mutation/snapshot surface),
-# which previously surfaced as a cryptic ``TypeError`` deep in the bridge.
-# Treat a module as the native backend only when it satisfies this contract.
+# Both the `native/world-engine/pybindings` crate and the `scaffolding/ge-py`
+# crate compile to a Python module literally named `genesis_world`, and they
+# expose different surfaces:
+#  - ge-py drives the simulation hot path (engine/world.py) through the terrain
+#    surface `sample_terrain_chunk` / `sample_terrain_batch`.
+#  - pybindings adds the mutation + snapshot surface exercised only by
+#    test_native_genesis_world.py.
+# A module is a usable native backend when it satisfies EITHER contract. The
+# snapshot contract is also kept as its own predicate (`is_canonical_pyworld`)
+# so the snapshot-only test can gate on it specifically.
 _CANONICAL_PYWORLD_API = (
     "set_voxel",
     "apply_pending",
     "save_snapshot",
     "restore_snapshot",
+)
+_TERRAIN_PYWORLD_API = (
+    "sample_terrain_chunk",
+    "observe_chunk",
 )
 _warned_non_canonical = False
 
@@ -103,36 +110,58 @@ class MockPyWorld:
 
 
 def is_canonical_pyworld(module: Any) -> bool:
-    """True when ``module`` exposes the canonical native ``PyWorld`` contract."""
+    """True when ``module`` exposes the snapshot/mutation ``PyWorld`` contract.
+
+    Satisfied by the ``native/world-engine/pybindings`` wheel. Used by the
+    snapshot-only test to gate itself.
+    """
     pyworld = getattr(module, "PyWorld", None)
     if pyworld is None:
         return False
     return all(hasattr(pyworld, name) for name in _CANONICAL_PYWORLD_API)
 
 
+def is_terrain_pyworld(module: Any) -> bool:
+    """True when ``module`` exposes the terrain surface used by the sim hot path.
+
+    Satisfied by the ``scaffolding/ge-py`` wheel (``sample_terrain_chunk`` …).
+    """
+    pyworld = getattr(module, "PyWorld", None)
+    if pyworld is None:
+        return False
+    return all(hasattr(pyworld, name) for name in _TERRAIN_PYWORLD_API)
+
+
+def is_native_pyworld(module: Any) -> bool:
+    """True when ``module`` is a usable native backend (either contract)."""
+    return is_canonical_pyworld(module) or is_terrain_pyworld(module)
+
+
 def try_import_genesis_world() -> Tuple[Any, bool]:
     """Return ``(module_or_mock, is_native)``.
 
-    A module named ``genesis_world`` is accepted as the native backend only
-    when it satisfies the canonical ``PyWorld`` contract. A legacy ``ge-py``
-    wheel shadowing the name falls back to the API-compatible mock with a
-    one-time warning, rather than crashing the bridge downstream.
+    A module named ``genesis_world`` is accepted as the native backend when it
+    satisfies either the terrain contract (sim hot path) or the snapshot
+    contract. A module that exposes a ``PyWorld`` matching neither falls back
+    to the API-compatible mock with a one-time warning, rather than crashing
+    the bridge downstream.
     """
     global _warned_non_canonical
     try:
         import genesis_world as gw  # type: ignore
     except ImportError:
         return MockPyWorld, False
-    if is_canonical_pyworld(gw):
+    if is_native_pyworld(gw):
         return gw, True
     if not _warned_non_canonical:
         _warned_non_canonical = True
         warnings.warn(
-            "Imported `genesis_world` lacks the canonical PyWorld API ("
+            "Imported `genesis_world` exposes neither the terrain contract ("
+            + ", ".join(_TERRAIN_PYWORLD_API)
+            + ") nor the snapshot contract ("
             + ", ".join(_CANONICAL_PYWORLD_API)
-            + ") — this is the legacy scaffolding/ge-py wheel shadowing the "
-            "native build. Falling back to the Genesis-anchored mock. Rebuild "
-            "the canonical wheel with `make maturin-dev`.",
+            + "); falling back to the Genesis-anchored mock. Rebuild the wheel "
+            "with `make maturin-dev`.",
             RuntimeWarning,
             stacklevel=2,
         )
@@ -230,10 +259,14 @@ def create_py_world_from_sim(sim, *,
 
 def bridge_status(sim=None) -> Dict[str, Any]:
     """Diagnostic for dashboards / CI."""
-    _, native = try_import_genesis_world()
+    gw, native = try_import_genesis_world()
+    backend = "mock"
+    if native:
+        backend = "canonical" if is_canonical_pyworld(gw) else "terrain"
     out: Dict[str, Any] = {
         "native": native,
         "module": "genesis_world" if native else "engine.rust_bridge.MockPyWorld",
+        "backend": backend,
     }
     if sim is not None:
         try:
@@ -249,6 +282,8 @@ def bridge_status(sim=None) -> Dict[str, Any]:
 __all__ = [
     "MockPyWorld",
     "is_canonical_pyworld",
+    "is_terrain_pyworld",
+    "is_native_pyworld",
     "try_import_genesis_world",
     "create_py_world",
     "create_py_world_from_sim",

@@ -20,6 +20,7 @@ async fn main() {
         for cx in 0..4 {
             let t0 = Instant::now();
             let chunk = mgr.get_or_generate(ChunkCoord { cx, cy }).await;
+            let chunk = chunk.read();
             let dt = t0.elapsed();
             total += dt;
             for b in &chunk.biome {

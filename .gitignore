@@ -59,11 +59,15 @@ runtime/genesis/*
 
 # --- Rust build artefacts (scaffolding crates) ---
 scaffolding/target/
+native/world-engine/target/
 **/target/debug/
 **/target/release/
 **/*.rlib
 **/*.rmeta
 Cargo.lock.bak
+
+# --- Stray probe / scratch artefacts from test harness runs ---
+runtime/tests/_probe_*.jsonl
 
 # --- Logs ---
 *.log

@@ -9,7 +9,9 @@
 
 **EMERGENCE SIM v2** — laboratoire ZERO PRE-SCRIPT : lois physiques L0–L4, agents autonomes, civilisation **non scriptée**, observable via Earth Console et métriques d'émergence.
 
-**Tests :** `pytest runtime/tests` — **389** tests · smokes **p72–p132** (+ `p87` observer) dans `validate-all`.  
+**Tests :** `pytest runtime/tests` — **395** tests · smokes **p72–p132** (+ `p87` observer) dans `validate-all`.  
+
+> **Session 2026-06-11 — rupture du « treadmill d'observateurs » (audit §D1) :** aucune Wave 64. (1) **Pont Python↔Rust réactivé** — le contrat trop strict (`is_canonical_pyworld` seul) rejetait silencieusement le wheel `ge-py` (surface *terrain*) vers `MockPyWorld` → backend natif inactif depuis Wave 42. Fix `rust_bridge.py` (`is_terrain_pyworld` / `is_native_pyworld`) **vérifié en live** : `bridge_status()` → `{native: True, backend: "terrain"}`. (2) **Garde D1** `engine/observer_budget.py` + `tests/test_observer_budget.py` (idempotence cross-observer prouvée, budget tick < 10 % instrumenté) + moratoire formalisé dans `CONTRIBUTING.md`. Diffs Rust moteur (`manager.rs` fix course mutation/éviction, `scenario` dép `worldgraph`, `-D warnings`) validés par inspection — **cargo absent de l'environnement**, CI = source de vérité.  
 **CI :** le job Python exécute `make doctor`, `compile-python`, `test-python`, puis les smokes réalisme dans le **même ordre que `make validate-all`**, puis `p82_observation_sse_smoke.py` (observation SSE).
 
 ### Philosophie — émergence civilisationnelle

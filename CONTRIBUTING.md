@@ -263,6 +263,21 @@ Le script doit :
 - **Imprimer** un résumé clair en fin
 - **Écrire** un journal dans `runtime/journals/pN_<name>.jsonl`
 
+### Moratoire observateurs (anti-treadmill)
+
+Les phénomènes scientifiques read-only (`engine/*_observer.py` qui wrappent
+`sim.step`) sont précieux mais bon marché à empiler. Le delta-audit du
+2026-06-10 (`native/world-engine/AUDIT-DELTA-2026-06-10.md` §D1) a constaté
+**14 vagues d'observateurs en 14 jours pour 0 item Phase A/B mergé**. Règle :
+
+- **Pas de nouvelle vague d'observateur (Wave 64+)** tant que le tableau
+  **Phase A** (`AUDIT-DELTA-*.md`) n'a pas **≥ 5/7 items à ✅** *et* qu'au
+  moins **un item Phase B** n'est pas mergé.
+- Tout nouvel observateur doit garder le coût cumulé de la chaîne **< 10 % du
+  tick** — mesure avec `engine.observer_budget.measure_observer_overhead(...)`
+  + `assert_observer_budget(...)`. L'idempotence install/uninstall est gardée
+  par `tests/test_observer_budget.py`.
+
 ### Tests d'intégration
 
 `p12_integration_full.py` teste les 5 sub-systems ensemble. Si ton change touche un de ces sub-systems, **vérifie que p12 passe toujours** (4/5 ou 5/5).

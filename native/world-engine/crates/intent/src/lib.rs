@@ -16,7 +16,6 @@
 use ahash::AHashSet;
 use genesis_core::{ChunkCoord, WorldCoord, CHUNK_SIZE_X, CHUNK_SIZE_Y};
 use genesis_streaming::ChunkManager;
-use glam::Vec3;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;

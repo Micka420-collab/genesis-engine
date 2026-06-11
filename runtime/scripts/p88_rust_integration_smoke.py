@@ -196,6 +196,32 @@ except Exception as e:
     check("ChunkStreamer.get() ≡ generate_chunk direct", False, str(e))
 
 # ---------------------------------------------------------------------------
+# 11. Anti-régression : un wheel `genesis_world` exposant le contrat terrain
+#     OU snapshot DOIT être détecté natif. Empêche le rejet silencieux d'un
+#     wheel valide (le bug du contrat trop strict) qui retombait sur le mock.
+# ---------------------------------------------------------------------------
+try:
+    import importlib
+    from engine.rust_bridge import is_native_pyworld, try_import_genesis_world
+    try:
+        gw_mod = importlib.import_module("genesis_world")
+        installed = True
+    except ImportError:
+        gw_mod = None
+        installed = False
+    _, native = try_import_genesis_world()
+    if installed and is_native_pyworld(gw_mod):
+        ok = native is True
+        detail = "wheel conforme → natif (pas de rejet silencieux)"
+    else:
+        ok = native is False
+        detail = ("wheel hors contrat → mock attendu" if installed
+                  else "wheel absent → mock attendu")
+    check("anti-régression : wheel conforme ⇒ natif", ok, detail)
+except Exception as e:
+    check("anti-régression : wheel conforme ⇒ natif", False, str(e))
+
+# ---------------------------------------------------------------------------
 # Résumé
 # ---------------------------------------------------------------------------
 total = passed + failed

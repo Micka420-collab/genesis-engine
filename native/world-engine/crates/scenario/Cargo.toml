@@ -6,13 +6,14 @@ license     = { workspace = true }
 description = "Declarative scientific scenarios (YAML) + FAIR manifest"
 
 [dependencies]
-genesis-core      = { path = "../core" }
-genesis-physics   = { path = "../physics" }
-genesis-laws      = { path = "../laws" }
-genesis-streaming = { path = "../streaming" }
-genesis-biome     = { path = "../biome" }
-genesis-weather   = { path = "../weather" }
-genesis-climate   = { path = "../climate" }
+genesis-core       = { path = "../core" }
+genesis-physics    = { path = "../physics" }
+genesis-laws       = { path = "../laws" }
+genesis-streaming  = { path = "../streaming" }
+genesis-biome      = { path = "../biome" }
+genesis-weather    = { path = "../weather" }
+genesis-climate    = { path = "../climate" }
+genesis-worldgraph = { path = "../worldgraph" }
 
 serde      = { workspace = true }
 serde_yaml = { workspace = true }

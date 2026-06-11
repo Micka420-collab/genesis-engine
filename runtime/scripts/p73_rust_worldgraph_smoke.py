@@ -54,7 +54,7 @@ def main() -> int:
 
     failures = 0
     w = create_py_world(seed=42)
-    obs = w.observe_chunk(0, 0)
+    obs = w.observe_chunk(0, 0, 0)
     ok = isinstance(obs, dict) and "elevation" in obs
     print(_row("PyWorld.observe_chunk", ok, f"keys={list(obs.keys())[:5]}"))
     if not ok:

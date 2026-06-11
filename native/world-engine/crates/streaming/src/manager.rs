@@ -178,11 +178,19 @@ impl ChunkManager {
     /// Replace voxel buffer after snapshot restore (bumps `mutation_version`).
     pub fn restore_chunk_voxels(&self, coord: ChunkCoord, voxels: Vec<u16>, version: u64) {
         let shared = self.get_or_generate_blocking(coord);
-        let mut c = shared.write();
-        if voxels.len() == c.voxels.len() {
-            c.voxels = voxels;
-            c.meta.mutation_version = version;
+        {
+            let mut c = shared.write();
+            if voxels.len() == c.voxels.len() {
+                c.voxels = voxels;
+                c.meta.mutation_version = version;
+            }
         }
+        // Same eviction race as set_voxel: get_or_generate_blocking ran
+        // maybe_evict() while this chunk was still version 0, so it may have
+        // been dropped before the restored voxels landed. Re-assert cache
+        // membership now that mutation_version is restored (pinning it).
+        self.cache.insert(coord, shared);
+        self.maybe_evict();
     }
 
     /// Drop chunks if we're over capacity.
@@ -322,6 +330,14 @@ impl ChunkManager {
         // its inner RwLock. Capturing into `result` forces the guard to
         // drop at this statement's end, before shared.
         let result = shared.write().set_voxel_world(pos, value);
+        // get_or_generate_blocking ran maybe_evict() while this chunk was still
+        // mutation_version == 0, so the LRU scanner may have dropped it from the
+        // cache before the write above landed — orphaning the mutation (the next
+        // read would regenerate a pristine chunk). Re-assert cache membership now
+        // that the write bumped mutation_version > 0 (which pins it), then
+        // re-balance capacity against the correctly-pinned set.
+        self.cache.insert(coord, shared);
+        self.maybe_evict();
         result
     }
 
@@ -691,7 +707,13 @@ mod tests {
     }
 
     #[test]
-    fn macro_grid_pins_border_elevation() {
+    fn macro_grid_drives_chunk_elevation() {
+        // End-to-end: a flat macro grid with full interior weight drives the
+        // whole chunk's elevation toward the grid (not just the 2px border —
+        // that narrower guarantee is covered by macro-bridge's
+        // `border_pins_to_macro`). With `macro_interior_weight = 0.0` the
+        // interior stays pure-procedural by design, so asserting the chunk
+        // *mean* tracks the grid only makes sense at full interior weight.
         let grid = Arc::new(
             MacroGrid::from_buffers(
                 32,
@@ -709,7 +731,7 @@ mod tests {
             cache_capacity: 4,
             macro_grid: Some(grid),
             chunk_side_m: 32.0,
-            macro_interior_weight: 0.0,
+            macro_interior_weight: 1.0,
             ..Default::default()
         };
         let mgr = ChunkManager::new(WorldSeed::from_u64(99), cfg);

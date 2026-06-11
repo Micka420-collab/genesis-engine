@@ -3,7 +3,6 @@
 use crate::manifest::{blake3_hex, Artefact, FairManifest, RunSummary};
 use crate::schema::{ExportSpec, Measurement, Scenario};
 use chrono::Utc;
-use genesis_biome::Biome;
 use genesis_climate::{Climate, ClimateParams};
 use genesis_core::{ChunkCoord, Prf, WorldSeed, CHUNK_SIZE_X, CHUNK_SIZE_Y};
 use genesis_streaming::manager::ChunkManagerConfig;

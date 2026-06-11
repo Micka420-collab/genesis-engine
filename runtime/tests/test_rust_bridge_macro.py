@@ -24,6 +24,6 @@ def test_create_py_world_from_sim_uses_genesis_mock():
         genesis_params=GenesisParams(seed=0xCAFE, resolution=16),
     )
     w = create_py_world_from_sim(sim)
-    obs = w.observe_chunk(0, 0)
+    obs = w.observe_chunk(0, 0, 0)
     assert obs.get("genesis") is True or obs.get("mock") is False
     assert len(obs["elevation"]) == 64 * 64
