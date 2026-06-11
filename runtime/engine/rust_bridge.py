@@ -137,6 +137,25 @@ def is_native_pyworld(module: Any) -> bool:
     return is_canonical_pyworld(module) or is_terrain_pyworld(module)
 
 
+def observe_chunk_compat(world: Any, cx: int, cy: int, cz: int = 0) -> Any:
+    """Call ``world.observe_chunk`` across both incompatible wheel arities.
+
+    The two native wheels disagree on the signature:
+      - ``ge-py`` (terrain hot path) and ``MockPyWorld``: ``observe_chunk(cx, cy, cz)``
+        with ``cz`` required.
+      - ``pybindings`` (canonical snapshot wheel): ``observe_chunk(cx, cy)`` — 2-arg.
+
+    A smoke or the worldgraph tick must not care which wheel is installed, so try
+    the 3-arg form first and fall back to 2-arg only on an arity ``TypeError``.
+    With integer coordinates the 3-arg call can only ``TypeError`` on arity, so
+    the fallback can't mask a real bug.
+    """
+    try:
+        return world.observe_chunk(cx, cy, cz)
+    except TypeError:
+        return world.observe_chunk(cx, cy)
+
+
 def try_import_genesis_world() -> Tuple[Any, bool]:
     """Return ``(module_or_mock, is_native)``.
 
@@ -284,6 +303,7 @@ __all__ = [
     "is_canonical_pyworld",
     "is_terrain_pyworld",
     "is_native_pyworld",
+    "observe_chunk_compat",
     "try_import_genesis_world",
     "create_py_world",
     "create_py_world_from_sim",

@@ -86,6 +86,27 @@ def test_canonical_wheel_is_treated_as_native(monkeypatch, _clean_bridge_state):
     assert module is fake
 
 
+def test_observe_chunk_compat_bridges_both_arities():
+    # The two wheels disagree on observe_chunk arity; the adapter must serve both
+    # and must NOT mask a non-arity TypeError raised inside the method.
+    class Terrain:  # ge-py / mock: requires cz
+        def observe_chunk(self, cx, cy, cz):
+            return {"arity": 3, "cz": cz}
+
+    class Canonical:  # pybindings: 2-arg only
+        def observe_chunk(self, cx, cy):
+            return {"arity": 2}
+
+    class Broken:
+        def observe_chunk(self, cx, cy, cz=0):
+            raise TypeError("unrelated boom")
+
+    assert rb.observe_chunk_compat(Terrain(), 1, 2) == {"arity": 3, "cz": 0}
+    assert rb.observe_chunk_compat(Canonical(), 1, 2) == {"arity": 2}
+    with pytest.raises(TypeError, match="boom"):
+        rb.observe_chunk_compat(Broken(), 1, 2)
+
+
 def test_contract_predicates():
     assert rb.is_canonical_pyworld(_fake_genesis_world(canonical=True)) is True
     assert rb.is_canonical_pyworld(_fake_genesis_world(terrain=True)) is False

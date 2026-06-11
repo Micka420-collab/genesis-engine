@@ -34,7 +34,11 @@ def main() -> int:
     print("P73b — Rust pybindings smoke")
     print("=" * 78)
 
-    from engine.rust_bridge import create_py_world, try_import_genesis_world
+    from engine.rust_bridge import (
+        create_py_world,
+        observe_chunk_compat,
+        try_import_genesis_world,
+    )
 
     gw_mod, native = try_import_genesis_world()
     if not native:
@@ -54,7 +58,8 @@ def main() -> int:
 
     failures = 0
     w = create_py_world(seed=42)
-    obs = w.observe_chunk(0, 0, 0)
+    # Arity-robust: pybindings wheel is observe_chunk(cx, cy); ge-py/mock is 3-arg.
+    obs = observe_chunk_compat(w, 0, 0)
     ok = isinstance(obs, dict) and "elevation" in obs
     print(_row("PyWorld.observe_chunk", ok, f"keys={list(obs.keys())[:5]}"))
     if not ok:
