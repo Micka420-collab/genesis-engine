@@ -1,10 +1,46 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 6 juin 2026 (Wave 60 — illumination comportementale / Quality-Diversity : couverture d'espace MAP-Elites + nouveauté comportementale, pur observateur read-only, complément spatial de la Wave 58).
+**Dernière mise à jour :** 12 juin 2026 (Cap. C2 — affleurements de pierre taillable : 2ᵉ _capacité_ agent anti-treadmill, découverte d'outil lithique émergente).
 
-> **Synthèse contributeur** (phases, réalisme **~78 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
+> **Synthèse contributeur** (phases, réalisme **~79,3 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-12) — Cap. C2 : affleurements de pierre taillable (`engine.lithic_outcrop`)
+
+**2ᵉ _capacité_ agent** (anti-*observer treadmill*), pendant de Cap. C1
+(`surface_mineralization`, minerai métallique / âge du bronze) côté **pierre
+taillée** — technologie plus fondamentale encore. La géologie portait la
+lithologie (`StrataLayer.rock_type`) et les silicates taillables
+(`obsidian`/`quartz` dans `ore_mix`) mais restait **muette** : aucun signal ne
+disait *où trouver une pierre qui fait des lames tranchantes*.
+
+- `runtime/engine/lithic_outcrop.py` (capacité pure, lecture, **coût tick nul**) :
+  table de taille (`KnapClass` `CONCHOIDAL`/`TABULAR`/`GROUND`/`SOFT`),
+  hiérarchie archéologique **obsidienne 1.0 > silex(chert) 0.72 > quartzite 0.42
+  > basalte 0.45 > granite 0.40** ; silex = `quartz` bonifié (`CHERT_BONUS`) en
+  hôte carbonaté ; affleurement vs enfouissement (`MAX_OUTCROP_DEPTH = 6 m`) ;
+  masquage par biome ; API `prospect_toolstone` / `discover_toolstone_by_sight`
+  / `best_toolstone_near` / `lithic_cue_summary` ; install idempotent.
+- **Invariant prouvé** « le monde ne ment jamais » : cue ⇒ vraie couche peu
+  profonde (`rock_type` OU `ore_mix`) portant la matière, même source que
+  `mine_at` ; boucle **voir verre → débiter → obsidienne** end-to-end.
+- `runtime/scripts/p134_lithic_outcrop_smoke.py` — **7/7 PASS** (seed `0xFACE`,
+  0 violation, déterminisme bit-identique).
+- `runtime/tests/test_lithic_outcrop.py` — **15/15** ; voisin
+  `test_surface_mineralization` vert ; `ruff` clean ; **pytest 426/426**.
+- Câblé `Makefile` + CI (après `p133`) + `_REQUIRED_MODULES`
+  (`world_model_capabilities`, ADR-0005 lint vert).
+- Doc : [`docs/sprints/2026-06-12_CAP-C2_lithic_outcrop.md`](docs/sprints/2026-06-12_CAP-C2_lithic_outcrop.md)
+  · veille : [`docs/veille/2026-06-12_VEILLE_lithic_outcrop.md`](docs/veille/2026-06-12_VEILLE_lithic_outcrop.md).
+- **Impact réalisme** : Sociétés/agents **76 → 77 %** ; global ≈ **79,3 %**.
+- **Gaps honnêtes** : provenance volcanique de l'obsidienne non verrouillée (à
+  traiter côté `engine.geology`, source de distribution) ; pas de nouvelle
+  `ActionKind` (perception + support de décision, débitage via flux existants) ;
+  visibilité par biome (pas par pente) ; aucun item Rust Phase A/B fermé
+  (`cargo` absent de l'env → CI = vérité).
 
 ---
 
