@@ -1,10 +1,44 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 12 juin 2026 (Cap. C2 — affleurements de pierre taillable : 2ᵉ _capacité_ agent anti-treadmill, découverte d'outil lithique émergente).
+**Dernière mise à jour :** 13 juin 2026 (Cap. C4 — affleurement de combustible : 4ᵉ _capacité_ agent, découverte d'énergie émergente tourbe/charbon/schiste).
 
-> **Synthèse contributeur** (phases, réalisme **~79,3 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
+> **Synthèse contributeur** (phases, réalisme **~79,6 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-13, suite) — Cap. C4 : affleurement de combustible (`engine.combustible_outcrop`)
+
+**4ᵉ _capacité_ agent.** Toute la branche **ORGANIQUE** de la géologie
+(`peat`/`coal`/`oil_shale`, déjà semée dans l'`ore_mix` par `engine.geology`)
+restait **muette** : aucun signal de surface ne disait *où trouver la roche/terre
+qui brûle* — premier maillon de la **révolution énergétique** (SYSTÈME F : feu
+durable → four + charbon → fusion → métallurgie).
+
+- `runtime/engine/combustible_outcrop.py` (capacité pure, lecture, **coût tick
+  nul**) : **combo veille D1×D2** — rang houiller (`calorific_grade` tourbe 0.35 <
+  schiste 0.55 < charbon 0.85 ; `SMELTING_GRADE 0.70` = seul le charbon fond le
+  métal) × **porte d'humidité** de Rothermel (`effective_moisture = ambient ×
+  hygroscopy` ; `MOISTURE_EXTINCTION 0.35`) → `burnable_now` vs `dry_to_burn`
+  (« couper→sécher→brûler »). Effet 1+1>2 : géologie organique (SYSTÈME C) ×
+  hydrologie de surface (SYSTÈME A, `chunk.water`).
+- Invariant **« le monde ne ment jamais »** : cue ⇒ combustible réel `≤ 6 m` dans
+  la *même* colonne que `mine_at` ; `burnable_now` ⇒ grade & sec ; `smelting_grade`
+  ⇒ grade ≥ seuil. Prouvé sur monde réel **boréal** (seed `0xB0`, 66/144 chunks =
+  24 charbon + 42 tourbe, 0 violation).
+- **Garde-fou ADR-0007 honoré** : `PY_TO_RUST` enrichi (`coal` enfin surfacé +
+  `peat`/`oil_shale` ajoutés) + **verrou byte-exact** tell charbon `(20,20,20)` ⇔
+  `Mineral::Coal::surface_color()` (miroir cuivre/malachite).
+- `runtime/tests/test_combustible_outcrop.py` (18) + contrat cross-langage +1 +
+  smoke `runtime/scripts/p136_combustible_outcrop_smoke.py` (7/7). **pytest
+  467/467** (+1 skip). Lint ruff vert. Module ajouté à
+  `world_model_capabilities._REQUIRED_MODULES` (ADR-0005 `ok`).
+- **Réalisme** : Géologie/relief **75 → 76**, global **~79,4 % → ~79,6 %**.
+- **Gap honnête** : diagenèse houillification (tourbe→charbon par enfouissement/T°)
+  non simulée ; ne ferme aucun item Rust Phase A/B (`cargo` absent → CI = vérité).
+- Détail : [`docs/sprints/2026-06-13_CAP-C4_combustible_outcrop.md`](docs/sprints/2026-06-13_CAP-C4_combustible_outcrop.md)
+  · veille : [`docs/veille/2026-06-13_VEILLE_combustible_outcrop.md`](docs/veille/2026-06-13_VEILLE_combustible_outcrop.md)
 
 ---
 

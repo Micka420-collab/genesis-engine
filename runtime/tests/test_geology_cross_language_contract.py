@@ -35,11 +35,22 @@ catalogue**. They are deliberately *not* 1:1. The genuine, must-hold contract is
   2. Every "tell" mineral the **live Python runtime** surfaces to agents maps to
      a real Rust variant (``PY_TO_RUST``), and every Python name exists in the
      catalogue. Drift on either side breaks the build.
-  3. The single byte-exact colour cross-reference that the code already documents
+  3. The byte-exact colour cross-references that the code documents stay locked:
      — the **malachite copper tell** (``surface_mineralization.py`` rgb (80,140,70)
-     ⇔ ``Mineral::Malachite::surface_color()`` ``[80,140,70]``) — stays locked.
+       ⇔ ``Mineral::Malachite::surface_color()`` ``[80,140,70]``) ;
+     — the **matte-black coal tell** (``combustible_outcrop.py`` coal rgb
+       (20,20,20) ⇔ ``Mineral::Coal::surface_color()`` ``[20,20,20]``).
   4. The intra-Python salt contract (C1 salt cue rgb == C3 brine rgb) that
      ``water_potability.py:161`` claims in a comment is enforced, not just hoped.
+
+Cap. C4 (``combustible_outcrop``) enrichment (ADR-0007 guardrail)
+-----------------------------------------------------------------
+The Wave-64+ moratorium guardrail requires **every new capability to enrich
+``PY_TO_RUST``**. C4 surfaces the organic-fuel branch (peat / coal / oil_shale)
+as live runtime tells, so it (a) finally exercises the ``coal`` entry that was
+mapped here speculatively, (b) adds ``peat`` and ``oil_shale`` (both binned to
+the coarse Rust ``Coal`` tell — there is no finer organic variant), and (c)
+locks the matte-black coal tell byte-exact, mirroring the malachite copper tell.
 """
 from __future__ import annotations
 
@@ -51,6 +62,7 @@ import pytest
 
 from engine import surface_mineralization as sm
 from engine import water_potability as wp
+from engine import combustible_outcrop as co
 from engine.mineral_catalog import MINERAL_BY_NAME
 
 
@@ -129,6 +141,11 @@ PY_TO_RUST: Dict[str, str] = {
     "obsidian":      "Obsidian",
     "quartz":        "Quartz",
     "coal":          "Coal",
+    # Cap. C4 (combustible_outcrop) organic fuels. The coarse Rust enum has a
+    # single "Coal" tell; the finer Python organics (immature peat, kerogen oil
+    # shale) bin to it — same dark carbonaceous "burnable" gameplay signal.
+    "peat":          "Coal",
+    "oil_shale":     "Coal",
 }
 
 # Rust variants intentionally without a same-named Python catalogue entry.
@@ -204,6 +221,23 @@ def test_malachite_copper_tell_is_byte_exact():
     assert tuple(copper_rule.rgb) == palette["Malachite"], (
         f"Copper tell drift: Python {tuple(copper_rule.rgb)} != "
         f"Rust Malachite {palette['Malachite']}"
+    )
+
+
+def test_coal_tell_is_byte_exact():
+    """The matte-black coal tell stays locked cross-language (Cap. C4).
+
+    combustible_outcrop coal cue rgb (20,20,20) == Rust
+    `Mineral::Coal::surface_color()` — the colour an agent learns to seek for a
+    furnace. Mirrors the malachite copper tell; drift on either side breaks the
+    build (D6 guardrail).
+    """
+    src = _require_rust_source()
+    palette = _parse_surface_palette(src)
+    assert "Coal" in palette, "Rust surface_color() lost the Coal arm"
+    assert co._PROFILE["coal"].rgb == palette["Coal"], (
+        f"Coal tell drift: Python {co._PROFILE['coal'].rgb} != "
+        f"Rust Coal {palette['Coal']}"
     )
 
 
