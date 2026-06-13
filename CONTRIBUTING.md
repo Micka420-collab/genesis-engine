@@ -278,6 +278,24 @@ Les phénomènes scientifiques read-only (`engine/*_observer.py` qui wrappent
   + `assert_observer_budget(...)`. L'idempotence install/uninstall est gardée
   par `tests/test_observer_budget.py`.
 
+### Moratoire capacités géologie (anti-divergence Python↔Rust)
+
+Le delta-audit 2026-06-12 (§D6) a constaté **3 capacités consécutives**
+(C1 `surface_mineralization`, C2 `lithic_outcrop`, C3 `water_potability`) qui
+dérivent toutes la géologie côté **Python** pendant que la crate Rust
+`crates/geology` reste dormante — *double source de vérité, protocole non
+documenté*. La **décision D5** ([ADR-0007](adr/0007-d5-geology-orphan-resolution.md))
+a levé le blocage Cap. C4 **par garde-fou**, pas par renoncement :
+
+- Toute **nouvelle capacité** qui surface un minéral « tell » à un agent
+  **doit** ajouter ce minéral à `PY_TO_RUST` dans
+  `tests/test_geology_cross_language_contract.py` (ou le justifier dans
+  `RUST_ONLY`). Ce test fige l'enum `Mineral` Rust et le tell cuivre/malachite
+  byte-exact ; il **casse le build** à la moindre divergence.
+- Le **câblage moteur Rust** de `genesis-geology` (Cargo dep + `sample_at` +
+  pybindings) reste un item **Phase A** (« D5-wiring »), à faire en session CI
+  avec `cargo` — il n'est **plus** un bloqueur de C4.
+
 ### Tests d'intégration
 
 `p12_integration_full.py` teste les 5 sub-systems ensemble. Si ton change touche un de ces sub-systems, **vérifie que p12 passe toujours** (4/5 ou 5/5).

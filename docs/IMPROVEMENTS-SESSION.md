@@ -16,3 +16,8 @@ cd native/world-engine
 maturin develop -m crates/pybindings/Cargo.toml
 ```
 
+
+## Pont Rust — OK
+
+`genesis_world` importable, observe_chunk OK.
+
