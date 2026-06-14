@@ -471,6 +471,26 @@ MINERALS: Tuple[Mineral, ...] = (
                                 "Si": 0.20, "Al": 0.07,
                                 "O": 0.50, "Fe": 0.03},
             tech_tier=3),  # industrial-era resource
+
+    # ===========================================================
+    # Plastic clay (Neolithic pottery / brick) — appended last so
+    # MINERAL_INDEX stays stable (Cap. C5 clay_outcrop, 2026-06-14).
+    # Residual / secondary kaolinite: the plastic potter's clay that
+    # closes the Rust ``Mineral::FineClay`` orphan (cross-language
+    # contract). Forms by humid weathering of feldspathic / argillaceous
+    # rock; shallow, low-elevation (floodplain / lacustrine) bias.
+    # ===========================================================
+    Mineral("fine_clay", "argile plastique (kaolin)",
+            MineralCategory.SILICATE, "Al2Si2O5(OH)4",
+            density_g_cm3=2.60, mohs_hardness=2.0,
+            biome_affinity=_aff("TEMPERATE_FOREST", "GRASSLAND",
+                                "SAVANNA", "TROPICAL_DRY_FOREST",
+                                "TROPICAL_RAINFOREST", "BOREAL_FOREST"),
+            min_depth_m=0.0, max_depth_m=12.0,
+            elevation_bias=-0.2, rarity=0.55,
+            yields_per_kg_ore={"Al": 0.21, "Si": 0.22,
+                                "O": 0.49, "H": 0.015},
+            tech_tier=0),  # pottery + brick + kiln → ceramics
 )
 
 

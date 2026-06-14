@@ -51,6 +51,15 @@ as live runtime tells, so it (a) finally exercises the ``coal`` entry that was
 mapped here speculatively, (b) adds ``peat`` and ``oil_shale`` (both binned to
 the coarse Rust ``Coal`` tell — there is no finer organic variant), and (c)
 locks the matte-black coal tell byte-exact, mirroring the malachite copper tell.
+
+Cap. C5 (``clay_outcrop``) enrichment (ADR-0007 guardrail)
+----------------------------------------------------------
+C5 surfaces plastic clay as a live runtime tell. It **closes the FineClay
+orphan**: a real ``fine_clay`` (kaolinite) catalogue entry is added, mapped to
+the Rust ``FineClay`` variant (moved out of ``RUST_ONLY``), and the smooth-ochre
+clay tell ``(180,140,110)`` is locked byte-exact ⇔
+``Mineral::FineClay::surface_color()`` — the third locked colour cross-reference
+after malachite (copper) and coal.
 """
 from __future__ import annotations
 
@@ -63,6 +72,7 @@ import pytest
 from engine import surface_mineralization as sm
 from engine import water_potability as wp
 from engine import combustible_outcrop as co
+from engine import clay_outcrop as cl
 from engine.mineral_catalog import MINERAL_BY_NAME
 
 
@@ -146,6 +156,11 @@ PY_TO_RUST: Dict[str, str] = {
     # shale) bin to it — same dark carbonaceous "burnable" gameplay signal.
     "peat":          "Coal",
     "oil_shale":     "Coal",
+    # Cap. C5 (clay_outcrop) plastic clay. Closes the former FineClay orphan:
+    # the new ``fine_clay`` (kaolinite) catalogue entry IS the Rust FineClay tell
+    # an agent learns to seek for a pot. (Shale, the brick-grade clay C5 also
+    # surfaces, keeps its own catalogue identity and is not mapped here.)
+    "fine_clay":     "FineClay",
 }
 
 # Rust variants intentionally without a same-named Python catalogue entry.
@@ -153,7 +168,6 @@ PY_TO_RUST: Dict[str, str] = {
 # Python-side modelling strategy is recorded.
 RUST_ONLY = {
     "Flint":         "modelled in Python as quartz upgraded by CHERT_BONUS in a carbonate host",
-    "FineClay":      "Python uses rock_type/clay vocabulary, no catalogue mineral of this name",
     "Malachite":     "weathering product of native_copper; it IS the copper surface tell colour",
     "LimestonePure": "Python models as limestone/calcite (catalogue), coarse Rust bins it",
     "None":          "sentinel for 'no deposit'",
@@ -238,6 +252,23 @@ def test_coal_tell_is_byte_exact():
     assert co._PROFILE["coal"].rgb == palette["Coal"], (
         f"Coal tell drift: Python {co._PROFILE['coal'].rgb} != "
         f"Rust Coal {palette['Coal']}"
+    )
+
+
+def test_fine_clay_tell_is_byte_exact():
+    """The smooth-ochre clay tell stays locked cross-language (Cap. C5).
+
+    clay_outcrop fine_clay cue rgb (180,140,110) == Rust
+    ``Mineral::FineClay::surface_color()`` — the colour an agent learns to seek
+    for a pot. This wiring closes the former FineClay orphan; drift on either
+    side breaks the build (D6 guardrail). Mirrors the malachite/coal tells.
+    """
+    src = _require_rust_source()
+    palette = _parse_surface_palette(src)
+    assert "FineClay" in palette, "Rust surface_color() lost the FineClay arm"
+    assert cl._PROFILE["fine_clay"].rgb == palette["FineClay"], (
+        f"Clay tell drift: Python {cl._PROFILE['fine_clay'].rgb} != "
+        f"Rust FineClay {palette['FineClay']}"
     )
 
 
