@@ -133,6 +133,7 @@ validate-all: test-python
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p135_water_potability_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p136_combustible_outcrop_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p137_clay_outcrop_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p138_limestone_outcrop_smoke.py
 
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release

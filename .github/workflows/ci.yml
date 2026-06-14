@@ -76,6 +76,7 @@ jobs:
             p135_water_potability_smoke.py
             p136_combustible_outcrop_smoke.py
             p137_clay_outcrop_smoke.py
+            p138_limestone_outcrop_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="

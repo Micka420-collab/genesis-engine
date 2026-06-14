@@ -60,6 +60,18 @@ the Rust ``FineClay`` variant (moved out of ``RUST_ONLY``), and the smooth-ochre
 clay tell ``(180,140,110)`` is locked byte-exact ⇔
 ``Mineral::FineClay::surface_color()`` — the third locked colour cross-reference
 after malachite (copper) and coal.
+
+Cap. C6 (``limestone_outcrop``) enrichment (ADR-0007 guardrail)
+--------------------------------------------------------------
+C6 surfaces high-purity carbonate as a live runtime tell. It **closes the
+LimestonePure orphan**: a real ``limestone_pure`` (near-pure CaCO3 / chalk)
+catalogue entry is added, mapped to the Rust ``LimestonePure`` variant (moved out
+of ``RUST_ONLY``), and the chalk-white tell ``(245,240,225)`` is locked byte-exact
+⇔ ``Mineral::LimestonePure::surface_color()`` — the fourth locked colour
+cross-reference after malachite (copper), coal, and fine_clay. (The common
+``limestone`` rock and the ``calcite`` / ``marble`` / ``dolomite`` carbonates C6
+also surfaces keep their own catalogue identity — the coarse Rust enum bins them
+all to the single LimestonePure tell.)
 """
 from __future__ import annotations
 
@@ -73,6 +85,7 @@ from engine import surface_mineralization as sm
 from engine import water_potability as wp
 from engine import combustible_outcrop as co
 from engine import clay_outcrop as cl
+from engine import limestone_outcrop as li
 from engine.mineral_catalog import MINERAL_BY_NAME
 
 
@@ -161,6 +174,13 @@ PY_TO_RUST: Dict[str, str] = {
     # an agent learns to seek for a pot. (Shale, the brick-grade clay C5 also
     # surfaces, keeps its own catalogue identity and is not mapped here.)
     "fine_clay":     "FineClay",
+    # Cap. C6 (limestone_outcrop) pure carbonate. Closes the former LimestonePure
+    # orphan: the new ``limestone_pure`` (high-purity CaCO3 / chalk) catalogue
+    # entry IS the Rust LimestonePure tell an agent learns to seek for lime /
+    # mortar. (The common ``limestone`` rock and the ``calcite`` / ``marble`` /
+    # ``dolomite`` carbonates C6 also surfaces keep their own catalogue identity
+    # and are not mapped here — the coarse Rust enum has a single carbonate tell.)
+    "limestone_pure": "LimestonePure",
 }
 
 # Rust variants intentionally without a same-named Python catalogue entry.
@@ -169,7 +189,6 @@ PY_TO_RUST: Dict[str, str] = {
 RUST_ONLY = {
     "Flint":         "modelled in Python as quartz upgraded by CHERT_BONUS in a carbonate host",
     "Malachite":     "weathering product of native_copper; it IS the copper surface tell colour",
-    "LimestonePure": "Python models as limestone/calcite (catalogue), coarse Rust bins it",
     "None":          "sentinel for 'no deposit'",
 }
 
@@ -269,6 +288,25 @@ def test_fine_clay_tell_is_byte_exact():
     assert cl._PROFILE["fine_clay"].rgb == palette["FineClay"], (
         f"Clay tell drift: Python {cl._PROFILE['fine_clay'].rgb} != "
         f"Rust FineClay {palette['FineClay']}"
+    )
+
+
+def test_limestone_pure_tell_is_byte_exact():
+    """The chalk-white pure-carbonate tell stays locked cross-language (Cap. C6).
+
+    limestone_outcrop limestone_pure cue rgb (245,240,225) == Rust
+    ``Mineral::LimestonePure::surface_color()`` — the colour an agent learns to
+    seek for lime / mortar. This wiring closes the former LimestonePure orphan;
+    drift on either side breaks the build (D6 guardrail). The fourth locked
+    colour cross-reference after malachite/coal/fine_clay.
+    """
+    src = _require_rust_source()
+    palette = _parse_surface_palette(src)
+    assert "LimestonePure" in palette, \
+        "Rust surface_color() lost the LimestonePure arm"
+    assert li._PROFILE["limestone_pure"].rgb == palette["LimestonePure"], (
+        f"Limestone tell drift: Python {li._PROFILE['limestone_pure'].rgb} != "
+        f"Rust LimestonePure {palette['LimestonePure']}"
     )
 
 

@@ -491,6 +491,27 @@ MINERALS: Tuple[Mineral, ...] = (
             yields_per_kg_ore={"Al": 0.21, "Si": 0.22,
                                 "O": 0.49, "H": 0.015},
             tech_tier=0),  # pottery + brick + kiln → ceramics
+
+    # ===========================================================
+    # High-purity carbonate (Neolithic lime / mortar) — appended
+    # last so MINERAL_INDEX stays stable (Cap. C6 limestone_outcrop,
+    # 2026-06-14). Closes the Rust ``Mineral::LimestonePure`` orphan
+    # (cross-language contract). A near-pure CaCO3 bed (chalk / micrite)
+    # that calcines to a reactive quicklime → the oldest binder known
+    # (lime plaster, Pre-Pottery Neolithic). Distinct from the common
+    # ``limestone`` rock (slightly argillaceous → weaker lime): purity
+    # is what makes the mortar. Shallow, low-elevation carbonate platform.
+    # ===========================================================
+    Mineral("limestone_pure", "calcaire pur (chaux vive)",
+            MineralCategory.CARBONATE, "CaCO3",
+            density_g_cm3=2.71, mohs_hardness=3.0,
+            biome_affinity=_aff("TEMPERATE_FOREST", "GRASSLAND",
+                                "TROPICAL_RAINFOREST", "SAVANNA",
+                                "OCEAN"),
+            min_depth_m=0.0, max_depth_m=600.0,
+            elevation_bias=-0.1, rarity=0.45,
+            yields_per_kg_ore={"Ca": 0.40, "C": 0.12, "O": 0.48},
+            tech_tier=0),  # quicklime → mortar / plaster (oldest binder)
 )
 
 
