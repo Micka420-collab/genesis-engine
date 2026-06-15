@@ -298,6 +298,15 @@ a levé le blocage Cap. C4 **par garde-fou**, pas par renoncement :
   enregistré dans `_CAPABILITY_TELL_MODULES`, ou si un de ses matériaux n'est ni
   dans `PY_TO_RUST` ni dans `PY_CATALOGUE_ONLY`, **le build casse**. Tu ne *peux
   plus* oublier d'enrichir le contrat. Cf. [ADR-0008](adr/0008-python-rust-frontier.md).
+- **Exception par composition (Cap. C7 `fire_ignition`, 2026-06-15).** Une capacité
+  qui **ne surface aucun nouveau tell** — pas de `_PROFILE`, pas de minéral nouveau,
+  fichier **hors** du glob `*_outcrop.py` — mais *compose* des tells **déjà classés**
+  (C7 lit la pyrite-gossan de C1 + le percuteur de C2) n'a **rien à ajouter** à
+  `PY_TO_RUST` : il n'y a pas de divergence possible. Ce n'est pas un contournement —
+  c'est asservi par `test_introduces_no_new_tell` (absence de `_PROFILE`, chaque
+  source d'étincelle est un tell C1 réel, chaque percuteur sort du `_PROFILE` de C2).
+  La règle « toute capacité enrichit le contrat » vise les capacités qui *créent* un
+  tell ; composer n'en crée pas.
 - Le **câblage moteur Rust** de `genesis-geology` (Cargo dep + `sample_at` +
   pybindings) reste un item **Phase A** (« D5-wiring »), à faire en session CI
   avec `cargo` — il n'est **plus** un bloqueur de C4+.
