@@ -83,6 +83,7 @@ import pytest
 
 from engine import surface_mineralization as sm
 from engine import water_potability as wp
+from engine import lithic_outcrop as lo
 from engine import combustible_outcrop as co
 from engine import clay_outcrop as cl
 from engine import limestone_outcrop as li
@@ -191,6 +192,81 @@ RUST_ONLY = {
     "Malachite":     "weathering product of native_copper; it IS the copper surface tell colour",
     "None":          "sentinel for 'no deposit'",
 }
+
+
+# --------------------------------------------------------------------------- #
+# D8 guardrail (R-J4-3) — make the CONTRIBUTING.md tell moratorium TECHNICAL.   #
+# --------------------------------------------------------------------------- #
+#
+# The 2026-06-14 delta-audit (``native/world-engine/AUDIT-DELTA-2026-06-14.md``
+# §5) named risk **D8 / F-D8-2**: ``PY_TO_RUST`` is a frozen static list, so a
+# new Cap. C7+ that surfaces a fresh "tell" mineral *without editing this file*
+# would slip past the contract — the CONTRIBUTING.md rule "every new capability
+# must enrich ``PY_TO_RUST``" was **social, not enforced**. The cross-language
+# guardrail could rot one forgotten capability at a time.
+#
+# The four current outcrop capabilities (C2 lithic, C4 combustible, C5 clay,
+# C6 limestone) surface their tells through a uniform private idiom
+# ``_PROFILE: Dict[material_name, Profile]`` (the same surface the byte-exact
+# tell tests above already read). We auto-discover that idiom and assert every
+# surfaced material is *classified* cross-language — in ``PY_TO_RUST`` (a distinct
+# Rust tell variant) or in ``PY_CATALOGUE_ONLY`` (a documented waiver: the coarse
+# 16-variant Rust enum has no distinct tell, so Python keeps the finer catalogue
+# identity and the agent perceives it as generic lithology / a carbonate already
+# covered by the single ``LimestonePure`` tell). A new unclassified material
+# breaks the build — closing F-D8-2 by CI instead of by convention.
+
+# Live capabilities that surface mineral "tells" through the ``_PROFILE`` idiom.
+# A new ``engine/*_outcrop.py`` that is NOT registered here trips
+# ``test_surfaced_capability_modules_all_registered`` below — so a Cap. C7 author
+# is forced to declare it and classify its tells.
+_CAPABILITY_TELL_MODULES = {
+    "lithic_outcrop":      lo,
+    "combustible_outcrop": co,
+    "clay_outcrop":        cl,
+    "limestone_outcrop":   li,
+}
+
+# Surfaced materials the coarse Rust enum deliberately does NOT model as a
+# distinct tell. Each keeps its finer Python catalogue identity; the agent reads
+# it as lithology (a generic knapping / building rock) or it bins to a carbonate
+# tell already covered by ``LimestonePure``. Documented so the waiver is a
+# conscious, reviewable decision — not a silent omission.
+PY_CATALOGUE_ONLY: Dict[str, str] = {
+    # Generic knapping / ground-stone / construction rock — no distinct Rust tell;
+    # perceived as lithology (``rock_type``), not an ore cue.
+    "slate":     "lithic tell — metamorphic tabular rock; no distinct Rust tell variant",
+    "shale":     "lithic + brick-clay tell — consolidated mudrock; no distinct Rust tell variant",
+    "basalt":    "lithic tell — mafic ground-stone (axes/querns); no distinct Rust tell variant",
+    "gneiss":    "lithic tell — hammerstone/quern rock; no distinct Rust tell variant",
+    "granite":   "lithic tell — hammerstone/quern rock; no distinct Rust tell variant",
+    "sandstone": "lithic tell — abrasive polisher; no distinct Rust tell variant",
+    # Carbonate family — the coarse Rust enum carries a SINGLE carbonate tell
+    # (``LimestonePure``); these finer carbonates bin to it (see PY_TO_RUST note).
+    "limestone": "carbonate (common building stone) — bins to the coarse Rust LimestonePure tell",
+    "calcite":   "carbonate (pure vein) — bins to the coarse Rust LimestonePure tell",
+    "marble":    "carbonate (metamorphic) — bins to the coarse Rust LimestonePure tell",
+    "dolomite":  "carbonate (Ca-Mg) — bins to the coarse Rust LimestonePure tell",
+}
+
+
+def _surfaced_tell_materials() -> Dict[str, str]:
+    """Auto-discover every material the live ``*_outcrop`` capabilities surface.
+
+    Returns ``{material: first_capability_module_name}``. Reads the uniform
+    ``_PROFILE`` idiom — the same private surface the byte-exact tell tests use.
+    Membership (not the label) is what the guardrail asserts.
+    """
+    out: Dict[str, str] = {}
+    for mod_name, mod in _CAPABILITY_TELL_MODULES.items():
+        profile = getattr(mod, "_PROFILE", None)
+        assert isinstance(profile, dict) and profile, (
+            f"capability '{mod_name}' lost its `_PROFILE` tell table — the D8 "
+            "guardrail relies on it (delta-audit J+4 §5)."
+        )
+        for material in profile:
+            out.setdefault(str(material), mod_name)
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -330,4 +406,76 @@ def test_salt_cue_shared_between_c1_and_c3():
     assert tuple(salt_rule.rgb) == tuple(brine_rgb), (
         f"Salt-crust (C1) {tuple(salt_rule.rgb)} diverged from brine rime (C3) "
         f"{tuple(brine_rgb)} — they share one halite substrate and must match."
+    )
+
+
+# --------------------------------------------------------------------------- #
+# D8 guardrail tests (R-J4-3) — moratorium enforced by CI, not by convention.  #
+# --------------------------------------------------------------------------- #
+
+def test_surfaced_capability_modules_all_registered():
+    """No ``engine/*_outcrop.py`` capability escapes the D8 guardrail (F-D8-2).
+
+    The CONTRIBUTING.md rule — *every new capability must enrich ``PY_TO_RUST``* —
+    becomes a CI gate here. A Cap. C7+ that drops a new ``engine/<x>_outcrop.py``
+    file MUST be registered in ``_CAPABILITY_TELL_MODULES`` (and have its tells
+    classified), or this test fails and forces the author to do so deliberately.
+    """
+    engine_dir = _REPO_ROOT / "runtime" / "engine"
+    assert engine_dir.is_dir(), f"engine dir not found at {engine_dir}"
+    on_disk = {p.stem for p in engine_dir.glob("*_outcrop.py")}
+    registered = set(_CAPABILITY_TELL_MODULES)
+    missing = on_disk - registered
+    assert not missing, (
+        f"Unregistered *_outcrop capability(ies): {sorted(missing)} — add to "
+        "`_CAPABILITY_TELL_MODULES` and classify their tells in PY_TO_RUST or "
+        "PY_CATALOGUE_ONLY (D8 guardrail, F-D8-2)."
+    )
+    # Registry must not reference a module whose file vanished (rename drift).
+    stale = registered - on_disk
+    assert not stale, (
+        f"`_CAPABILITY_TELL_MODULES` references absent capability(ies): "
+        f"{sorted(stale)} — a module was renamed/removed; fix the registry."
+    )
+
+
+def test_every_surfaced_tell_is_classified():
+    """Every material a live capability shows an agent is classified cross-language.
+
+    This is the technical form of the geology moratorium (R-J4-3). A surfaced
+    material that is neither in ``PY_TO_RUST`` (a distinct Rust tell) nor in
+    ``PY_CATALOGUE_ONLY`` (a documented coarse-bin waiver) breaks the build — so a
+    Cap. C7 author cannot add a new tell mineral without consciously deciding its
+    cross-language fate. Closes F-D8-2 (delta-audit J+4 §5).
+    """
+    surfaced = _surfaced_tell_materials()
+    classified = set(PY_TO_RUST) | set(PY_CATALOGUE_ONLY)
+    unclassified = {m: cap for m, cap in surfaced.items() if m not in classified}
+    assert not unclassified, (
+        "Surfaced tell material(s) not classified cross-language: "
+        f"{dict(sorted(unclassified.items()))}.\n"
+        "Add each to PY_TO_RUST (Rust models it as a distinct tell) or to "
+        "PY_CATALOGUE_ONLY (it bins to a coarse Rust tell), with a reason."
+    )
+
+
+def test_classification_sets_are_disjoint_real_and_live():
+    """``PY_TO_RUST`` and ``PY_CATALOGUE_ONLY`` partition cleanly, no dead entries.
+
+    - disjoint: no material is both mapped and waived;
+    - real: every waiver is an actual catalogue mineral;
+    - live: every waiver is actually surfaced by some capability (a waiver that
+      nothing surfaces is dead documentation and must be removed).
+    """
+    overlap = set(PY_TO_RUST) & set(PY_CATALOGUE_ONLY)
+    assert not overlap, f"Material(s) both mapped and waived: {sorted(overlap)}"
+    for material in PY_CATALOGUE_ONLY:
+        assert material in MINERAL_BY_NAME, (
+            f"PY_CATALOGUE_ONLY lists '{material}' absent from the catalogue."
+        )
+    surfaced = set(_surfaced_tell_materials())
+    dead = set(PY_CATALOGUE_ONLY) - surfaced
+    assert not dead, (
+        f"Dead PY_CATALOGUE_ONLY waiver(s) (no capability surfaces them): "
+        f"{sorted(dead)} — remove them."
     )

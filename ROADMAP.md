@@ -9,6 +9,31 @@ installable et maintenable.
 
 ---
 
+## Frontière Python/Rust (ADR-0008, 2026-06-15)
+
+[ADR-0008](adr/0008-python-rust-frontier.md) tranche la frontière restée implicite :
+pour l'ère **cargo-less** (env sans `cargo`/`rustc`), `runtime/engine/` (Python
+déterministe) est la **couche de simulation/perception active** ; `native/world-engine/`
+(Rust) est le **substrat worldgen gelé** (Wave 42) + oracle de contrat (ADR-0007).
+La frontière est **réversible** : les items ci-dessous sont **différés** à une
+« session cargo » (CI dédiée ou toolchain locale), **pas abandonnés**.
+
+**Backlog « session cargo » (nécessite `cargo`) :**
+
+- **R-J4-2** — binding compilé `#[pyfunction] fn mineral_tells()` dans
+  `crates/pybindings/`, consommé par `test_geology_cross_language_contract.py`
+  (élimine F-D8-1, le parsing texte fragile du contrat).
+- **D5-wiring** (ADR-0007 étape 2) — `geology::sample_at()` dans `Chunk::generate()`
+  + hash content-key worldgraph.
+- **Phase A** — A3 (spatial index `rstar`), A4 (raycast accéléré), A5 (GPU erosion
+  auto-fallback). **Phase B** — B1→B8 (tectonique dyn, hydro cross-chunk, advection
+  humidité, saisons, SDF caves, boids, hot-reload biomes, debug overlay).
+
+Tant que ces items ne sont pas verts en CI, **on ne prétend pas que le moteur Rust
+sert la simulation** (le score réalisme mesure la couche perception Python, R-J4-1).
+
+---
+
 ## P0 — Reproductibilite locale
 
 **Objectif :** un nouveau contributeur doit pouvoir installer et verifier le

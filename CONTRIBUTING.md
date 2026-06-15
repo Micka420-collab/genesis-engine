@@ -290,11 +290,17 @@ a levé le blocage Cap. C4 **par garde-fou**, pas par renoncement :
 - Toute **nouvelle capacité** qui surface un minéral « tell » à un agent
   **doit** ajouter ce minéral à `PY_TO_RUST` dans
   `tests/test_geology_cross_language_contract.py` (ou le justifier dans
-  `RUST_ONLY`). Ce test fige l'enum `Mineral` Rust et le tell cuivre/malachite
-  byte-exact ; il **casse le build** à la moindre divergence.
+  `RUST_ONLY` / `PY_CATALOGUE_ONLY`). Ce test fige l'enum `Mineral` Rust et le
+  tell cuivre/malachite byte-exact ; il **casse le build** à la moindre divergence.
+- **Depuis 2026-06-15 (D8 / R-J4-3), cette règle est CI-enforced, plus seulement
+  sociale.** Une capacité qui surface ses tells via l'idiome `_PROFILE` et dépose
+  un `engine/<x>_outcrop.py` est **auto-découverte** : si son fichier n'est pas
+  enregistré dans `_CAPABILITY_TELL_MODULES`, ou si un de ses matériaux n'est ni
+  dans `PY_TO_RUST` ni dans `PY_CATALOGUE_ONLY`, **le build casse**. Tu ne *peux
+  plus* oublier d'enrichir le contrat. Cf. [ADR-0008](adr/0008-python-rust-frontier.md).
 - Le **câblage moteur Rust** de `genesis-geology` (Cargo dep + `sample_at` +
   pybindings) reste un item **Phase A** (« D5-wiring »), à faire en session CI
-  avec `cargo` — il n'est **plus** un bloqueur de C4.
+  avec `cargo` — il n'est **plus** un bloqueur de C4+.
 
 ### Tests d'intégration
 

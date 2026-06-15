@@ -1,10 +1,41 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 13 juin 2026 (Cap. C4 — affleurement de combustible : 4ᵉ _capacité_ agent, découverte d'énergie émergente tourbe/charbon/schiste).
+**Dernière mise à jour :** 15 juin 2026 (J+5 — **ADR-0008** frontière Python/Rust + garde-fou **D8** ; pas de Cap. C7 par décision d'audit. Antérieur : Cap. C5 `clay_outcrop`, Cap. C6 `limestone_outcrop` — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
 
-> **Synthèse contributeur** (phases, réalisme **~79,6 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
+> **Synthèse contributeur** (phases, réalisme **~79,9 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-15, J+5) — ADR-0008 frontière Python/Rust + garde-fou D8 (R-J4-3)
+
+**Pas de Cap. C7 par décision d'audit.** L'audit J+4
+([`AUDIT-DELTA-2026-06-14.md`](native/world-engine/AUDIT-DELTA-2026-06-14.md) §7)
+a posé un **choix exclusif** — (a) Cap. C7 ou (b) trancher la frontière Python/Rust —
+et recommandait **(b)** : empiler une 7ᵉ capacité aurait approfondi l'asymétrie **D7**
+(6 capacités Python / 0 Rust en 29 j) sans rien débloquer. On exécute (b).
+
+- **[ADR-0008](adr/0008-python-rust-frontier.md) (Accepted)** — nomme la frontière,
+  **réversible** : `runtime/engine/` (Python déterministe) = couche de simulation/
+  perception **active** de l'ère *cargo-less* ; `native/world-engine/` = substrat
+  worldgen **gelé** (Wave 42) + oracle de contrat (ADR-0007) ; Phase A/B **différés**
+  (pas abandonnés) à une « session cargo » ; score réalisme = couche perception
+  Python, **dit honnêtement** (R-J4-1). Lève **BLIND-SPOTS R3**.
+- **Garde-fou D8 (R-J4-3)** — `runtime/tests/test_geology_cross_language_contract.py` :
+  ferme **F-D8-2** en rendant le moratoire de *tells* **CI-enforced**. Auto-découverte
+  du `_PROFILE` des 4 capacités `*_outcrop` (C2/C4/C5/C6) + nouveau waiver documenté
+  `PY_CATALOGUE_ONLY` (slate/shale/basalt/gneiss/granite/sandstone + carbonates
+  limestone/calcite/marble/dolomite). **Tout tell surfacé doit être classé**
+  (`PY_TO_RUST` ∪ `PY_CATALOGUE_ONLY`) ET **tout `engine/*_outcrop.py` enregistré**,
+  sinon **le build casse**. La prochaine C7 ne pourra plus diverger en silence.
+- 3 tests (registre, classification, disjonction/réalité/vivacité). **pytest
+  516/516** (513 → 516), 0 skip. **Capacité ? non — garde-fou** (0 hook `sim.step`,
+  coût tick nul ; conforme moratoire). **Émergence absolue** (0 contenu scripté).
+- **Gap honnête :** F-D8-1 (parse texte Rust) non fermé — demande le binding
+  `mineral_tells` (R-J4-2), donc `cargo` → différé ADR-0008 §5.
+- Détail : [`docs/sprints/2026-06-15_ADR0008_frontier_and_D8_guardrail.md`](docs/sprints/2026-06-15_ADR0008_frontier_and_D8_guardrail.md)
+  · veille : [`docs/veille/2026-06-15_VEILLE.md`](docs/veille/2026-06-15_VEILLE.md).
 
 ---
 
