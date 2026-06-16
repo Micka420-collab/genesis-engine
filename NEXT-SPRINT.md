@@ -1,10 +1,45 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 15 juin 2026 (J+5 — **ADR-0008** frontière Python/Rust + garde-fou **D8** ; pas de Cap. C7 par décision d'audit. Antérieur : Cap. C5 `clay_outcrop`, Cap. C6 `limestone_outcrop` — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
+**Dernière mise à jour :** 16 juin 2026 (J+6 — **Cap. C8 `lithic_tempering`** : 8ᵉ capacité agent et **1ʳᵉ transformation** (trempe thermique de la pierre, par composition C2×C7) + `crates/STATUS.md` (R1). Antérieur J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
 
 > **Synthèse contributeur** (phases, réalisme **~79,9 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-16, J+6) — Cap. C8 : trempe thermique de la pierre (`engine.lithic_tempering`) + `crates/STATUS.md`
+
+**8ᵉ capacité agent et 1ʳᵉ _transformation_** (pas perception). Recommandation audit
+J+5 §7 : **(b)** `crates/STATUS.md` *puis* **(a)** première transformation par
+composition pure. Les deux sont livrés. **Combo veille** : *ARYA — Physics-Constrained
+Composable & Deterministic World Model* (arxiv 2603.21340) valide la discipline
+« transformation = composition, 0 nouveau primitive ».
+
+- `runtime/engine/lithic_tempering.py` (capacité pure, lecture, **coût tick nul**) :
+  **lit** C2 `lithic_outcrop` (pierre + `knap_quality`) × C7 `fire_ignition` (feu
+  faisable) → `tempered_quality` (SSOT déterministe, borné `TEMPER_CEILING`=0,95).
+  Effet **1+1>2** : trempe possible QUE si **silice réactive ET feu** coexistent.
+- **Quatre réponses** : silex/chert **+0,20** / quartzite +0,12 / **obsidienne 0**
+  (déjà du verre — *le mensonge rendu visible*) / non-silice 0. Plus ancienne
+  pyrotechnologie après le feu (silcrète, Pinnacle Point ~72 ka).
+- Invariant **« le monde ne ment jamais »** : cue ⇒ pierre réactive réelle (C2,
+  même colonne que `mine_at`) + feu faisable (C7). Monde réel **prairie** (seed
+  `0xBEEF`, **84/144 temperables = 76 chert + 8 quartzite, 0 violation**) + boucle
+  silex+foyer se trempe / obsidienne vue idéale mais sans gain (`temper_preview`
+  non mutant).
+- **Garde-fou D8 par COMPOSITION (2ᵉ après C7)** : pas de `_PROFILE`, **aucune**
+  entrée `PY_TO_RUST` (reste 15), hors glob `*_outcrop.py` ; `test_introduces_no_new_tell`.
+- **Capacité, pas observateur** (0 hook `sim.step`). **Émergence absolue** (le four,
+  l'enfouissement, la durée, le refroidissement lent émergent). 16 tests + smoke
+  `p140` (7/7), **pytest 552/552**.
+- **Aussi livré — R1 BLIND-SPOTS (dette J+30)** : `native/world-engine/crates/STATUS.md`
+  — **23 crates** classées (20 active / 2 entrypoints / `gpu` dormant / `geology`
+  orphelin=ADR-0007), inspection source (cargo absent → CI = vérité), ⚠ sur `scenario`.
+- **Gap honnête :** cinétique du four / sur-chauffe non simulées ; ne ferme aucun
+  item Rust Phase A/B.
+- Détail : [`docs/sprints/2026-06-16_CAP-C8_lithic_tempering.md`](docs/sprints/2026-06-16_CAP-C8_lithic_tempering.md)
+  · veille : [`docs/veille/2026-06-16_VEILLE_lithic_tempering.md`](docs/veille/2026-06-16_VEILLE_lithic_tempering.md).
 
 ---
 
