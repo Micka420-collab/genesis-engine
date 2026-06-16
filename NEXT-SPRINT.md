@@ -1,10 +1,47 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 16 juin 2026 (J+6 — **Cap. C8 `lithic_tempering`** : 8ᵉ capacité agent et **1ʳᵉ transformation** (trempe thermique de la pierre, par composition C2×C7) + `crates/STATUS.md` (R1). Antérieur J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
+**Dernière mise à jour :** 16 juin 2026 (J+6, run #2 — **Cap. C9 `ceramic_firing`** : 9ᵉ capacité agent et **2ᵉ transformation** (cuisson de la céramique, par composition C5×C7 ; inversion réfractaire — le kaolin sous-cuit au feu nu). Antérieur même jour : Cap. C8 `lithic_tempering` (1ʳᵉ transformation) + `crates/STATUS.md` (R1) ; J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
 
 > **Synthèse contributeur** (phases, réalisme **~79,9 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-16, J+6, run #2) — Cap. C9 : cuisson de la céramique (`engine.ceramic_firing`)
+
+**9ᵉ capacité agent et 2ᵉ _transformation_** (suite directe de C8). Méta-règle de la
+routine World Realism : « un phénomène naturel de plus, physiquement cohérent, chaque
+jour ». **Combo veille** : seuils archéométriques de cuisson (Kostadinova-Avramova,
+*Archaeometry* 2025 ; corpus *Bonfire* ; EXARC 2025) — la température n'est jamais
+inventée.
+
+- `runtime/engine/ceramic_firing.py` (capacité pure, lecture, **coût tick nul**) :
+  **lit** C5 `clay_outcrop` (argile + `pottery_grade` + `ceramic_grade`) × C7
+  `fire_ignition` (feu + `fine_fuel`) → `ware_quality` (SSOT déterministe borné).
+  Effet **1+1>2** : cuisson possible QUE si **argile ET feu** coexistent.
+- **Physique calculée** : pointe du feu ouvert `open_fire_peak_temp_c` 600–850 °C
+  (selon `fine_fuel`) × maturation `clay_maturation_temp_c` — terre commune `shale`
+  **700 °C → saine** (`ware` 0,45) ; **kaolin `fine_clay` réfractaire 1250 °C →
+  sous-cuit** (`ware` 0,16). `firedness = min(1, peak/maturation)`.
+- **L'inversion réfractaire** (*le mensonge rendu visible*, pendant de l'obsidienne
+  C8) : la **meilleure** argile (kaolin, peut vitrifier étanche) **déçoit au feu
+  nu** car il faut un four ≥1100 °C. `best_firing_site_near` enseigne donc : cuis la
+  terre banale, pas la belle argile blanche. `watertight` **toujours False** (pas de
+  vitrification sans four → capacité « four » future).
+- Invariant **« le monde ne ment jamais »** : cue ⇒ argile réelle (C5, même colonne
+  que `mine_at`) + feu faisable (C7) ; `ware`==SSOT. Monde réel **prairie** (seed
+  `0xBEEF`, **144/144 cuisibles = 127 terre saine + 17 kaolin sous-cuit, 0
+  violation**) + boucle argile+foyer cuit / kaolin vu idéal mais sous-cuit
+  (`firing_preview` non mutant).
+- **Garde-fou D8 par composition** (3ᵉ après C7/C8) : pas de `_PROFILE`, `PY_TO_RUST`
+  inchangé à **15**, hors glob `*_outcrop.py` (`test_introduces_no_new_tell`).
+- **18 tests** (`test_ceramic_firing.py`) + smoke `p141` 7/7 · **pytest 570/570**.
+
+**Fichiers :** `runtime/engine/ceramic_firing.py`, `runtime/tests/test_ceramic_firing.py`,
+`runtime/scripts/p141_ceramic_firing_smoke.py`,
+`docs/sprints/2026-06-16_CAP-C9_ceramic_firing.md`,
+`docs/veille/2026-06-16_VEILLE_ceramic_firing.md`.
 
 ---
 
