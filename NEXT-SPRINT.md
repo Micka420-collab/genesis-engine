@@ -1,10 +1,53 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 16 juin 2026 (J+6, run #2 — **Cap. C9 `ceramic_firing`** : 9ᵉ capacité agent et **2ᵉ transformation** (cuisson de la céramique, par composition C5×C7 ; inversion réfractaire — le kaolin sous-cuit au feu nu). Antérieur même jour : Cap. C8 `lithic_tempering` (1ʳᵉ transformation) + `crates/STATUS.md` (R1) ; J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
+**Dernière mise à jour :** 17 juin 2026 (J+7 — **Cap. C10 `lime_burning`** : 10ᵉ capacité agent et **3ᵉ transformation** (cuisson de la chaux, par composition C6×C7 + réemploi de la SSOT de température de C9 ; inversion réfractaire — le calcaire pur sous-cuit au feu nu, pendant exact de C9). Antérieur J+6 run #2 : Cap. C9 `ceramic_firing` (2ᵉ transformation, C5×C7) ; Cap. C8 `lithic_tempering` (1ʳᵉ transformation) + `crates/STATUS.md` (R1) ; J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
 
 > **Synthèse contributeur** (phases, réalisme **~79,9 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-17, J+7) — Cap. C10 : cuisson de la chaux (`engine.lime_burning`)
+
+**10ᵉ capacité agent et 3ᵉ _transformation_** (pendant exact de C9). Méta-règle de la
+routine Morning v3.0 : « un phénomène naturel de plus, physiquement cohérent, chaque
+jour ». **Combo veille** : thermochimie de la calcination (Boynton, *Chemistry and
+Technology of Lime and Limestone*) — la température de décarbonatation n'est jamais
+inventée. **LE COMBO** : C10 **réutilise verbatim** la SSOT de température de C9
+`cf.open_fire_peak_temp_c` (un seul feu, deux pyrotransformations : cuire l'argile,
+calciner le calcaire).
+
+- `runtime/engine/lime_burning.py` (capacité pure, lecture, **coût tick nul**) :
+  **lit** C6 `limestone_outcrop` (calcaire + `lime_grade` + `lime_class` +
+  `mortar_grade`) × C7 `fire_ignition` (feu + `fine_fuel`) → `lime_yield` (SSOT
+  déterministe borné). Effet **1+1>2** : calcination possible QUE si **calcaire ET
+  feu** coexistent.
+- **Physique calculée** : pointe du feu ouvert `open_fire_peak_temp_c` 600–850 °C
+  (réemploi C9) × seuil de décarbonatation `calcination_onset_c` — calcaire commun /
+  dolomitique **680 °C → bien cuit** (`lime_yield` 0,72) ; **calcaire pur réfractaire
+  770 °C → sous-cuit** (`lime_yield` 0,12), conversion complète ~898 °C.
+  `calcination_extent = (peak−onset)/(898−onset)`.
+- **L'inversion réfractaire** (*le mensonge rendu visible*, pendant du kaolin C9 / de
+  l'obsidienne C8) : la **meilleure** pierre (`limestone_pure`, `mortar_grade`, peut
+  lier le mortier) **déçoit au feu nu** car il faut un four à chaux ≥900 °C.
+  `best_burning_site_near` enseigne donc : brûle la pierre grise banale, pas la belle
+  pierre blanche. `mortar_ready` **toujours False** (pas de mortier liant sans four →
+  capacité « four à chaux » future).
+- Invariant **« le monde ne ment jamais »** : cue ⇒ calcaire réel (C6, même colonne
+  que `mine_at`) + feu faisable (C7) ; `lime_yield`==SSOT. Monde réel **prairie**
+  (seed `0xBEEF`, **131/144 cuisibles = 44 bien cuits (commun+dolomie) + 87 sous-cuits
+  (pur+calcite+marbre), 0 violation**) + boucle calcaire+foyer cuit / calcaire pur vu
+  idéal mais sous-cuit (`burn_preview` non mutant).
+- **Garde-fou D8 par composition** (4ᵉ après C7/C8/C9) : pas de `_PROFILE`,
+  `PY_TO_RUST` inchangé à **15**, hors glob `*_outcrop.py`
+  (`test_introduces_no_new_tell`).
+- **20 tests** (`test_lime_burning.py`) + smoke `p142` 7/7 · **pytest 590/590**.
+
+**Fichiers :** `runtime/engine/lime_burning.py`, `runtime/tests/test_lime_burning.py`,
+`runtime/scripts/p142_lime_burning_smoke.py`,
+`docs/sprints/2026-06-17_CAP-C10_lime_burning.md`,
+`docs/veille/2026-06-17_VEILLE_lime_burning.md`.
 
 ---
 
