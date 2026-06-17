@@ -1,6 +1,6 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 17 juin 2026 (J+7 — **Cap. C10 `lime_burning`** : 10ᵉ capacité agent et **3ᵉ transformation** (cuisson de la chaux, par composition C6×C7 + réemploi de la SSOT de température de C9 ; inversion réfractaire — le calcaire pur sous-cuit au feu nu, pendant exact de C9). Antérieur J+6 run #2 : Cap. C9 `ceramic_firing` (2ᵉ transformation, C5×C7) ; Cap. C8 `lithic_tempering` (1ʳᵉ transformation) + `crates/STATUS.md` (R1) ; J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
+**Dernière mise à jour :** 17 juin 2026 (J+7 run #2 — **Cap. C11 `kiln_draft`** : 11ᵉ capacité agent, l'**apparatus du four à tirage** (le pendant de C7) — un feu (C7) enclos dans une argile de paroi (C5) atteint ~1000–1100 °C (vs ≤850 °C feu nu), **réalisant** le mortier liant de C10 (`would_mortar_if_kiln_fired`) et **rachetant** le kaolin de C9 (sous-cuit comme poterie, mais meilleure argile de paroi réfractaire) ; tirage forcé/charbon différé. Par composition C5×C7(×C6) + réemploi SSOT C9. Antérieur J+7 run #1 : Cap. C10 `lime_burning` (3ᵉ transformation, C6×C7) ; J+6 run #2 : Cap. C9 `ceramic_firing` (2ᵉ transformation, C5×C7) ; Cap. C8 `lithic_tempering` (1ʳᵉ transformation) + `crates/STATUS.md` (R1) ; J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
 
 > **Synthèse contributeur** (phases, réalisme **~79,9 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
@@ -8,7 +8,53 @@
 
 ---
 
-## ✅ Livré (2026-06-17, J+7) — Cap. C10 : cuisson de la chaux (`engine.lime_burning`)
+## ✅ Livré (2026-06-17, J+7, run #2) — Cap. C11 : le four à tirage (`engine.kiln_draft`)
+
+**11ᵉ capacité agent et l'_apparatus_ qui élève la température** (le pendant de C7 :
+C7 expose « un feu *peut* être fait ici », C11 « un **four** — un feu enclos plus chaud
+— *peut* être fait ici »). C'est la **VOÛTE** que C9 (`vitrifies_if_kiln_fired`) ET C10
+(`would_mortar_if_kiln_fired`) désignent toutes deux. **Combo veille** : archéométrie
+de la pyrotechnologie (four à tirage ~1000–1100 °C vs feu nu ≤850 °C ; fire-clay /
+kaolin 1515–1775 °C, garnissage de four ; charbon + soufflet 1100–1300 °C — bas-
+fourneau). **LE COMBO** : C11 **réutilise verbatim** la SSOT de pointe du feu nu de C9
+`cf.open_fire_peak_temp_c` comme base, et ne fait que l'**enclore**.
+
+- `runtime/engine/kiln_draft.py` (apparatus pur, lecture, **coût tick nul**) : **lit**
+  C5 `clay_outcrop` (paroi + `ceramic_grade`) × C7 `fire_ignition` (`fine_fuel`) × C6
+  `limestone_outcrop` (carbonate, pour le mortier), et recompose C9/C10 à la pointe du
+  four. Effet **1+1>2** : four possible QUE si **argile-de-paroi ET feu** coexistent,
+  et il débloque **deux** transformations différées d'un coup.
+- **Physique calculée** : `kiln_peak_temp_c(fine_fuel, wall_refractory)` = pointe du
+  feu nu (réemploi C9) + gain d'enceinte **plafonné par la réfractarité de paroi** —
+  argile commune `shale` **1000 °C** (elle flue au-delà) / kaolin réfractaire
+  `fine_clay` **1150 °C** (la fire-clay survit). Le four cuit le calcaire pur **à
+  cœur** (`realizes_binding_mortar` — C10 réalisé) et fritte l'argile **saine** (C9).
+- **L'inversion DE l'inversion** (*le rachat du kaolin C9*) : le kaolin réfractaire — la
+  *mauvaise* argile de poterie de C9 (sous-cuite au feu ouvert, firedness 0,64) — est
+  la **meilleure argile de PAROI** ; c'est lui qui bâtit le four assez chaud (1070 °C)
+  pour, enfin, cuire le kaolin **sain** (firedness 0,86), qu'une paroi commune (1000 °C)
+  ne cuit jamais. `best_kiln_site_near` enseigne : chemise ton four de l'argile blanche.
+- **La marche différée honnête** : `vitrifies_watertight` **toujours False** en tirage
+  naturel → `vitrifies_if_forced_draught` diffère la vitrification complète + la
+  métallurgie au **soufflet + charbon** (C12+) — comme C9/C10 différaient *vers* le four.
+- Invariant **« le monde ne ment jamais »** : cue ⇒ argile réelle (C5) + feu (C7) ;
+  `kiln_peak_c` ≥ feu nu, ≤ plafond de paroi, == SSOT ; mortier réalisé ⇒ carbonate
+  mortar-grade présent (C6). Monde réel **prairie** (seed `0xBEEF`, **144/144
+  constructibles = 127 parois communes + 17 réfractaires, 87 réalisent le mortier
+  liant, 0 violation**) + `kiln_preview` non mutant.
+- **Garde-fou D8 par composition** (5ᵉ après C7/C8/C9/C10) : pas de `_PROFILE`,
+  `PY_TO_RUST` inchangé à **15**, hors glob `*_outcrop.py`
+  (`test_introduces_no_new_tell`).
+- **23 tests** (`test_kiln_draft.py`) + smoke `p143` 7/7 · **pytest 613/613**.
+
+**Fichiers :** `runtime/engine/kiln_draft.py`, `runtime/tests/test_kiln_draft.py`,
+`runtime/scripts/p143_kiln_draft_smoke.py`,
+`docs/sprints/2026-06-17_CAP-C11_kiln_draft.md`,
+`docs/veille/2026-06-17_VEILLE_kiln_draft.md`.
+
+---
+
+## ✅ Livré (2026-06-17, J+7, run #1) — Cap. C10 : cuisson de la chaux (`engine.lime_burning`)
 
 **10ᵉ capacité agent et 3ᵉ _transformation_** (pendant exact de C9). Méta-règle de la
 routine Morning v3.0 : « un phénomène naturel de plus, physiquement cohérent, chaque
