@@ -1,6 +1,6 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 18 juin 2026 (J+8 — **Cap. C12 `forced_draught`** : 12ᵉ capacité agent, le **2ᵉ apparatus** (le pendant de C11) — le **tirage forcé** (soufflet + charbon de bois) : un four (C11) soufflé atteint ~1100–1400 °C (vs ≤1150 °C tirage naturel), **RÉALISANT** la vitrification du kaolin réfractaire (`vitrifies_watertight` enfin True — l'arc « mensonge du kaolin C9 → paroi C11 → vitrification C12 » se ferme) et **OUVRANT** la métallurgie du cuivre (`would_smelt_copper_here` ≥1085 °C × tell vert C1) ; fonte effective + fer différés (C13). Par composition C11×C1 + réemploi SSOT C11/C9, **aucun nouveau tell** (garde-fou D8 par composition, 6ᵉ). Antérieur J+7 run #2 : Cap. C11 `kiln_draft` (1ᵉʳ apparatus, four à tirage, C5×C7×C6) ; J+7 run #1 : Cap. C10 `lime_burning` (3ᵉ transformation, C6×C7) ; J+6 run #2 : Cap. C9 `ceramic_firing` (2ᵉ transformation, C5×C7) ; Cap. C8 `lithic_tempering` (1ʳᵉ transformation) + `crates/STATUS.md` (R1) ; J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
+**Dernière mise à jour :** 18 juin 2026 (J+8 run #2 — **Cap. C13 `copper_smelting`** : 13ᵉ capacité agent, la **4ᵉ transformation et la 1ʳᵉ MÉTALLURGIQUE** — le **seuil chalcolithique, le premier métal**. RÉALISE la promesse différée de C12 (`would_smelt_copper_here`) : `smelt_at` **consomme** réellement le minerai (mutation via `geo.mine_at`) et **rend** un bouton de cuivre + scorie, exactement comme l'oracle s'y engage (« le monde ne ment jamais » au sens FORT). **Mensonge rendu visible #4** : le même tell vert C1 couvre le cuivre **natif** (fonte directe, facile) ET la **chalcopyrite** (sulfure → **griller** ~590 °C avant, sinon scorie seule). Par composition C12×C1 + réemploi seuil `fd.COPPER_SMELT_TEMP_C` + rendement catalogue, **aucun nouveau tell** (garde-fou D8 par composition, 7ᵉ). Monde 0xBEEF : 21 sites de fonte émergents (18 natifs + 3 sulfures) **sans injection**. Antérieur J+8 run #1 : Cap. C12 `forced_draught` (2ᵉ apparatus, tirage forcé soufflet+charbon, vitrification + ouverture métallurgie, C11×C1) ; J+7 run #2 : Cap. C11 `kiln_draft` (1ᵉʳ apparatus) ; J+7 run #1 : Cap. C10 `lime_burning` ; J+6 run #2 : Cap. C9 `ceramic_firing` ; Cap. C8 `lithic_tempering` + `crates/STATUS.md` (R1) ; J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
 
 > **Synthèse contributeur** (phases, réalisme **~80,2 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
@@ -8,7 +8,44 @@
 
 ---
 
-## ✅ Livré (2026-06-18, J+8) — Cap. C12 : le tirage forcé (`engine.forced_draught`)
+## ✅ Livré (2026-06-18, J+8 run #2) — Cap. C13 : la fonte du cuivre (`engine.copper_smelting`)
+
+**13ᵉ capacité agent, la _4ᵉ transformation_ et la _1ʳᵉ métallurgique_** — le **seuil
+chalcolithique, le premier métal**. C12 avait porté un four soufflé ≥1085 °C et exposé
+`would_smelt_copper_here` comme un **potentiel**, en différant explicitement *la fonte
+effective* à C13. Ce run la **réalise**.
+
+- `runtime/engine/copper_smelting.py` : **lit** C12 `forced_draught`
+  (`forced_cue_for_chunk` : four ≥1085 °C, `copper_mineral`) × C1 `surface_mineralization`
+  (tell vert + `dig_depth_m`), **réutilise** le seuil `fd.COPPER_SMELT_TEMP_C` (C12) + le
+  rendement par élément du **catalogue** (`yields_per_kg_ore["Cu"]`, `category`). Effet
+  **1+1>2** : fonte possible QUE si four ≥1085 °C (C12) **ET** minerai de cuivre (C1).
+- **La FONTE EFFECTIVE (mutation)** : `smelt_at(sim, row, *, charge_kg, roasted)`
+  **consomme** le minerai (réemploi `geo.mine_at`) et **rend** un `SmeltResult` (bouton de
+  Cu + scorie). « Le monde ne ment jamais » au sens FORT : le cuivre rendu == celui que
+  l'oracle `smelt_cue_for_chunk` promettait (à 1e-4 près).
+- **Physique calculée** : `copper_smelt_yield(ore, kg, peak, roasted)` = teneur catalogue
+  × rendement de classe — natif (fonte directe, plafond 0,95, pureté 0,97) / oxyde (0,80) /
+  sulfure (**0 cru**, grillé 0,72, pureté 0,85) ; + bonus de surchauffe (saturant), plafonné
+  < 1.0 (la scorie garde toujours du Cu).
+- **Mensonge rendu visible #4** (après obsidienne C8, kaolin C9) : le **même tell vert**
+  C1 couvre `native_copper` (fonte directe, facile) ET `chalcopyrite` (sulfure réfractaire
+  → **griller** ~590 °C d'abord, sinon `smelt_at` rend **scorie seule**). Les isotopes du
+  plomb à Belovode montrent que les fondeurs *connaissaient* la différence.
+  `best_smelt_site_near` enseigne : fonds le vert natif, grille le vert sulfuré.
+- **Émergence absolue** : on n'apprend pas à l'agent « fonds la pierre verte au charbon ».
+  On expose le fait physique ; creuset, tuyère, fluxage, coulée, martelage émergent.
+- **Garde-fou D8 par composition (7ᵉ)** : pas de `_PROFILE`, **`PY_TO_RUST` reste 15**,
+  hors glob `*_outcrop.py`. **Déterminisme** (oracle), **coût tick nul** (oracle).
+- **Chiffres** : pytest **653/653** (+19), ruff clean, smoke **p145 7/7**. Monde 0xBEEF :
+  **21/144 sites émergents** (18 natifs + 3 sulfures), sans injection. Métallurgie 80→81.
+- **Différé honnête** : bronze (Cu + étain `cassiterite`, **sans tell de surface** →
+  exploration à l'aveugle, Cap. C14) ; bas-fourneau du fer (`reaches_iron_bloomery_temp`,
+  paroi réfractaire). Détail : [`docs/sprints/2026-06-18_CAP-C13_copper_smelting.md`](docs/sprints/2026-06-18_CAP-C13_copper_smelting.md).
+
+---
+
+## ✅ Livré (2026-06-18, J+8 run #1) — Cap. C12 : le tirage forcé (`engine.forced_draught`)
 
 **12ᵉ capacité agent et le _2ᵉ apparatus_** (le pendant de C11 : C11 expose « un **four**
 *peut* être fait ici », C12 « un **four à tirage forcé** — soufflet + charbon — *peut*
