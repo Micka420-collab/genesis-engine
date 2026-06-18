@@ -1,10 +1,58 @@
 # Genesis Engine — Next Sprint Queue
 
-**Dernière mise à jour :** 17 juin 2026 (J+7 run #2 — **Cap. C11 `kiln_draft`** : 11ᵉ capacité agent, l'**apparatus du four à tirage** (le pendant de C7) — un feu (C7) enclos dans une argile de paroi (C5) atteint ~1000–1100 °C (vs ≤850 °C feu nu), **réalisant** le mortier liant de C10 (`would_mortar_if_kiln_fired`) et **rachetant** le kaolin de C9 (sous-cuit comme poterie, mais meilleure argile de paroi réfractaire) ; tirage forcé/charbon différé. Par composition C5×C7(×C6) + réemploi SSOT C9. Antérieur J+7 run #1 : Cap. C10 `lime_burning` (3ᵉ transformation, C6×C7) ; J+6 run #2 : Cap. C9 `ceramic_firing` (2ᵉ transformation, C5×C7) ; Cap. C8 `lithic_tempering` (1ʳᵉ transformation) + `crates/STATUS.md` (R1) ; J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
+**Dernière mise à jour :** 18 juin 2026 (J+8 — **Cap. C12 `forced_draught`** : 12ᵉ capacité agent, le **2ᵉ apparatus** (le pendant de C11) — le **tirage forcé** (soufflet + charbon de bois) : un four (C11) soufflé atteint ~1100–1400 °C (vs ≤1150 °C tirage naturel), **RÉALISANT** la vitrification du kaolin réfractaire (`vitrifies_watertight` enfin True — l'arc « mensonge du kaolin C9 → paroi C11 → vitrification C12 » se ferme) et **OUVRANT** la métallurgie du cuivre (`would_smelt_copper_here` ≥1085 °C × tell vert C1) ; fonte effective + fer différés (C13). Par composition C11×C1 + réemploi SSOT C11/C9, **aucun nouveau tell** (garde-fou D8 par composition, 6ᵉ). Antérieur J+7 run #2 : Cap. C11 `kiln_draft` (1ᵉʳ apparatus, four à tirage, C5×C7×C6) ; J+7 run #1 : Cap. C10 `lime_burning` (3ᵉ transformation, C6×C7) ; J+6 run #2 : Cap. C9 `ceramic_firing` (2ᵉ transformation, C5×C7) ; Cap. C8 `lithic_tempering` (1ʳᵉ transformation) + `crates/STATUS.md` (R1) ; J+5 : Cap. C7 `fire_ignition`, ADR-0008 + garde-fou D8 — détail dans [`PROJECT-STATUS.md`](PROJECT-STATUS.md)).
 
-> **Synthèse contributeur** (phases, réalisme **~79,9 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
+> **Synthèse contributeur** (phases, réalisme **~80,2 %**, smokes de référence) : [`PROJECT-STATUS.md`](PROJECT-STATUS.md)  
 > **Grille réalisme Terre** : [`docs/ROADMAP-REALISME-TERRE.md`](docs/ROADMAP-REALISME-TERRE.md)  
 > **Index doc** : [`docs/README.md`](docs/README.md)
+
+---
+
+## ✅ Livré (2026-06-18, J+8) — Cap. C12 : le tirage forcé (`engine.forced_draught`)
+
+**12ᵉ capacité agent et le _2ᵉ apparatus_** (le pendant de C11 : C11 expose « un **four**
+*peut* être fait ici », C12 « un **four à tirage forcé** — soufflet + charbon — *peut*
+être fait ici »). C'est la **VOÛTE** que C9 (`vitrifies_if_kiln_fired`) ET C11
+(`vitrifies_if_forced_draught`) désignent toutes deux. **Combo veille** : archéométrie du
+bas-fourneau (soufflet/tuyère → 1100–1300 °C, EXARC/MDPI 2025) + métallurgie du cuivre
+chalcolithique (malachite + charbon + ~1100–1200 °C → cuivre, Belovode ~5000 av. J.-C.).
+**LE COMBO** : C12 **réutilise verbatim** la SSOT de pointe du four de C11
+`kd.kiln_peak_temp_c` comme base, et ne fait que la **pousser** au soufflet.
+
+- `runtime/engine/forced_draught.py` (apparatus pur, lecture, **coût tick nul**) : **lit**
+  C11 `kiln_draft` (paroi + `wall_refractory` + `fine_fuel`) × C1 `surface_mineralization`
+  (tell vert cuivre), et recompose C9 à la pointe forcée. Effet **1+1>2** : four forcé
+  possible QUE si **four (C11) ET combustible-charbon** coexistent.
+- **Physique calculée** : `forced_draught_peak_c(fine_fuel, wall_refractory)` = pointe du
+  four naturel (réemploi C11) + gain du tirage forcé **plafonné par la réfractarité de
+  paroi** — argile commune `shale` **1100 °C** (slumpe juste au-delà du cuivre) / kaolin
+  réfractaire `fine_clay` **1400 °C** (régime du bas-fourneau).
+- **La RÉALISATION** (l'arc « mensonge du kaolin » se ferme) : open-fire firedness 0,64
+  (C9 sous-cuit) → four 0,86 (C11 sain) → **forcé 1,00 → VITRIFIE** (`vitrifies_watertight`
+  enfin **True** pour le kaolin réfractaire). La pire argile de poterie est la seule clé
+  de la haute pyrotechnologie.
+- **L'OUVERTURE** : la métallurgie du cuivre. `reaches_copper_smelting_temp` (≥1085 °C) ×
+  `copper_ore_here` (tell vert C1) → `would_smelt_copper_here`. La **fonte effective**
+  (consommer le minerai → métal) reste différée (**Cap. C13**), comme
+  `reaches_iron_bloomery_temp` (1200 °C, paroi réfractaire) — la chaîne reste ouverte.
+- Invariant **« le monde ne ment jamais »** : cue ⇒ four réel (C11) ; `forced_peak_c` ≥
+  four naturel, ≤ plafond de paroi, == SSOT ; ware vitrifiée == SSOT C9 ; cuivre
+  co-localisé ⇒ C1 le voit. Monde réel **prairie** (seed `0xBEEF`, **144/144 forçables =
+  127 communes + 17 réfractaires qui vitrifient, 144 atteignent le cuivre, 17 le fer, 0
+  violation**) + `forced_draught_preview` non mutant.
+- **Garde-fou D8 par composition** (6ᵉ après C7/C8/C9/C10/C11) : pas de `_PROFILE`,
+  `PY_TO_RUST` inchangé à **15**, hors glob `*_outcrop.py`
+  (`test_introduces_no_new_tell`).
+- **21 tests** (`test_forced_draught.py`) + smoke `p144` 7/7 · **pytest 634/634** · ruff clean.
+
+**Fichiers :** `runtime/engine/forced_draught.py`, `runtime/tests/test_forced_draught.py`,
+`runtime/scripts/p144_forced_draught_smoke.py`,
+`docs/sprints/2026-06-18_CAP-C12_forced_draught.md`,
+`docs/veille/2026-06-18_VEILLE_forced_draught.md`.
+
+**Prochaine capacité naturelle (C13)** : `copper_smelting` — la **1ʳᵉ transformation
+métallurgique** (consommer la malachite/cuivre natif sous un four forcé → bouton de
+cuivre + scorie vitreuse), qui lira le seuil `would_smelt_copper_here` que C12 expose.
 
 ---
 
