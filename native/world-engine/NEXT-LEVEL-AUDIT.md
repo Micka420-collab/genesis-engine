@@ -5,6 +5,17 @@
 **Mode :** audit complet + propositions architecturales + code stubs Rust isolés.
 **Source-of-truth des proposals :** `proposals/axis{N}_*` (modules indépendants, hors build pour ne rien casser).
 
+> **§0 post-ADR-0008 (annoté 2026-06-19, J+9 — clôt R-J8-3).** Cet audit a été
+> rédigé pour un moteur Rust *actif*. Depuis le 2026-06-15 ([ADR-0008](../../adr/0008-python-rust-frontier.md)),
+> le `runtime/engine` est **Python** (couche de simulation/perception active de
+> l'ère cargo-less) et le workspace `crates/` est **gelé Wave 42** (oracle de
+> contrat lecture-seule, ADR-0007). Les sections 2 (climat) et 4 (perf GPU)
+> ci-dessous sont **en stase** ; l'axe 5 (agent-API) est livré côté Python via
+> **14 capacités émergentes C1–C14** (C14 `cryoclasty` rompt enfin le treadmill
+> fire-based C7→C13 — 7ᵉ opérateur orthogonal *ramasser*). Le périmètre réel est
+> **23 crates** (cf. [`crates/STATUS.md`](crates/STATUS.md)), pas 15. Le suivi
+> vivant des risques moteur est dans les `AUDIT-DELTA-2026-06-*.md` de ce dossier.
+
 ---
 
 ## 0. Verdict global en une page

@@ -134,6 +134,7 @@ soit explicitement rejete (justification 1 ligne).
 | **AgentSociety / Synthetic Social Graph** | Social | arxiv 2502.08691 + 2604.27271 | metriques d'emergence (cohesion + divergence) | **INTEGRE Wave 13 (2026-05-17)** -- `engine.social_resonance` |
 | **AI Metropolis Out-of-Order Execution** | Agentic | arxiv 2411.03519 (veille 2026-05-28) | parallelisme tick LLM tier-2 par detection de fausses dependances inter-agents | conditionne a l'activation Phase 5 LLM tier-2 (~5h une fois LLM actif) |
 | **Project Sid civilization benchmark** | Social | arxiv 2411.00114 (veille 2026-05-28) | comparaison externe metriques emergence (specialisation roles, transmission culturelle) | document `docs/benchmarks/PROJECT-SID.md` a programmer (~3h) |
+| **Emergence World long-horizon benchmark** | Social/Agentic | arxiv 2606.08367 + AIvilization v0 (2602.10429) (veille 2026-06-19) | banc d'evaluation autonomie multi-agent long-horizon (normes, internalisation contrat social) — voisin Project Sid | conditionne a l'activation Phase 5 LLM tier-2 (~3h une fois LLM actif) |
 | **Collusion / conformity observer** | Social | arxiv 2603.27771v2 (veille 2026-05-28) | detection emergence collusion-like / conformity sous contrainte ressources | overlap Wave 13 `social_resonance` -- a ouvrir si delta mesurable (~4h) |
 
 Toutes les veilles matinales sont archivees dans [`docs/veille/`](docs/veille/).
