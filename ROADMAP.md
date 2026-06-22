@@ -128,7 +128,7 @@ soit explicitement rejete (justification 1 ligne).
 | Combo | Couche Genesis | Source veille | Gain estime | Cout |
 |---|---|---|---|---|
 | **Tri-Spirit Architecture** (planning / reasoning / reflex) | Agentic | arxiv 2604.13757 | structure cognitive 3-tiers, decoupage explicite de la cognition | refonte partielle `engine.cognition` (~6h) |
-| **Bevy 0.16 ECS Relationships + GPU-Driven Rendering** | World (port Rust) | bevy.org/news/bevy-0-16 | archetype fragmentation reduite, big-scenes plus rapides | conditionne a P1 (scaffolding Rust vert) |
+| **Bevy 0.18 ECS scheduler + GPU-Driven Rendering** | World (port Rust) | bevy.org/news/bevy-0-18 (veille 2026-06-22) | archetype fragmentation reduite, big-scenes plus rapides, editor preview | conditionne a P1 (scaffolding Rust vert) |
 | **X-Wing KEM hybride X25519 x ML-KEM-768** | Platform | draft-ietf-mls-pq-ciphersuites + Cloudflare PQC TLS | un seul KEM standardise pour TLS / gRPC future-proof | conditionne a la sortie d'un endpoint reseau Genesis (~4h une fois necessaire) |
 | **Neo4j Native Vector Type** | Observatory | neo4j.com/blog (mai 2026) | vecteurs natifs sans helpers, contraintes de shape/dtype | conditionne au deploiement Neo4j (Observatory Phase 5+) |
 | **AgentSociety / Synthetic Social Graph** | Social | arxiv 2502.08691 + 2604.27271 | metriques d'emergence (cohesion + divergence) | **INTEGRE Wave 13 (2026-05-17)** -- `engine.social_resonance` |
@@ -136,6 +136,7 @@ soit explicitement rejete (justification 1 ligne).
 | **Project Sid civilization benchmark** | Social | arxiv 2411.00114 (veille 2026-05-28) | comparaison externe metriques emergence (specialisation roles, transmission culturelle) | document `docs/benchmarks/PROJECT-SID.md` a programmer (~3h) |
 | **Emergence World long-horizon benchmark** | Social/Agentic | arxiv 2606.08367 + AIvilization v0 (2602.10429) (veille 2026-06-19) | banc d'evaluation autonomie multi-agent long-horizon (normes, internalisation contrat social) — voisin Project Sid | conditionne a l'activation Phase 5 LLM tier-2 (~3h une fois LLM actif) |
 | **Collusion / conformity observer** | Social | arxiv 2603.27771v2 (veille 2026-05-28) | detection emergence collusion-like / conformity sous contrainte ressources | overlap Wave 13 `social_resonance` -- a ouvrir si delta mesurable (~4h) |
+| **Deterministic Simulation Testing (DST)** | Observatory / devtools (axe 6) | QCon London + FOSDEM 2026 (veille 2026-06-22) | harnais de test seed-reproductible avec injection de fautes (tick-loop mono-thread) — calque exact de la discipline determinisme/seed de Genesis ; rejoue toute regression depuis un seed | combo INTERNE viable cargo-less (~4h) : envelopper `runtime/experiments/run_all.py` d'un mode DST (fautes injectees + replay seed). A promouvoir si une regression non-deterministe apparait |
 
 Toutes les veilles matinales sont archivees dans [`docs/veille/`](docs/veille/).
 
