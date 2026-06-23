@@ -263,7 +263,7 @@ def teach_practice(state: MetallurgyState, culture: int, practice: str) -> bool:
 _METAL_DISPATCH: Dict[int, Tuple[object, "MetallurgyState"]] = {}
 
 
-def _metallurgy_global_wrapper(agents, row, decision, streamer, tick):
+def _metallurgy_global_wrapper(agents, row, decision, streamer, tick, *args, **kwargs):
     """Stacked wrapper around the previous ``apply_decision``.
 
     Handles ActionKind.SMELT — by default smelts 1 kg of the highest-Fe
@@ -279,11 +279,11 @@ def _metallurgy_global_wrapper(agents, row, decision, streamer, tick):
         return None
     pair = _METAL_DISPATCH.get(id(agents))
     if pair is None:
-        return inner(agents, row, decision, streamer, tick)
+        return inner(agents, row, decision, streamer, tick, *args, **kwargs)
     sim, _state = pair
     act = int(decision.action)
     if act != int(ActionKind.SMELT):
-        return inner(agents, row, decision, streamer, tick)
+        return inner(agents, row, decision, streamer, tick, *args, **kwargs)
     # Resolve ore + kg from decision.
     from engine.mineral_catalog import MINERALS as _MINS
     ore_idx = int(getattr(decision, "target_x", 0))

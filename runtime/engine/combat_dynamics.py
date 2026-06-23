@@ -437,7 +437,7 @@ def _apply_wound_to_anatomy(sim, row: int, part: int, kind: int,
 _COMBAT_DISPATCH: Dict[int, Tuple[object, CombatState]] = {}
 
 
-def _combat_global_wrapper(agents, row, decision, streamer, tick):
+def _combat_global_wrapper(agents, row, decision, streamer, tick, *args, **kwargs):
     """Stacked wrapper on apply_decision.
 
     Hooks ActionKind.FIGHT : the decision must have `target_row`
@@ -453,11 +453,11 @@ def _combat_global_wrapper(agents, row, decision, streamer, tick):
         return None
     pair = _COMBAT_DISPATCH.get(id(agents))
     if pair is None:
-        return inner(agents, row, decision, streamer, tick)
+        return inner(agents, row, decision, streamer, tick, *args, **kwargs)
     sim, state = pair
 
     # Delegate first (lets other modules + native handler do their work).
-    events = inner(agents, row, decision, streamer, tick)
+    events = inner(agents, row, decision, streamer, tick, *args, **kwargs)
 
     if int(decision.action) == int(ActionKind.FIGHT):
         try:

@@ -93,7 +93,7 @@ def _maybe_smelt(sim, agents, row: int) -> Optional[dict]:
     return {"kind": "smelt_bronze", "row": row, "material": getattr(mat, "name", "bronze")}
 
 
-def _knowledge_global_wrapper(agents, row, decision, streamer, tick):
+def _knowledge_global_wrapper(agents, row, decision, streamer, tick, *args, **kwargs):
     import engine.cognition as _cog
 
     inner = getattr(_cog, "_knowledge_inner_apply_decision", None)
@@ -101,11 +101,11 @@ def _knowledge_global_wrapper(agents, row, decision, streamer, tick):
         return None
     pair = _KNOWLEDGE_DISPATCH.get(id(agents))
     if pair is None:
-        return inner(agents, row, decision, streamer, tick)
+        return inner(agents, row, decision, streamer, tick, *args, **kwargs)
     sim, _state = pair
 
     act = int(decision.action)
-    events = inner(agents, row, decision, streamer, tick)
+    events = inner(agents, row, decision, streamer, tick, *args, **kwargs)
     if events is None:
         events = []
 

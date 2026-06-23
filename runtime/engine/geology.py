@@ -421,7 +421,7 @@ def generate_chunk_geology(sim, chunk) -> ChunkGeology:
 _GEOLOGY_DISPATCH: Dict[int, Tuple[object, "GeologyState"]] = {}
 
 
-def _geology_global_wrapper(agents, row, decision, streamer, tick):
+def _geology_global_wrapper(agents, row, decision, streamer, tick, *args, **kwargs):
     """Stacked wrapper around the previous ``apply_decision``.
 
     Handles ActionKind.MINE — extracts ore from the chunk's strata at
@@ -436,7 +436,7 @@ def _geology_global_wrapper(agents, row, decision, streamer, tick):
         return None
     pair = _GEOLOGY_DISPATCH.get(id(agents))
     if pair is None:
-        return inner(agents, row, decision, streamer, tick)
+        return inner(agents, row, decision, streamer, tick, *args, **kwargs)
     sim, _state = pair
     act = int(decision.action)
 
@@ -452,7 +452,7 @@ def _geology_global_wrapper(agents, row, decision, streamer, tick):
             pass
         return []
 
-    return inner(agents, row, decision, streamer, tick)
+    return inner(agents, row, decision, streamer, tick, *args, **kwargs)
 
 
 def _patch_actions(sim, state: "GeologyState") -> None:

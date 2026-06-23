@@ -724,7 +724,7 @@ def install(sim, *, world_seed: Optional[int] = None) -> None:
     from engine import cognition as _cog
     original_apply = _cog.apply_decision
 
-    def patched_apply(agents, row, decision, streamer, tick):
+    def patched_apply(agents, row, decision, streamer, tick, *args, **kwargs):
         # Only override when this is the registered sim instance.
         events = []
         speak_handled = False
@@ -762,7 +762,8 @@ def install(sim, *, world_seed: Optional[int] = None) -> None:
             except Exception:
                 pass
         try:
-            base_events = original_apply(agents, row, decision, streamer, tick)
+            base_events = original_apply(agents, row, decision, streamer, tick,
+                                         *args, **kwargs)
         finally:
             if speak_handled:
                 try:

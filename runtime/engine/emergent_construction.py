@@ -358,14 +358,14 @@ def tick_emergent_construction(sim) -> List[dict]:
     return events
 
 
-def _emergent_global_wrapper(agents, row, decision, streamer, tick):
+def _emergent_global_wrapper(agents, row, decision, streamer, tick, *args, **kwargs):
     """Wrapper empilé — délègue puis BUILD/SMELT émergents."""
     import engine.cognition as cog
 
     inner = getattr(cog, "_emergent_inner_apply_decision", None)
     if inner is None:
         return None
-    events = inner(agents, row, decision, streamer, tick)
+    events = inner(agents, row, decision, streamer, tick, *args, **kwargs)
     if events is None:
         events = []
     sim = _EMERGENT_DISPATCH.get(id(agents))

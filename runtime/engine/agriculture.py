@@ -315,7 +315,7 @@ def tick_agriculture(sim, state: AgricultureState) -> None:
 _AG_DISPATCH: Dict[int, Tuple[object, "AgricultureState"]] = {}
 
 
-def _ag_global_wrapper(agents, row, decision, streamer, tick):
+def _ag_global_wrapper(agents, row, decision, streamer, tick, *args, **kwargs):
     """Stacked wrapper around the previous ``apply_decision``.
 
     Handles ActionKind.PLANT and ActionKind.HARVEST + side-effects
@@ -330,7 +330,7 @@ def _ag_global_wrapper(agents, row, decision, streamer, tick):
         return None
     pair = _AG_DISPATCH.get(id(agents))
     if pair is None:
-        return inner(agents, row, decision, streamer, tick)
+        return inner(agents, row, decision, streamer, tick, *args, **kwargs)
     sim, state = pair
     act = int(decision.action)
 
@@ -379,7 +379,7 @@ def _ag_global_wrapper(agents, row, decision, streamer, tick):
         return []
 
     # All other actions : delegate, then hook FORAGE side-effect.
-    events = inner(agents, row, decision, streamer, tick)
+    events = inner(agents, row, decision, streamer, tick, *args, **kwargs)
     if act == int(ActionKind.FORAGE):
         try:
             maybe_record_forage_discovery(sim, state, row)

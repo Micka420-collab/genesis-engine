@@ -345,7 +345,8 @@ class Simulation:
             self.agents.action[row] = d.action
             self.agents.target_x[row] = d.target_x
             self.agents.target_y[row] = d.target_y
-            ev = apply_decision(self.agents, row, d, self.streamer, self.tick)
+            ev = apply_decision(self.agents, row, d, self.streamer, self.tick,
+                                sim=self)
             for e in ev:
                 if e.get("kind") == "mate_attempt":
                     mate_intents.append((e["a"], e["b"]))

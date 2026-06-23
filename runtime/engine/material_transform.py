@@ -255,8 +255,9 @@ def install_material_transform(sim) -> MaterialTransformState:
             if getattr(cog, "_transform_inner_apply", None) is None:
                 cog._transform_inner_apply = cog.apply_decision
 
-                def wrapped(agents, row, decision, streamer, tick):
-                    events = cog._transform_inner_apply(agents, row, decision, streamer, tick)
+                def wrapped(agents, row, decision, streamer, tick, *args, **kwargs):
+                    events = cog._transform_inner_apply(
+                        agents, row, decision, streamer, tick, *args, **kwargs)
                     if events is None:
                         events = []
                     if int(decision.action) == int(ActionKind.BUILD):

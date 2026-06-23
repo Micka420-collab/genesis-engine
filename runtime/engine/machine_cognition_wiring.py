@@ -78,7 +78,7 @@ _MACHINE_DISPATCH: Dict[int, Tuple[object, object]] = {}
 # Wrapper
 # ---------------------------------------------------------------------------
 
-def _machine_global_wrapper(agents, row, decision, streamer, tick):
+def _machine_global_wrapper(agents, row, decision, streamer, tick, *args, **kwargs):
     """Stacked wrapper around the previous ``apply_decision``.
 
     Délègue d'abord à ``inner(...)`` (autres modules ou native handler),
@@ -98,11 +98,11 @@ def _machine_global_wrapper(agents, row, decision, streamer, tick):
 
     pair = _MACHINE_DISPATCH.get(id(agents))
     if pair is None:
-        return inner(agents, row, decision, streamer, tick)
+        return inner(agents, row, decision, streamer, tick, *args, **kwargs)
     sim, _state = pair
 
     # Déléguer en premier — laisse les autres wrappers handle leurs actions.
-    events = inner(agents, row, decision, streamer, tick)
+    events = inner(agents, row, decision, streamer, tick, *args, **kwargs)
 
     # Post-hook : si l'action était BUILD, roller pour l'assemblage.
     if int(decision.action) == int(ActionKind.BUILD):

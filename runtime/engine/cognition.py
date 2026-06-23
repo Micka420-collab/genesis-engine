@@ -615,6 +615,53 @@ def _find_mate(agents, row, near, sim=None):
 ARRIVE_RADIUS_M = 1.5
 DRINK_RELIEF = 0.30
 EAT_RELIEF = 0.25
+
+
+def _hydration_factor(ppt: float, potable: bool) -> float:
+    """Signed hydration factor of drinking water of salinity ``ppt`` — composes the
+    C3 ``water_potability`` truth so the world never lies in *behaviour*.
+
+    Fresh water sustains fully (+1.0); brackish-but-drinkable water helps less
+    (down to +0.4 at the potability ceiling); sea / brine water causes **net
+    dehydration** (negative, scaling with salinity toward −1.0 at seawater) — the
+    osmotic load costs the body more water than the drink provides. The agent
+    discovers this by acting; nothing is scripted."""
+    from engine import water_potability as wp
+    if potable:
+        if ppt <= wp.FRESH_MAX_PPT:
+            return 1.0
+        span = max(1e-6, wp.POTABLE_MAX_PPT - wp.FRESH_MAX_PPT)
+        return float(max(0.4, 1.0 - 0.6 * (ppt - wp.FRESH_MAX_PPT) / span))
+    span = max(1e-6, wp.SEAWATER_PPT - wp.POTABLE_MAX_PPT)
+    frac = min(1.0, max(0.0, (ppt - wp.POTABLE_MAX_PPT) / span))
+    return float(-frac)
+
+
+def _drink_factor(sim, chunk, chunk_c) -> float:
+    """Hydration factor of the water at ``chunk_c`` for a DRINK action.
+
+    Gated on the C3 ``water_potability`` capability being **already installed** on
+    ``sim`` (its cue cache exists) — this is the first real consumption of a
+    substrate capability by the agent loop. When C3 is active, hydration follows
+    the true salinity (fresh sustains; sea / brine net-dehydrates). When it is
+    NOT active there is no salinity truth in the world, so we keep the legacy
+    full-hydration behaviour (factor 1.0) — drinking is just drinking.
+
+    Two safety rules for the hot loop: (1) never trigger ``install_*`` here — the
+    geology installer patches ``apply_decision`` and doing that mid-iteration
+    corrupts the wrapper chain; we only *read* an already-installed C3. (2) a
+    biome-only fallback is deliberately NOT used: ``Biome.OCEAN == 0`` is
+    indistinguishable from an unpopulated (all-zero) biome array, so it would
+    falsely dehydrate agents drinking inland water in lightweight sims."""
+    try:
+        if sim is not None and getattr(sim, "_water_cue_cache", None) is not None:
+            from engine import water_potability as wp
+            cue = wp.water_cue_for_chunk(sim, tuple(int(c) for c in chunk_c))
+            if cue is not None:
+                return _hydration_factor(float(cue.salinity_ppt), bool(cue.potable))
+    except Exception:
+        return 1.0
+    return 1.0   # no salinity capability active → legacy full hydration
 SLEEP_RELIEF = 0.40
 FORAGE_RATE = 18.0
 FORAGE_KCAL_PER_KG = 300.0
@@ -721,7 +768,7 @@ def promote_memories(agents, row: int, min_repeats: int = 2) -> int:
     return moved
 
 
-def apply_decision(agents, row, decision, streamer, tick):
+def apply_decision(agents, row, decision, streamer, tick, sim=None):
     events = []
     act = decision.action
     px, py = float(agents.pos[row, 0]), float(agents.pos[row, 1])
@@ -769,12 +816,23 @@ def apply_decision(agents, row, decision, streamer, tick):
         chunk.water[cy, cx] = avail - consumed
         invalidate_resource_masks(chunk)
         if consumed > 0:
-            agents.thirst[row] = max(0.0, float(agents.thirst[row]) - DRINK_RELIEF * (consumed / 5.0))
-            agents.inv_water[row] = min(float(agents.inv_water[row]) + 0.5, 2.0)
-            mem = agents.memory[row]
-            mem.known_water_locations.append((px, py))
-            if len(mem.known_water_locations) > 8:
-                mem.known_water_locations.pop(0)
+            # The world must not lie in BEHAVIOUR: hydration depends on the water's
+            # salinity (C3 water_potability). Fresh water sustains; brackish helps
+            # less; sea / brine water causes NET DEHYDRATION — the agent drinks but
+            # is harmed (thirst rises). The agent discovers this by acting.
+            factor = _drink_factor(sim, chunk, chunk_c)
+            relief = DRINK_RELIEF * (consumed / 5.0) * factor
+            agents.thirst[row] = float(
+                np.clip(float(agents.thirst[row]) - relief, 0.0, 1.0))
+            if factor > 0.0:
+                # only drinkable water replenishes the canteen and is remembered as
+                # a reliable water source (emergent: brine traps are not recorded).
+                agents.inv_water[row] = min(
+                    float(agents.inv_water[row]) + 0.5 * factor, 2.0)
+                mem = agents.memory[row]
+                mem.known_water_locations.append((px, py))
+                if len(mem.known_water_locations) > 8:
+                    mem.known_water_locations.pop(0)
         return events
 
     if act == int(ActionKind.EAT):

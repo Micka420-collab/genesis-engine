@@ -581,7 +581,7 @@ def _tick_auto_relief_and_bathe(sim, fields: PhysioFields) -> None:
 _PHYSIO_DISPATCH: Dict[int, Tuple[object, "PhysioFields"]] = {}
 
 
-def _physio_global_wrapper(agents, row, decision, streamer, tick):
+def _physio_global_wrapper(agents, row, decision, streamer, tick, *args, **kwargs):
     """Stacked wrapper around the previous ``apply_decision``.
 
     Reads the ``id(agents)`` and looks up the appropriate sim/fields
@@ -597,12 +597,12 @@ def _physio_global_wrapper(agents, row, decision, streamer, tick):
     pair = _PHYSIO_DISPATCH.get(id(agents))
     if pair is None:
         # No physiology attached to this AgentRegistry — pass through.
-        return inner(agents, row, decision, streamer, tick)
+        return inner(agents, row, decision, streamer, tick, *args, **kwargs)
     sim, fields = pair
     prev_thirst = float(agents.thirst[row])
     prev_hunger = float(agents.hunger[row])
     prev_injuries = float(agents.injuries[row])
-    events = inner(agents, row, decision, streamer, tick)
+    events = inner(agents, row, decision, streamer, tick, *args, **kwargs)
     post_thirst = float(agents.thirst[row])
     post_hunger = float(agents.hunger[row])
     post_injuries = float(agents.injuries[row])
