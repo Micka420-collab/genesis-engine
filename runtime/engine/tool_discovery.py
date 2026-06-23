@@ -6,7 +6,7 @@ outils et techniques par imitation culturelle.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from engine.core import prf_rng
 from engine.material_transform import TRANSFORM_RECIPES, can_transform, _local_temp_k

@@ -23,6 +23,9 @@ earth = [
 ]
 dev = [
   "pytest>=8",
+  # ruff lints the capability arc (`make lint`) — wired into CI so the per-sprint
+  # "ruff clean" claims are enforced, not just asserted (AUDIT-DELTA-2026-06-23 R-J13-3).
+  "ruff>=0.6",
   # PIL (Pillow) is needed by the realism smoke suite — render_macro_with_atmosphere
   # writes PNGs and p72/p78 assert their existence. world_render._save_png is a
   # silent no-op if Pillow is missing, so without it the smokes pass internally

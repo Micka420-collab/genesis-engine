@@ -66,7 +66,7 @@ from engine.world_genesis import GenesisParams                      # noqa: E402
 from engine.genesis_bootstrap import bootstrap_genesis_sim          # noqa: E402
 from engine import geology as geo                                   # noqa: E402
 from engine.geology import StrataLayer, ChunkGeology                # noqa: E402
-from engine.world import Biome, CHUNK_SIDE_M                        # noqa: E402
+from engine.world import CHUNK_SIDE_M                        # noqa: E402
 import engine.lithic_outcrop as lo                                  # noqa: E402
 import engine.fire_ignition as fi                                   # noqa: E402
 import engine.lithic_tempering as lt                                # noqa: E402

@@ -11,6 +11,7 @@ help:
 	@echo "  make doctor         # check local tooling and dependency imports"
 	@echo "  make compile-python # syntax-check Python sources"
 	@echo "  make test-python    # run Python unit tests"
+	@echo "  make lint           # ruff-check the capability arc (modules + tests + smokes)"
 	@echo "  make smoke          # run baseline p0 smoke"
 	@echo "  make civilization   # Genesis bootstrap + agents + FAIR exports"
 	@echo "  make terre          # preset terre (400 ticks, live observe JSONL)"
@@ -40,6 +41,28 @@ compile-python:
 
 test-python:
 	PYTHONPATH=runtime $(PYTHON) -m pytest runtime/tests
+
+# Ruff-check ONLY the emergent-capability arc (C1→C20) + its tests/smokes — the
+# ruff-clean set the per-sprint commits claim. The legacy engine tree carries
+# accumulated style debt (mostly intentional E402/F401 across 178 modules +
+# smokes); a full-tree cleanup is deferred (AUDIT-DELTA-2026-06-23 R-J13-3). New
+# capabilities must keep this set clean and add themselves here.
+lint:
+	$(PYTHON) -m ruff check \
+	  runtime/engine/surface_mineralization.py runtime/engine/lithic_outcrop.py \
+	  runtime/engine/water_potability.py runtime/engine/combustible_outcrop.py \
+	  runtime/engine/clay_outcrop.py runtime/engine/limestone_outcrop.py \
+	  runtime/engine/fire_ignition.py runtime/engine/lithic_tempering.py \
+	  runtime/engine/ceramic_firing.py runtime/engine/lime_burning.py \
+	  runtime/engine/kiln_draft.py runtime/engine/forced_draught.py \
+	  runtime/engine/copper_smelting.py runtime/engine/cryoclasty.py \
+	  runtime/engine/salt_evaporation.py runtime/engine/food_curing.py \
+	  runtime/engine/iron_bloomery.py runtime/engine/ochre_grinding.py \
+	  runtime/engine/bloom_forging.py runtime/engine/rock_canvas.py \
+	  runtime/tests/test_geology_cross_language_contract.py \
+	  runtime/tests/test_drink_potability.py \
+	  runtime/scripts/p13[3-9]_*_smoke.py runtime/scripts/p14[0-9]_*_smoke.py \
+	  runtime/scripts/p15[0-2]_*_smoke.py
 
 smoke:
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p0_smoke.py
@@ -135,9 +158,22 @@ validate-all: test-python
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p137_clay_outcrop_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p138_limestone_outcrop_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p139_fire_ignition_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p140_lithic_tempering_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p141_ceramic_firing_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p142_lime_burning_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p143_kiln_draft_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p144_forced_draught_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p145_copper_smelting_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p146_cryoclasty_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p147_salt_evaporation_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p148_food_curing_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p149_iron_bloomery_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p150_ochre_grinding_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p151_bloom_forging_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p152_rock_canvas_smoke.py
 
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release
 
-.PHONY: help setup setup-earth setup-dev doctor compile-python test-python smoke smoke-realism civilization terre terre-long validate-fair earth-console observe validate-all maturin-dev rust-check rust-test rust-check-scaffolding rust-test-scaffolding test
+.PHONY: help setup setup-earth setup-dev doctor compile-python test-python lint smoke smoke-realism civilization terre terre-long validate-fair earth-console observe validate-all maturin-dev rust-check rust-test rust-check-scaffolding rust-test-scaffolding test
 

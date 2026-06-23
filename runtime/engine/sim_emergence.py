@@ -10,11 +10,15 @@ Smokes and ``run.py`` only *validate* behaviour; they do not drive it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set,
+                    Tuple)
 
 import numpy as np
 
 from engine.world import invalidate_resource_masks, world_to_chunk
+
+if TYPE_CHECKING:  # avoid a runtime import cycle; only for type-checkers / ruff
+    from engine.sim import Simulation
 
 
 ObservationListener = Callable[["Simulation", Dict[str, Any]], None]

@@ -30,6 +30,9 @@ jobs:
       - name: Compile Python sources
         run: make compile-python
 
+      - name: Lint capability arc (ruff)
+        run: make lint
+
       - name: Run Python tests
         run: make test-python
 
@@ -78,6 +81,19 @@ jobs:
             p137_clay_outcrop_smoke.py
             p138_limestone_outcrop_smoke.py
             p139_fire_ignition_smoke.py
+            p140_lithic_tempering_smoke.py
+            p141_ceramic_firing_smoke.py
+            p142_lime_burning_smoke.py
+            p143_kiln_draft_smoke.py
+            p144_forced_draught_smoke.py
+            p145_copper_smelting_smoke.py
+            p146_cryoclasty_smoke.py
+            p147_salt_evaporation_smoke.py
+            p148_food_curing_smoke.py
+            p149_iron_bloomery_smoke.py
+            p150_ochre_grinding_smoke.py
+            p151_bloom_forging_smoke.py
+            p152_rock_canvas_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="
