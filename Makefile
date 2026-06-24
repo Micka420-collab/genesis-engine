@@ -59,11 +59,13 @@ lint:
 	  runtime/engine/salt_evaporation.py runtime/engine/food_curing.py \
 	  runtime/engine/iron_bloomery.py runtime/engine/ochre_grinding.py \
 	  runtime/engine/bloom_forging.py runtime/engine/rock_canvas.py \
+	  runtime/engine/climate_biome.py \
 	  runtime/tests/test_geology_cross_language_contract.py \
 	  runtime/tests/test_drink_potability.py \
 	  runtime/tests/test_lithic_knapping_loop.py \
+	  runtime/tests/test_climate_biome_orographic.py \
 	  runtime/scripts/p13[3-9]_*_smoke.py runtime/scripts/p14[0-9]_*_smoke.py \
-	  runtime/scripts/p15[0-3]_*_smoke.py
+	  runtime/scripts/p15[0-4]_*_smoke.py
 
 smoke:
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p0_smoke.py
@@ -173,6 +175,7 @@ validate-all: test-python
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p151_bloom_forging_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p152_rock_canvas_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p153_lithic_knapping_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p154_orographic_climate_smoke.py
 
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release

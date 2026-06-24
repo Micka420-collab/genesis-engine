@@ -84,6 +84,20 @@ The :class:`engine.world_genesis.GenesisWorld` macro arrays are never
 mutated. Only ``chunk.biome`` and ``chunk.food_capacity`` change ; the
 streamer cache is the authoritative source for downstream consumers
 (:mod:`engine.cognition`, :mod:`engine.agriculture`, …).
+
+Orographic coupling (live elevation -> chunk climate)
+-----------------------------------------------------
+
+On top of the global anomaly source, every install adds a per-chunk
+*orographic* term that **reads** (never writes) the live macro
+``elevation_m`` field and converts its drift from the install-time baseline
+into a temperature anomaly at the environmental lapse rate
+(``earth_laws.LAPSE_K_PER_M``). When tectonics / erosion mutate
+``elevation_m`` in the disjoint ``autonomous_world`` loop, that change now
+becomes visible on the agent-facing chunk path : uplift cools and migrates
+biomes down the cooling ladder, erosion warms and migrates them up. The
+term is identically 0 on a static world, so prior behaviour is unchanged.
+Set ``orographic_coupling=False`` to opt out.
 """
 from __future__ import annotations
 
@@ -92,7 +106,8 @@ from typing import Dict, Optional, Tuple
 
 import numpy as np
 
-from engine.core import prf_rng, TICK_DT_S
+from engine.core import prf_rng
+from engine.earth_laws import LAPSE_K_PER_M
 from engine.world import (CHUNK_SIDE_M, Biome, invalidate_resource_masks,
                           _BIOME_NPP)
 from engine.world_genesis import GenesisAnchor
@@ -122,6 +137,19 @@ DEFAULT_JITTER_C = 0.0
 # Convert sim-tick to sim-year with engine.core.TICK_DT_S (=1 sim-second)
 # and ``sim.cfg.drive_accel`` (=accelerated real-time multiplier).
 SECONDS_PER_YEAR = 86_400.0 * 365.0
+
+# --- Orographic (live-elevation) coupling ---------------------------------
+# The chunk biome map responds to the *live* macro ``elevation_m`` field
+# through the environmental lapse rate (SSOT ``earth_laws.LAPSE_K_PER_M`` =
+# 6.5 K/km — the same value already baked into the macro baseline temperature
+# in ``world_genesis`` so the coupling is self-consistent). When tectonics /
+# erosion mutate ``anchor.world.elevation_m`` (``plate_tectonics_live``,
+# ``novel_operators``), each chunk's effective temperature anomaly moves by
+# ``-LAPSE_K_PER_M * Δelevation_m``: uplift cools (drives the cooling biome
+# ladder), erosion/subsidence warms. This is the term that wires the
+# otherwise-disjoint live macro mutation onto the agent-visible chunk path
+# (closes the chunk-path half of D11). It is identically 0 while the macro
+# elevation is unchanged, so static worlds keep their exact prior behaviour.
 
 
 # ---------------------------------------------------------------------------
@@ -199,8 +227,13 @@ class ClimateBiomeState:
     warming_rate_c_per_year: float = 0.02
     temperature_jitter_amplitude: float = DEFAULT_JITTER_C
     transition_speed: float = 0.001
+    # Additive physical coupling: chunk temperature tracks the *live* macro
+    # elevation through the lapse rate. On by default ; 0 on static worlds.
+    orographic_coupling: bool = True
 
     baseline_temp_c: Dict[Tuple[int, int, int], float] = field(
+        default_factory=dict)
+    baseline_elev_m: Dict[Tuple[int, int, int], float] = field(
         default_factory=dict)
     current_anomaly_c: Dict[Tuple[int, int, int], float] = field(
         default_factory=dict)
@@ -210,6 +243,7 @@ class ClimateBiomeState:
         default_factory=dict)
 
     global_anomaly_c: float = 0.0
+    orographic_anomaly_c: float = 0.0
     transitions_total: int = 0
     last_apply_tick: int = -1
 
@@ -236,18 +270,23 @@ def _sample_macro_at_chunk(anchor: GenesisAnchor,
     y_km = chunk_center_y_m / 1000.0 + anchor.sim_origin_macro_km[1]
     fx = float(np.clip(x_km / cell_km - 0.5, 0.0, R - 1.001))
     fy = float(np.clip(y_km / cell_km - 0.5, 0.0, R - 1.001))
-    ix = int(np.floor(fx)); iy = int(np.floor(fy))
-    tx = fx - ix; ty = fy - iy
+    ix = int(np.floor(fx))
+    iy = int(np.floor(fy))
+    tx = fx - ix
+    ty = fy - iy
 
     def _bil(arr: np.ndarray) -> float:
-        a = float(arr[iy, ix]); b = float(arr[iy, ix + 1])
-        c = float(arr[iy + 1, ix]); d = float(arr[iy + 1, ix + 1])
+        a = float(arr[iy, ix])
+        b = float(arr[iy, ix + 1])
+        c = float(arr[iy + 1, ix])
+        d = float(arr[iy + 1, ix + 1])
         return (a * (1.0 - tx) * (1.0 - ty) + b * tx * (1.0 - ty)
                 + c * (1.0 - tx) * ty + d * tx * ty)
 
     return {
         "temp_c": _bil(world.temp_c),
         "precip_mm": _bil(world.precip_mm),
+        "elevation_m": _bil(world.elevation_m),
         "biome": int(world.biome[iy, ix]),
     }
 
@@ -262,8 +301,30 @@ def _ensure_baseline(state: ClimateBiomeState,
         sample = _sample_macro_at_chunk(state.anchor, coord)
         state.baseline_temp_c[coord] = float(sample["temp_c"])
         state.chunk_precip_proxy[coord] = float(sample["precip_mm"])
+        state.baseline_elev_m[coord] = float(sample["elevation_m"])
     return (state.baseline_temp_c[coord],
             state.chunk_precip_proxy.get(coord, 800.0))
+
+
+def _orographic_anomaly_for_chunk(state: ClimateBiomeState,
+                                   coord: Tuple[int, int, int]) -> float:
+    """Lapse-rate temperature anomaly (°C) from the *live* macro elevation.
+
+    Re-samples ``anchor.world.elevation_m`` at the chunk centre (the world
+    object is read live, so tectonic/erosion mutations are seen) and compares
+    it to the baseline elevation captured at install. Returns
+    ``-LAPSE_K_PER_M * (current - baseline)`` : uplift → negative (cooling),
+    erosion/subsidence → positive (warming). Returns ``0.0`` when no baseline
+    exists yet or the elevation is unchanged. Pure / deterministic — no RNG.
+    """
+    base = state.baseline_elev_m.get(coord)
+    if base is None:
+        return 0.0
+    cur = float(_sample_macro_at_chunk(state.anchor, coord)["elevation_m"])
+    # Lapse applies only above sea level (consistent with the macro baseline
+    # temperature in world_genesis, which uses max(elev, 0) / 1000). Elevation
+    # excursions below 0 m (submerged land) carry no extra lapse anomaly.
+    return float(-LAPSE_K_PER_M * (max(cur, 0.0) - max(base, 0.0)))
 
 
 def _anomaly_for_tick(state: ClimateBiomeState, sim) -> float:
@@ -272,17 +333,21 @@ def _anomaly_for_tick(state: ClimateBiomeState, sim) -> float:
     For ``anomaly_source='linear_warming'``: ``warming_rate * sim_years``
     where ``sim_years = tick * drive_accel / SECONDS_PER_YEAR``.
 
-    For ``anomaly_source='macro'``: read the current mean of the macro
-    ``temp_c`` field on the anchor (static for now — placeholder so
-    integrations with future dynamic-macro waves can substitute).
+    This returns only the *global* (spatially-uniform) component. The live,
+    spatially-varying physical signal is the per-chunk orographic term
+    (:func:`_orographic_anomaly_for_chunk`, added in the apply loop).
+
+    For ``anomaly_source='macro'``: there is no synthetic global trend — the
+    world's climate is driven purely by the live macro state via the
+    orographic coupling, so the global component is 0.
     """
     if state.anomaly_source == "linear_warming":
         accel = float(getattr(sim.cfg, "drive_accel", 1.0))
         sim_years = float(sim.tick) * accel / SECONDS_PER_YEAR
         return float(state.warming_rate_c_per_year * sim_years)
     elif state.anomaly_source == "macro":
-        # Static anchor : current = baseline -> anomaly = 0. Hook to be
-        # replaced when a dynamic-macro Wave ships.
+        # No synthetic global trend ; the real (spatially-varying) signal is
+        # supplied per-chunk by the orographic coupling from live elevation.
         return 0.0
     else:
         return 0.0
@@ -387,6 +452,7 @@ def install_climate_biome(sim,
                             warming_rate_c_per_year: float = 0.02,
                             temperature_jitter_amplitude: float = DEFAULT_JITTER_C,
                             transition_speed: float = 0.001,
+                            orographic_coupling: bool = True,
                             ) -> ClimateBiomeState:
     """Idempotent installer.
 
@@ -406,6 +472,7 @@ def install_climate_biome(sim,
         existing.temperature_jitter_amplitude = float(
             temperature_jitter_amplitude)
         existing.transition_speed = float(transition_speed)
+        existing.orographic_coupling = bool(orographic_coupling)
         # Top up the baseline for any chunks that have entered cache since
         # the previous install (idempotent ; existing baselines kept).
         for coord in list(sim.streamer.cache.keys()):
@@ -418,6 +485,7 @@ def install_climate_biome(sim,
         warming_rate_c_per_year=float(warming_rate_c_per_year),
         temperature_jitter_amplitude=float(temperature_jitter_amplitude),
         transition_speed=float(transition_speed),
+        orographic_coupling=bool(orographic_coupling),
     )
     sim._climate_biome_state = state
 
@@ -464,20 +532,30 @@ def apply_climate_biome_step(sim) -> Dict[str, float]:
 
     cells_shifted = 0
     jitter_amp = float(state.temperature_jitter_amplitude)
+    max_oro = 0.0
 
     for coord, chunk in list(sim.streamer.cache.items()):
         # Make sure we have a baseline for this chunk (may have been
         # streamed in since install).
         _ensure_baseline(state, coord)
 
-        # Optional per-chunk jitter on the anomaly, deterministic via PRF.
         local_dT = global_dT
+
+        # Additive physical coupling: per-chunk lapse-rate response to the
+        # live macro elevation (0 while elevation is unchanged).
+        if state.orographic_coupling:
+            oro = _orographic_anomaly_for_chunk(state, coord)
+            local_dT += oro
+            if abs(oro) > abs(max_oro):
+                max_oro = oro
+
+        # Optional per-chunk jitter on the anomaly, deterministic via PRF.
         if jitter_amp > 0.0:
             cx, cy, cz = coord
             jrng = prf_rng(int(sim.cfg.seed) & 0xFFFFFFFFFFFFFFFF,
                             ["climate_biome", "jitter"],
                             [int(sim.tick), int(cx), int(cy), int(cz)])
-            local_dT = float(global_dT + jrng.uniform(-jitter_amp, jitter_amp))
+            local_dT = float(local_dT + jrng.uniform(-jitter_amp, jitter_amp))
         state.current_anomaly_c[coord] = float(local_dT)
 
         n = _apply_shift_to_chunk(sim, state, coord, chunk, local_dT)
@@ -487,10 +565,12 @@ def apply_climate_biome_step(sim) -> Dict[str, float]:
             cells_shifted += n
 
     state.transitions_total += cells_shifted
+    state.orographic_anomaly_c = float(max_oro)
 
     return {
         "cells_shifted_this_step": int(cells_shifted),
         "global_anomaly_c": float(global_dT),
+        "orographic_anomaly_c": float(max_oro),
     }
 
 
@@ -506,7 +586,9 @@ def climate_biome_state(sim) -> Dict[str, object]:
         "warming_rate_c_per_year": state.warming_rate_c_per_year,
         "transition_speed": state.transition_speed,
         "temperature_jitter_amplitude": state.temperature_jitter_amplitude,
+        "orographic_coupling": bool(state.orographic_coupling),
         "global_anomaly_c": float(state.global_anomaly_c),
+        "orographic_anomaly_c": float(state.orographic_anomaly_c),
         "transitions_total": int(state.transitions_total),
         "chunks_tracked": int(len(state.baseline_temp_c)),
         "chunks_with_shifts": int(len(state.chunk_biome_shifted)),
