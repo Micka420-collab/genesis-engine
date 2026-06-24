@@ -1,6 +1,6 @@
 # Genesis Engine — Roadmap Viable
 
-**Derniere mise a jour :** 2026-05-17
+**Derniere mise a jour :** 2026-06-24
 
 Ce fichier est la roadmap stable du projet. La file de sprint vivante reste
 dans [`NEXT-SPRINT.md`](NEXT-SPRINT.md). Ici, l'objectif est simple :
@@ -31,6 +31,25 @@ La frontière est **réversible** : les items ci-dessous sont **différés** à 
 
 Tant que ces items ne sont pas verts en CI, **on ne prétend pas que le moteur Rust
 sert la simulation** (le score réalisme mesure la couche perception Python, R-J4-1).
+
+---
+
+## Boucle agent : l'arc devient *vécu* (ADR-0009, 2026-06-24)
+
+[ADR-0009](adr/0009-agent-consumer-loop.md) tranche **D12 / R0** (audit J+13) : l'arc
+de 20 capacités C1→C20 n'avait **aucun consommateur agent** — découverte *prouvée
+possible*, jamais *vécue*. La boucle de consommation canonique est
+`perceive → decide → act → remember` (les 3 appels de `Simulation.step`), sous les
+drives de survie, **sans arbre tech scripté** (le monde décide le résultat).
+
+- **C3 / DRINK** (R-J13-4, `2d0ebd0`) — 1ʳᵉ bouchée : une action existante devient honnête.
+- **C2 / KNAP** (R-J13-1, ce sprint) — 1ᵉʳ *comportement nouveau* : un agent curieux
+  qui **voit** un affleurement taillable y va et **taille** un éclat ; `inv_tools` gagne
+  un tranchant ∝ `knap_quality` réelle. 1ᵉʳ remplisseur de `inv_tools` de tout l'arc.
+
+**Reste (18 capacités + piliers langage/bâtiments)** : même patron, une tranche
+verticale à la fois. Un **registre de capacités** + budget de perception seront
+introduits quand le nombre de branchements le justifiera (éviter la sur-ingénierie).
 
 ---
 

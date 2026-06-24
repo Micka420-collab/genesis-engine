@@ -525,6 +525,13 @@ def decide(agents, obs, sim=None):
 
     curiosity = float(agents.curiosity[row])
     if curiosity > 0.6:
+        # D12 wire: before wandering at random, a curious agent that perceives
+        # a knappable tool-stone outcrop (C2) goes to debit it. Emergent, not
+        # scripted — survival is already satisfied here, so this is the agent
+        # *choosing* to invest idle time in a useful stone it can see.
+        ts = _seek_toolstone(agents, row, obs, sim)
+        if ts is not None:
+            return ts
         ang = float(agents.heading[row]) + (curiosity - 0.5) * 0.8
         tx = obs.pos[0] + math.cos(ang) * 20.0
         ty = obs.pos[1] + math.sin(ang) * 20.0
@@ -547,6 +554,53 @@ def _jitter_target(row, tx, ty, drive_kind):
     u = (float(int(seed) & 0xFFFF) / 65535.0) * 2.0 - 1.0
     v = (float((int(seed) >> 16) & 0xFFFF) / 65535.0) * 2.0 - 1.0
     return tx + u * GOAL_JITTER_M, ty + v * GOAL_JITTER_M
+
+
+def _seek_toolstone(agents, row, obs, sim):
+    """Emergent stone-age foraging — the agent loop's consumption of C2.
+
+    A survival-satisfied, curious agent that SEES a knappable tool-stone
+    outcrop (``lithic_outcrop.best_toolstone_near``) heads there and knaps a
+    flake rather than wandering at random. Utility-based action selection: a
+    sharp, useful stone outranks blind exploration. Nothing is scripted — the
+    agent perceives a glassy / sharp-edged outcrop and *chooses* to debit it;
+    the WORLD decides whether that stone actually yields an edge (the cue's
+    ``knap_quality``). The agent learns the stone→edge link by acting.
+
+    Gated on C2 being installed on the world (its cue cache exists). Two hot-loop
+    safety rules, mirroring the C3/DRINK wire: (1) we only *read* an already
+    installed C2 — never ``install_*`` mid-iteration (``install_lithic_outcrop``
+    only re-enters the idempotent ``install_geology``, which early-returns once
+    ``_geology_state`` exists, so no wrapper-chain is re-patched); (2) any error
+    degrades to ``None`` (plain exploration), never crashes the tick.
+
+    Returns a ``Decision`` (KNAP if standing on the outcrop, else WALK_TO) or
+    ``None`` to fall through to ordinary exploration.
+    """
+    if sim is None or getattr(sim, "_lithic_cue_cache", None) is None:
+        return None
+    if float(agents.inv_stone[row]) >= TOOLSTONE_SATED_KG:
+        return None
+    if _inventory_mass(agents, row) >= float(agents.inv_capacity_kg[row]) - 1e-3:
+        return None
+    try:
+        from engine import lithic_outcrop as lo
+        cue = lo.best_toolstone_near(sim, int(row),
+                                     perception_radius_m=TOOLSTONE_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Confidence sits above random EXPLORE (0.3) but below survival actions, so
+    # tool-stone foraging never out-prioritises hunger / thirst / shelter.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.KNAP), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
 def _act_on(agents, row, obs, drive_kind):
@@ -678,6 +732,19 @@ FIGHT_RETALIATION_AFFINITY = -0.05
 SHARE_AFFINITY_BONUS = +0.05
 SPEAK_AFFINITY_BONUS = +0.005
 FLEE_SPEED_MULT = 1.0        # FLEE always runs (uses run_max_ms)
+
+# D12 wire (2026-06-24) — emergent stone-age tool-stone foraging. The agent
+# loop consumes the C2 ``lithic_outcrop`` capability: a survival-satisfied,
+# curious agent that PERCEIVES a knappable outcrop walks to it and knaps a
+# flake instead of wandering at random. Nothing is scripted — the agent picks
+# up a sharp-looking stone; the WORLD decides (via LithicCue.knap_quality)
+# whether it truly yields a cutting edge. The first real agent consumer of a
+# *resource-gathering* affordance from the arc (DRINK only corrected physiology).
+TOOLSTONE_PERCEPT_M = 96.0   # sight range for outcrops (chunk-scale; cues memoised)
+TOOLSTONE_SATED_KG = 3.0     # stop seeking once this much raw tool-stone is carried
+KNAP_STONE_KG = 1.5          # raw stone debited per KNAP action
+KNAP_TOOL_YIELD = 0.6        # usable cutting edge per unit of true knap_quality
+INV_TOOLS_MAX = 5.0          # tool inventory ceiling
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -862,6 +929,51 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             mem.known_food_locations.append((px, py))
             if len(mem.known_food_locations) > 8:
                 mem.known_food_locations.pop(0)
+        return events
+
+    if act == int(ActionKind.KNAP):
+        # Debit the knappable outcrop the agent is standing on (C2). The world
+        # never lies: raw stone always comes, but a usable CUTTING EDGE emerges
+        # only in proportion to the stone's TRUE knapping quality — obsidian /
+        # flint give razor tools, a quern-grade boulder barely any. The agent
+        # learns the stone→edge link by acting; brine-trap analogue: a location
+        # the world says is barren (no cue here) yields nothing and isn't
+        # remembered. Surface gather only — NOT a geology mutation (no
+        # geo.mine_at), so the mutation frontier (D10) stays frozen.
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_lithic_cue_cache", None) is None:
+            return events
+        cap_left = max(0.0, float(agents.inv_capacity_kg[row]) - _inventory_mass(agents, row))
+        if cap_left <= 1e-3:
+            return events
+        try:
+            from engine import lithic_outcrop as lo
+            cue = lo.prospect_toolstone(sim, px, py)
+        except Exception:
+            return events
+        if cue is None:
+            return events   # the world says: no knappable stone crops out here
+        gained = min(KNAP_STONE_KG, cap_left)
+        agents.inv_stone[row] = float(agents.inv_stone[row]) + gained
+        tool_gain = KNAP_TOOL_YIELD * float(cue.knap_quality) * (gained / KNAP_STONE_KG)
+        agents.inv_tools[row] = float(
+            min(float(agents.inv_tools[row]) + tool_gain, INV_TOOLS_MAX))
+        mem = agents.memory[row]
+        if mem is not None:
+            locs = getattr(mem, "known_toolstone_locations", None)
+            if locs is not None:
+                locs.append((px, py))
+                if len(locs) > 8:
+                    locs.pop(0)
+            remember_short(agents, row, "toolstone",
+                           {"class": int(cue.knap_class), "material": cue.material})
+        events.append({
+            "kind": "knap",
+            "row": int(row),
+            "knap_class": int(cue.knap_class),
+            "stone_kg": round(float(gained), 4),
+            "tool_gain": round(float(tool_gain), 4),
+        })
         return events
 
     if act == int(ActionKind.SLEEP):

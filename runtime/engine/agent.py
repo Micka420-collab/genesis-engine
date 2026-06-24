@@ -58,6 +58,8 @@ class ActionKind(IntEnum):
     MINE = 17        # extract ore/rock from the chunk's strata column
     # Wave 10c — Metallurgy.
     SMELT = 18       # reduce ore with fuel in a furnace → pure metal
+    # D12 wire (2026-06-24) — stone-age tool-stone foraging (consumes C2).
+    KNAP = 19        # debit a knappable outcrop into raw stone + a cutting edge
 
 
 @dataclass
@@ -67,6 +69,7 @@ class EpisodicMemory:
     known_water_locations: List[Tuple[float, float]] = field(default_factory=list)
     known_food_locations: List[Tuple[float, float]] = field(default_factory=list)
     known_shelters: List[Tuple[float, float]] = field(default_factory=list)
+    known_toolstone_locations: List[Tuple[float, float]] = field(default_factory=list)
     capacity_short: int = 32
     capacity_long: int = 256
 
