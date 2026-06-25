@@ -96,6 +96,7 @@ jobs:
             p152_rock_canvas_smoke.py
             p153_lithic_knapping_smoke.py
             p154_orographic_climate_smoke.py
+            p155_frost_clast_gather_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="

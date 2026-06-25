@@ -60,6 +60,8 @@ class ActionKind(IntEnum):
     SMELT = 18       # reduce ore with fuel in a furnace → pure metal
     # D12 wire (2026-06-24) — stone-age tool-stone foraging (consumes C2).
     KNAP = 19        # debit a knappable outcrop into raw stone + a cutting edge
+    # D12 wire (2026-06-25) — frost-shattered surface clast gathering (consumes C14).
+    GATHER = 20      # pick up a frost-detached surface clast (no percussion)
 
 
 @dataclass
@@ -70,6 +72,7 @@ class EpisodicMemory:
     known_food_locations: List[Tuple[float, float]] = field(default_factory=list)
     known_shelters: List[Tuple[float, float]] = field(default_factory=list)
     known_toolstone_locations: List[Tuple[float, float]] = field(default_factory=list)
+    known_frost_clast_locations: List[Tuple[float, float]] = field(default_factory=list)
     capacity_short: int = 32
     capacity_long: int = 256
 

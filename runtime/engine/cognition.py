@@ -525,10 +525,16 @@ def decide(agents, obs, sim=None):
 
     curiosity = float(agents.curiosity[row])
     if curiosity > 0.6:
-        # D12 wire: before wandering at random, a curious agent that perceives
-        # a knappable tool-stone outcrop (C2) goes to debit it. Emergent, not
-        # scripted — survival is already satisfied here, so this is the agent
-        # *choosing* to invest idle time in a useful stone it can see.
+        # D12 wire: before wandering at random, a curious agent invests idle
+        # time in useful stone it can SEE (survival is already satisfied here).
+        # Gathering frost-detached clasts (C14) is tried first — where the cold
+        # has already broken sound clasts loose at one's feet, stooping to pick
+        # them up beats knapping an in-situ outcrop. Else, debit a knappable
+        # outcrop (C2). Both emergent, never scripted; both inert unless their
+        # capability is installed, so neither perturbs the other's scenarios.
+        fc = _seek_frost_clast(agents, row, obs, sim)
+        if fc is not None:
+            return fc
         ts = _seek_toolstone(agents, row, obs, sim)
         if ts is not None:
             return ts
@@ -600,6 +606,60 @@ def _seek_toolstone(agents, row, obs, sim):
     conf = 0.30 + 0.20 * float(cue.confidence)
     if d < INTERACT_RADIUS_M:
         return Decision(int(ActionKind.KNAP), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
+def _seek_frost_clast(agents, row, obs, sim):
+    """Emergent gelifract gathering — the agent loop's consumption of C14.
+
+    A survival-satisfied, curious agent that SEES a frost-shattered scree of
+    workable clasts (``cryoclasty.best_frost_clast_near``) walks there and
+    GATHERS a ready flake — no percussion, the cold already did the breaking.
+    Utility-based action selection: where freeze-thaw has detached sound clasts
+    at one's feet, stooping to gather them outranks knapping an outcrop (less
+    effort) and blind exploration. So this is tried *before* ``_seek_toolstone``.
+
+    Nothing is scripted — the agent perceives an angular scree on a cold slope
+    and *chooses* to gather; the WORLD decides whether those clasts carry an edge
+    (the cue's ``clast_quality`` = C2 base × frost fabric response). A cold
+    granite scree is spectacular grus that yields nothing; the same cold on
+    obsidian / flint yields razor clasts. The agent learns cold+rock→edge by
+    acting (the « mensonge rendu visible » #5).
+
+    Gated on C14 being installed on the world (its cue cache exists) — so this is
+    fully inert wherever cryoclasty was never installed (every other smoke / the
+    plain bootstrap), exactly like the C2/C3 wires gate on their own caches. Two
+    hot-loop safety rules mirror the KNAP wire: (1) only *read* an already
+    installed C14 — never ``install_*`` mid-iteration; (2) any error degrades to
+    ``None`` (ordinary exploration), never crashes the tick. Surface gather only
+    (the cue's ``collect_depth_m == 0``) — no geology mutation (D10 frozen).
+
+    Returns a ``Decision`` (GATHER if standing on the scree, else WALK_TO) or
+    ``None`` to fall through to ``_seek_toolstone`` / ordinary exploration.
+    """
+    if sim is None or getattr(sim, "_cryoclasty_cue_cache", None) is None:
+        return None
+    if float(agents.inv_stone[row]) >= TOOLSTONE_SATED_KG:
+        return None
+    if _inventory_mass(agents, row) >= float(agents.inv_capacity_kg[row]) - 1e-3:
+        return None
+    try:
+        from engine import cryoclasty as cc
+        cue = cc.best_frost_clast_near(sim, int(row),
+                                       perception_radius_m=FROST_CLAST_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as KNAP: above random EXPLORE (0.3), below survival
+    # actions — gathering never out-prioritises hunger / thirst / shelter.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.GATHER), tx, ty, conf)
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
@@ -745,6 +805,20 @@ TOOLSTONE_SATED_KG = 3.0     # stop seeking once this much raw tool-stone is car
 KNAP_STONE_KG = 1.5          # raw stone debited per KNAP action
 KNAP_TOOL_YIELD = 0.6        # usable cutting edge per unit of true knap_quality
 INV_TOOLS_MAX = 5.0          # tool inventory ceiling
+
+# D12 wire (2026-06-25) — emergent frost-clast gathering. The agent loop consumes
+# the C14 ``cryoclasty`` capability: where freeze-thaw has detached sound clasts
+# at the surface, a curious, survival-satisfied agent GATHERS a ready flake with
+# no percussion. The WORLD decides (via FrostClastCue.clast_quality = C2 base ×
+# frost fabric response) whether that cold scree truly carries an edge — obsidian
+# / flint give razor clasts, a cold granite slope gives barren grus. Shares the
+# raw tool-stone pool (and TOOLSTONE_SATED_KG gate) with KNAP: enough stone is
+# enough, however it was won. Gathering is effortless, so it yields a touch more
+# raw mass where the scree is copious (talus / strong frost field).
+FROST_CLAST_PERCEPT_M = 96.0  # sight range for scree fields (chunk-scale, memoised)
+GATHER_STONE_KG = 1.5         # raw clast mass gathered per GATHER on a sparse field
+GATHER_ABUNDANT_MULT = 1.25   # copious scree (talus / strong FCI) → more per stoop
+GATHER_TOOL_YIELD = 0.6       # usable cutting edge per unit of true clast_quality
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -973,6 +1047,53 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "knap_class": int(cue.knap_class),
             "stone_kg": round(float(gained), 4),
             "tool_gain": round(float(tool_gain), 4),
+        })
+        return events
+
+    if act == int(ActionKind.GATHER):
+        # Pick up frost-detached surface clasts the agent is standing on (C14).
+        # The world never lies: raw stone always comes, but a usable CUTTING EDGE
+        # emerges only in proportion to the clast's TRUE quality (C2 base × frost
+        # fabric response) — obsidian / flint scree give razor flakes, a cold
+        # granite slope gives edgeless grus (mensonge #5). A spot the world says
+        # is barren (no frost field / no rock → no cue) yields nothing and isn't
+        # remembered. Surface GATHER only — NOT a geology mutation (no
+        # geo.mine_at), so the mutation frontier (D10) stays frozen.
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_cryoclasty_cue_cache", None) is None:
+            return events
+        cap_left = max(0.0, float(agents.inv_capacity_kg[row]) - _inventory_mass(agents, row))
+        if cap_left <= 1e-3:
+            return events
+        try:
+            from engine import cryoclasty as cc
+            cue = cc.prospect_frost_clasts(sim, px, py)
+        except Exception:
+            return events
+        if cue is None:
+            return events   # the world says: no frost-shattered clasts lie here
+        nominal = GATHER_STONE_KG * (GATHER_ABUNDANT_MULT if cue.abundant else 1.0)
+        gained = min(nominal, cap_left)
+        agents.inv_stone[row] = float(agents.inv_stone[row]) + gained
+        tool_gain = GATHER_TOOL_YIELD * float(cue.clast_quality) * (gained / nominal)
+        agents.inv_tools[row] = float(
+            min(float(agents.inv_tools[row]) + tool_gain, INV_TOOLS_MAX))
+        mem = agents.memory[row]
+        if mem is not None:
+            locs = getattr(mem, "known_frost_clast_locations", None)
+            if locs is not None:
+                locs.append((px, py))
+                if len(locs) > 8:
+                    locs.pop(0)
+            remember_short(agents, row, "frost_clast",
+                           {"zone": cue.zone, "material": cue.material})
+        events.append({
+            "kind": "gather",
+            "row": int(row),
+            "zone": cue.zone,
+            "stone_kg": round(float(gained), 4),
+            "tool_gain": round(float(tool_gain), 4),
+            "abundant": bool(cue.abundant),
         })
         return events
 

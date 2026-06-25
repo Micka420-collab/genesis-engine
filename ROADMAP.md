@@ -1,6 +1,6 @@
 # Genesis Engine — Roadmap Viable
 
-**Derniere mise a jour :** 2026-06-24
+**Derniere mise a jour :** 2026-06-25
 
 Ce fichier est la roadmap stable du projet. La file de sprint vivante reste
 dans [`NEXT-SPRINT.md`](NEXT-SPRINT.md). Ici, l'objectif est simple :
@@ -43,11 +43,17 @@ possible*, jamais *vécue*. La boucle de consommation canonique est
 drives de survie, **sans arbre tech scripté** (le monde décide le résultat).
 
 - **C3 / DRINK** (R-J13-4, `2d0ebd0`) — 1ʳᵉ bouchée : une action existante devient honnête.
-- **C2 / KNAP** (R-J13-1, ce sprint) — 1ᵉʳ *comportement nouveau* : un agent curieux
+- **C2 / KNAP** (R-J13-1, `7d4c748`) — 1ᵉʳ *comportement nouveau* : un agent curieux
   qui **voit** un affleurement taillable y va et **taille** un éclat ; `inv_tools` gagne
   un tranchant ∝ `knap_quality` réelle. 1ᵉʳ remplisseur de `inv_tools` de tout l'arc.
+- **C14 / GATHER** (R-J14-1, 2026-06-25) — 3ᵉ capacité branchée, **opérateur orthogonal**
+  (ramasser, pas casser) : là où le gel a déjà détaché des éclats sains en surface, un
+  agent curieux **ramasse** un gélifract prêt à l'emploi (`ActionKind.GATHER`), sans
+  percussion. Essayé **avant** KNAP dans `decide()` (le gel a fait le travail → ramasser
+  prime). Rendement ∝ `clast_quality` (= base C2 × réponse de gel) : obsidienne froide →
+  rasoir, granite froid → arène stérile (mensonge #5). Surface seule → D10 gelé.
 
-**Reste (18 capacités + piliers langage/bâtiments)** : même patron, une tranche
+**Reste (17 capacités + piliers langage/bâtiments)** : même patron, une tranche
 verticale à la fois. Un **registre de capacités** + budget de perception seront
 introduits quand le nombre de branchements le justifiera (éviter la sur-ingénierie).
 
