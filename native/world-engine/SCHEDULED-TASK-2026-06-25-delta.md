@@ -69,3 +69,36 @@
 | Faut-il écrire du Rust ? | **Non** (ADR-0008 + env cargo-less inchangés). |
 | La routine est-elle utile aujourd'hui ? | **Oui** (run productif) mais **toujours pas gatée** → R-J15-1 (P0). |
 | Push effectué ? | **Oui — `main`** (code + tests + smoke + docs). |
+
+---
+
+## 5. RUN #2 (J+15, même journée) — R-J15-3 (P1) FERMÉE : moitié hydro de D11
+
+> **Type :** exécution (code livré + push). Routine `world-realism-system-v2.0`
+> (axe **Substrate / Eau & Hydrologie**), tirée une 2ᵉ fois le même jour.
+> **Veille-first** → combo → code → push respecté.
+
+**Veille :** combo `LTI river routing (Hascoet et al. 2026, JGR-ML)` × `bilan runoff
+Budyko (Collignan 2025, WRR)` × `discharge_observer` existant. **Aucun pivot** : le
+papier du jour **valide** le solveur LTI CPU déjà présent (la variante GPU/conv
+différentiable reste backlog, Rust gelé ADR-0008). CVE : aucune critique.
+
+**Livré — Wave 64 `river_discharge` : couplage de débit de rivière vivant.** Ferme le
+« **Reste** » explicite du sprint orographique d'hier (la **moitié hydro** de D11) et
+**R-J15-3**. Voir [`docs/sprints/2026-06-25_D11-river-discharge-coupling.md`](../../docs/sprints/2026-06-25_D11-river-discharge-coupling.md).
+
+- Pendant **exact** du couplage orographique : relit le même `elevation_m` vivant →
+  canal **température/ET** (SSOT `runoff_field_m3s`) → routage **LTI mass-conservatif**
+  (SSOT `route_runoff`) → met à l'échelle la rivière peinte par le débit du bassin.
+  Uplift refroidit→**gonfle** (×1,41) ; érosion réchauffe→**rétrécit** (×0,43) /
+  **tarit** (×0, oued émergent). Ferme l'observer-treadmill de `discharge_observer`.
+- Garde-fous : **no-op strict** sur monde statique (0 régression), read-only macro
+  (D10 gelé), `PY_TO_RUST` **inchangé** = 15 (D8), 0 RNG, réversible, **mass-conservatif**
+  (résidu 1e-16). Optionnel via `ALL_MODULES` (hors `_DEFAULT_MODULES`, comme `climate_biome`).
+- Vérif : pytest **vert** ; `ruff` clean ; **p156 9/9** ; non-régression p47/p49/p52/p122/
+  p154/p155/p82. Portail smoke CI **p155 → p156**.
+
+**Recos restantes (R-J15-x) :** R-J15-1 (P0, gater la routine d'audit) **toujours
+ouverte**. R-J15-2 (brancher une 4ᵉ capacité agent) toujours ouverte. Nouveau : R-J15-4
+— promouvoir `climate_biome` **et** `river_discharge` dans le set runtime par défaut
+(les deux moitiés de D11 sont prêtes mais restent optionnelles).

@@ -55,6 +55,7 @@ MOD_CLIMATE = "climate"          # Wave 19 — macro_climate (unifies 3 wind sou
 MOD_CLIMATE_BIOME = "climate_biome"      # Wave 20
 MOD_MARINE_BATHYMETRY = "bathymetry"     # Wave 21
 MOD_GLOBAL_GENESIS = "global_genesis"    # Wave 22
+MOD_RIVER_DISCHARGE = "river_discharge"  # Wave 64 — live discharge coupling
 
 
 _DEFAULT_MODULES: Set[str] = {
@@ -263,6 +264,27 @@ def bootstrap_genesis_sim(sim,
         except Exception as e:
             state.modules_skipped[MOD_MARINE_BATHYMETRY] = repr(e)
 
+    # ---- Optional Wave 64 — river_discharge coupling ----------------------
+    # Wires the live macro discharge onto the chunk river path: it rescales the
+    # rivers chunk_hydrology painted by the live basin discharge, so the same
+    # tectonic/erosion drift that climate_biome turns into a temperature anomaly
+    # also swells or dries the rivers. Needs the painted rivers (hydrology) and
+    # is installed after climate_biome so the orographic temperature is settled
+    # first. Strict no-op on a static-elevation world.
+    if MOD_RIVER_DISCHARGE in selected:
+        if MOD_HYDROLOGY not in state.modules_installed:
+            state.modules_skipped[MOD_RIVER_DISCHARGE] = "requires hydrology"
+        else:
+            try:
+                from engine.river_discharge import install_river_discharge
+                rd_st = install_river_discharge(sim, anchor)
+                state.sub_states["river_discharge"] = rd_st
+                state.modules_installed.add(MOD_RIVER_DISCHARGE)
+            except ImportError:
+                state.modules_skipped[MOD_RIVER_DISCHARGE] = "not yet implemented"
+            except Exception as e:
+                state.modules_skipped[MOD_RIVER_DISCHARGE] = repr(e)
+
     # ---- Optional Wave 22 — global_genesis is opt-in, not default ---------
     # Use engine.world_genesis_global directly when running multi-region.
 
@@ -309,7 +331,7 @@ def resolve_genesis_anchor(sim, *, synthetic_only: bool = False) -> Optional[Gen
 
 # Convenience set re-export so callers can pass `modules=ALL_MODULES` etc.
 ALL_MODULES: Set[str] = set(_DEFAULT_MODULES) | {
-    MOD_CLIMATE_BIOME, MOD_MARINE_BATHYMETRY,
+    MOD_CLIMATE_BIOME, MOD_MARINE_BATHYMETRY, MOD_RIVER_DISCHARGE,
 }
 
 MINIMAL_MODULES: Set[str] = {MOD_GENESIS, MOD_GEOLOGY, MOD_HYDROLOGY}
