@@ -213,7 +213,24 @@ Ce qu'impliquerait une telle cible et le matériel correspondant :
 
 En clair : le **substrat agent existe déjà** (corps, métabolisme, cognition NEAT, émergence), mais le **rendu photoréaliste 3D/4D est un axe de recherche graphique non commencé**. Le passer de 2.5D à 3D volumétrique photoréaliste est un chantier à part entière, indépendant de la simulation — qui, elle, resterait **CPU-bound et déterministe**.
 
-### Installation
+### Installation express (1 commande, recommandé)
+
+Installeurs stylés qui font tout — détection Python, venv, dépendances, diagnostic, smoke — en étapes numérotées :
+
+```bash
+# 1. Récupérer le projet
+git clone https://github.com/Micka420-collab/genesis-engine.git
+cd genesis-engine
+```
+
+| OS | Commande | Options |
+|----|----------|---------|
+| **Windows** | double-cliquer **`install.bat`** (ou `powershell -ExecutionPolicy Bypass -File install.ps1`) | `-Earth` (Terre réelle), `-NoSmoke` |
+| **Linux / macOS** | `chmod +x install.sh && ./install.sh` | `--earth`, `--no-smoke` |
+
+L'installeur crée `.venv`, installe `genesis-engine`, lance `doctor` puis le smoke `p0` et affiche les commandes de démarrage. En cas d'erreur il s'arrête avec un message clair.
+
+### Installation manuelle
 
 ```bash
 git clone https://github.com/Micka420-collab/genesis-engine.git
