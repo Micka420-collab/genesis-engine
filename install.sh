@@ -136,15 +136,40 @@ if [ "$NOSMOKE" != 1 ]; then
 fi
 
 # --- Final ------------------------------------------------------------------
+# IP locale (LAN) pour voir/controler l'interface depuis un autre appareil.
+IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+[ -z "$IP" ] && IP="$(ipconfig getifaddr en0 2>/dev/null || true)"
+[ -z "$IP" ] && IP="$(ipconfig getifaddr en1 2>/dev/null || true)"
+[ -z "$IP" ] && IP="<votre-ip-locale>"
+PORT=8090
+
 echo
 echo "$(C "$GREEN;1")  +--------------------------------------------------------------+$(R)"
 echo "$(C "$GREEN;1")  |   INSTALLATION TERMINEE                                       |$(R)"
 echo "$(C "$GREEN;1")  +--------------------------------------------------------------+$(R)"
 echo
-echo "  Pour demarrer :"
-echo "$(C 97)    source .venv/bin/activate$(R)"
-echo "$(C 97)    PYTHONPATH=runtime python runtime/run.py origins   $(R)$(C $GREY)# biosphere emergente$(R)"
-echo "$(C 97)    python -m pytest runtime/tests                     $(R)$(C $GREY)# 800+ tests$(R)"
+echo "$(C "$CYAN;1")  L'INTERFACE  (Earth Console - voir ET controler le monde)$(R)"
+echo "$(C $GREY)  ------------------------------------------------------------$(R)"
+echo "    Lancer :"
+echo "$(C 97)      PYTHONPATH=runtime python runtime/scripts/run_earth_console.py$(R)"
+echo "$(C $GREY)      (ajoute  --host 0.0.0.0  pour autoriser le controle a distance)$(R)"
 echo
-echo "$(C $GREY)  Doc : README.md  -  docs/EMERGENCE-SIM-v2.md$(R)"
+echo "    Ouvrir dans un navigateur :"
+echo "      $(C $GREEN)cet ordinateur : $(R)$(C 97)http://127.0.0.1:$PORT/$(R)"
+echo "      $(C $GREEN)reseau local   : $(R)$(C 97)http://$IP:$PORT/$(R)"
+echo
+echo "$(C "$CYAN;1")  COMMENT CA MARCHE$(R)"
+echo "$(C $GREY)  ------------------------------------------------------------$(R)"
+echo "    L'Earth Console sert une page web temps reel (flux SSE) : tu VOIS"
+echo "    le monde vivre (climat, biomes, agents, ressources) et tu le"
+echo "    CONTROLES en mode dieu (pause, vitesse, perturbations)."
+echo
+echo "$(C "$CYAN;1")  LE BUT DU PROJET$(R)"
+echo "$(C $GREY)  ------------------------------------------------------------$(R)"
+echo "    Laboratoire de simulation civilisationnelle ZERO script : seules"
+echo "    les lois physiques sont codees. Le langage, les outils, la"
+echo "    civilisation doivent EMERGER des agents IA - jamais etre scriptes."
+echo "    Chaque emergence est inscrite dans un ledger refutable."
+echo
+echo "$(C $GREY)  Doc : README.md  -  docs/EMERGENCE-SIM-v2.md  -  docs/EARTH-CONSOLE.md$(R)"
 echo

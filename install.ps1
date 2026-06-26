@@ -89,15 +89,43 @@ if (-not $NoSmoke) {
 }
 
 # --- Final ------------------------------------------------------------------
+# IP locale (LAN) pour voir/controler l'interface depuis un autre appareil.
+$ip = $null
+try {
+    $ip = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+           Where-Object { $_.IPAddress -ne '127.0.0.1' -and $_.IPAddress -notlike '169.254*' -and $_.PrefixOrigin -ne 'WellKnown' } |
+           Select-Object -First 1).IPAddress
+} catch {}
+if (-not $ip) { $ip = "<votre-ip-locale>" }
+$port = 8090
+
 Write-Host ""
 Write-Host (C "92;1" "  +--------------------------------------------------------------+")
 Write-Host (C "92;1" "  |   INSTALLATION TERMINEE                                       |")
 Write-Host (C "92;1" "  +--------------------------------------------------------------+")
 Write-Host ""
-Write-Host "  Pour demarrer :"
-Write-Host (C "97" "    .\.venv\Scripts\activate")
-Write-Host (C "97" "    `$env:PYTHONPATH='runtime'; python runtime/run.py origins   ") (C "90" "# biosphere emergente")
-Write-Host (C "97" "    python -m pytest runtime/tests                            ") (C "90" "# 800+ tests")
+Write-Host (C "96;1" "  L'INTERFACE  (Earth Console - voir ET controler le monde)")
+Write-Host (C "90"   "  ------------------------------------------------------------")
+Write-Host "    Lancer :"
+Write-Host (C "97" "      `$env:PYTHONPATH='runtime'; python runtime/scripts/run_earth_console.py")
+Write-Host (C "90" "      (ajoute  --host 0.0.0.0  pour autoriser le controle a distance)")
 Write-Host ""
-Write-Host (C "90" "  Doc : README.md  -  docs/EMERGENCE-SIM-v2.md")
+Write-Host "    Ouvrir dans un navigateur :"
+Write-Host ("      " + (C "92" "cet ordinateur : ") + (C "97" "http://127.0.0.1:$port/"))
+Write-Host ("      " + (C "92" "reseau local   : ") + (C "97" "http://${ip}:$port/"))
+Write-Host ""
+Write-Host (C "96;1" "  COMMENT CA MARCHE")
+Write-Host (C "90"   "  ------------------------------------------------------------")
+Write-Host "    L'Earth Console sert une page web temps reel (flux SSE) : tu VOIS"
+Write-Host "    le monde vivre (climat, biomes, agents, ressources) et tu le"
+Write-Host "    CONTROLES en mode dieu (pause, vitesse, perturbations)."
+Write-Host ""
+Write-Host (C "96;1" "  LE BUT DU PROJET")
+Write-Host (C "90"   "  ------------------------------------------------------------")
+Write-Host "    Laboratoire de simulation civilisationnelle ZERO script : seules"
+Write-Host "    les lois physiques sont codees. Le langage, les outils, la"
+Write-Host "    civilisation doivent EMERGER des agents IA - jamais etre scriptes."
+Write-Host "    Chaque emergence est inscrite dans un ledger refutable."
+Write-Host ""
+Write-Host (C "90" "  Doc : README.md  -  docs/EMERGENCE-SIM-v2.md  -  docs/EARTH-CONSOLE.md")
 Write-Host ""
