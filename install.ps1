@@ -180,9 +180,9 @@ Write-Host (C "92;1" "  +-------------------------------------------------------
 Write-Host ""
 Write-Host (C "96;1" "  L'INTERFACE  (Earth Console - voir ET controler le monde)")
 Write-Host (C "90"   "  ------------------------------------------------------------")
-Write-Host "    Lancer :"
-Write-Host (C "97" "      `$env:PYTHONPATH='runtime'; python runtime/scripts/run_earth_console.py")
-Write-Host (C "90" "      (ajoute  --host 0.0.0.0  pour autoriser le controle a distance)")
+Write-Host "    Lancer (1 commande, bind reseau + bon Python automatiques) :"
+Write-Host (C "97" "      powershell -ExecutionPolicy Bypass -File start-console.ps1")
+Write-Host (C "90" "      (accessible depuis un autre appareil ; Ctrl+C pour arreter)")
 Write-Host ""
 Write-Host "    Ouvrir dans un navigateur :"
 Write-Host ("      " + (C "92" "cet ordinateur : ") + (C "97" "http://127.0.0.1:$port/"))

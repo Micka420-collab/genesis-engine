@@ -231,6 +231,8 @@ cd genesis-engine
 
 L'installeur crée `.venv`, installe `genesis-engine`, **installe l'IA locale (Ollama) avec un menu de choix du modèle**, lance `doctor` puis le smoke `p0`, et affiche l'URL de l'Earth Console (vue + contrôle) avec une explication du projet. En cas d'erreur il s'arrête avec un message clair.
 
+Pour lancer l'interface ensuite, un **lanceur dédié** choisit le bon Python (celui du `.venv`, donc pas de « python introuvable » sous Ubuntu) et expose l'interface sur le réseau (`--host 0.0.0.0`) : `./start-console.sh` (Linux/macOS) ou `start-console.ps1` (Windows). Ouvre alors `http://<ip-de-la-machine>:8090/`.
+
 > **Ubuntu / Debian** : `python3 -m venv` exige le paquet `python3-venv` (et `python3-dev`/`build-essential` pour compiler les dépendances natives). L'option `--apt` les installe automatiquement (`sudo apt-get install -y python3-venv python3-pip python3-dev build-essential`). Sans `--apt`, si le venv échoue, l'installeur affiche la commande exacte à lancer.
 
 > **IA locale (Ollama)** : l'installeur pose Ollama, propose un **menu stylé comparant les modèles** (taille / RAM / vitesse / qualité), télécharge celui choisi (défaut `llama3.2:3b`) et écrit `genesis_llm.json` → connexion **automatique**. Rôle : **observateur/narrateur en lecture seule** ([`engine/llm_observer.py`](runtime/engine/llm_observer.py)) — l'IA décrit le monde, ne pilote jamais les agents (règle d'émergence). Options : `--no-ai` (sauter), `--model NAME` (sans menu). Vérifié par le smoke `p157`.

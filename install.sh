@@ -239,9 +239,9 @@ echo "$(C "$GREEN;1")  +--------------------------------------------------------
 echo
 echo "$(C "$CYAN;1")  L'INTERFACE  (Earth Console - voir ET controler le monde)$(R)"
 echo "$(C $GREY)  ------------------------------------------------------------$(R)"
-echo "    Lancer :"
-echo "$(C 97)      PYTHONPATH=runtime python runtime/scripts/run_earth_console.py$(R)"
-echo "$(C $GREY)      (ajoute  --host 0.0.0.0  pour autoriser le controle a distance)$(R)"
+echo "    Lancer (1 commande, bind reseau + bon Python automatiques) :"
+echo "$(C 97)      ./start-console.sh$(R)"
+echo "$(C $GREY)      (accessible depuis un autre appareil ; Ctrl+C pour arreter)$(R)"
 echo
 echo "    Ouvrir dans un navigateur :"
 echo "      $(C $GREEN)cet ordinateur : $(R)$(C 97)http://127.0.0.1:$PORT/$(R)"
