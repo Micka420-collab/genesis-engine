@@ -98,6 +98,7 @@ jobs:
             p154_orographic_climate_smoke.py
             p155_frost_clast_gather_smoke.py
             p156_river_discharge_smoke.py
+            p157_llm_observer_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="

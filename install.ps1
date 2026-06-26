@@ -7,7 +7,9 @@
 #>
 param(
     [switch]$Earth,
-    [switch]$NoSmoke
+    [switch]$NoSmoke,
+    [switch]$NoAi,
+    [string]$Model = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,7 +17,9 @@ $ESC = [char]27
 function C($code, $txt) { "$ESC[${code}m$txt$ESC[0m" }
 $OK   = C "92" "OK"      # vert
 $ERRC = C "91" "ERREUR" # rouge
-$total = if ($NoSmoke) { 5 } else { 6 }
+$total = 5                       # python, venv, pip, deps, doctor
+if (-not $NoSmoke) { $total++ }  # + smoke
+if (-not $NoAi)    { $total++ }  # + IA locale (Ollama)
 $script:step = 0
 
 function Banner {
@@ -37,6 +41,73 @@ function Step($title) {
 
 function Done($msg)  { Write-Host "      [$OK] $msg" }
 function Fail($msg)  { Write-Host "      [$ERRC] $msg" -ForegroundColor Red; exit 1 }
+function Warn($msg)  { Write-Host (C "93" "      [!] $msg") }
+
+# --- IA locale : catalogue de modeles Ollama (observateur/narrateur) --------
+$MODELS = @(
+    @{ name="llama3.2:1b"; size="1.3 Go"; ram="4 Go";  speed="tres rapide"; qual="basique";  note="ultra-leger" }
+    @{ name="llama3.2:3b"; size="2.0 Go"; ram="8 Go";  speed="rapide";      qual="bon";      note="RECOMMANDE (defaut)" }
+    @{ name="llama3.1:8b"; size="4.7 Go"; ram="16 Go"; speed="moyen";       qual="tres bon"; note="narration riche" }
+    @{ name="phi3:mini";   size="2.3 Go"; ram="8 Go";  speed="rapide";      qual="bon";      note="compact (Microsoft)" }
+    @{ name="mistral:7b";  size="4.1 Go"; ram="16 Go"; speed="moyen";       qual="tres bon"; note="polyvalent" }
+    @{ name="qwen2.5:7b";  size="4.7 Go"; ram="16 Go"; speed="moyen";       qual="tres bon"; note="multilingue FR" }
+)
+$DEFAULT_MODEL_IDX = 2
+
+function Print-ModelTable {
+    Write-Host (C "90" ("        {0,-2} {1,-15} {2,-8} {3,-6} {4,-12} {5,-10} {6}" -f "#","modele","taille","RAM","vitesse","qualite","note"))
+    for ($i=0; $i -lt $MODELS.Count; $i++) {
+        $m = $MODELS[$i]
+        Write-Host ("        {0,-2} {1,-15} {2,-8} {3,-6} {4,-12} {5,-10} {6}" -f ($i+1), $m.name, $m.size, $m.ram, $m.speed, $m.qual, $m.note)
+    }
+}
+
+function Ollama-Serving {
+    try { $r = Invoke-WebRequest -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 3 -UseBasicParsing; return $r.StatusCode -eq 200 }
+    catch { return $false }
+}
+
+function Write-LlmConfig($name) {
+    '{"host": "http://127.0.0.1:11434", "model": "' + $name + '"}' | Out-File -Encoding utf8 -NoNewline genesis_llm.json
+    Done "connexion configuree -> genesis_llm.json (modele $name)"
+}
+
+function Ai-Step {
+    Step "IA locale (Ollama) - observateur/narrateur"
+    # 1. Installer Ollama si absent.
+    if (Get-Command ollama -ErrorAction SilentlyContinue) {
+        Done "Ollama deja present"
+    } elseif (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host (C "90" "      winget install Ollama.Ollama ...")
+        winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
+        $exe = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"
+        if (Get-Command ollama -ErrorAction SilentlyContinue) { Done "Ollama installe" }
+        elseif (Test-Path $exe) { $env:Path += ";" + (Split-Path $exe); Done "Ollama installe" }
+        else { Warn "echec winget - telecharge Ollama: https://ollama.com/download"; return }
+    } else {
+        Warn "winget absent - telecharge Ollama: https://ollama.com/download"; return
+    }
+    # 2. Demarrer le service si pas en ecoute.
+    if (-not (Ollama-Serving)) { Start-Process -WindowStyle Hidden ollama -ArgumentList "serve" -ErrorAction SilentlyContinue; Start-Sleep 2 }
+    if (Ollama-Serving) { Done "service Ollama en ecoute (127.0.0.1:11434)" }
+    else { Warn "service Ollama pas encore en ecoute (lance 'ollama serve')" }
+    # 3. Choix du modele (menu, sauf si -Model fourni).
+    $choice = $Model
+    if (-not $choice) {
+        Write-Host ""; Write-Host "    Choisis le modele a telecharger :"
+        Print-ModelTable; Write-Host ""
+        $choice = Read-Host ("      Numero [defaut $DEFAULT_MODEL_IDX, 0=aucun, ou un nom Ollama]")
+        if (-not $choice) { $choice = "$DEFAULT_MODEL_IDX" }
+    }
+    if ($choice -eq "0") { Warn "aucun modele telecharge (fais 'ollama pull <nom>' plus tard)"; return }
+    if ($choice -match '^[1-9][0-9]*$' -and [int]$choice -le $MODELS.Count) { $name = $MODELS[[int]$choice - 1].name }
+    else { $name = $choice }
+    # 4. Pull + config (connexion auto).
+    Write-Host (C "90" "      ollama pull $name  (peut prendre quelques minutes)...")
+    & ollama pull $name
+    if ($LASTEXITCODE -eq 0) { Done "modele '$name' pret" } else { Warn "echec du pull de '$name'" }
+    Write-LlmConfig $name
+}
 
 Banner
 
@@ -72,6 +143,9 @@ Step "Installation de Genesis Engine  (extras: $extra)"
 Write-Host (C "90" "      pip install -e `".[$extra]`"  (peut prendre 1-3 min)...")
 & $VPY -m pip install -e ".[$extra]"; if ($LASTEXITCODE) { Fail "echec installation des dependances" }
 Done "Genesis Engine installe en mode editable"
+
+# --- Etape IA locale (Ollama) ----------------------------------------------
+if (-not $NoAi) { Ai-Step }
 
 # --- Etape 5 : doctor -------------------------------------------------------
 Step "Diagnostic (doctor) - outils + imports"
@@ -113,6 +187,21 @@ Write-Host ""
 Write-Host "    Ouvrir dans un navigateur :"
 Write-Host ("      " + (C "92" "cet ordinateur : ") + (C "97" "http://127.0.0.1:$port/"))
 Write-Host ("      " + (C "92" "reseau local   : ") + (C "97" "http://${ip}:$port/"))
+Write-Host ""
+# Etat de l'IA locale (narrateur).
+$aiModel = ""
+if (Test-Path genesis_llm.json) {
+    try { $aiModel = (Get-Content genesis_llm.json -Raw | ConvertFrom-Json).model } catch {}
+}
+Write-Host (C "96;1" "  L'IA LOCALE  (Ollama - narrateur, lecture seule)")
+Write-Host (C "90"   "  ------------------------------------------------------------")
+if ($aiModel) {
+    Write-Host ("      " + (C "92" "pret") + " : modele " + (C "97" $aiModel) + " sur http://127.0.0.1:11434")
+    Write-Host (C "90" "      Connexion AUTOMATIQUE : le moteur lit genesis_llm.json.")
+} else {
+    Write-Host (C "90" "      Aucun modele configure. Lance : ollama pull llama3.2:3b")
+}
+Write-Host "      L'IA DECRIT le monde, elle ne pilote jamais les agents (emergence)."
 Write-Host ""
 Write-Host (C "96;1" "  COMMENT CA MARCHE")
 Write-Host (C "90"   "  ------------------------------------------------------------")

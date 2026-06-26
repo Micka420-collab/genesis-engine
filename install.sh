@@ -3,21 +3,26 @@
 #  Genesis Engine - Installeur Linux (Ubuntu/Debian) / macOS
 #  Usage :
 #      chmod +x install.sh && ./install.sh
-#      ./install.sh --earth     # + Terre reelle (rasterio/pyproj)
-#      ./install.sh --no-smoke  # saute le test final
-#      ./install.sh --apt       # installe d'abord les paquets systeme (Ubuntu/Debian, sudo)
+#      ./install.sh --earth        # + Terre reelle (rasterio/pyproj)
+#      ./install.sh --no-smoke     # saute le test final
+#      ./install.sh --apt          # paquets systeme (Ubuntu/Debian, sudo)
+#      ./install.sh --no-ai        # n'installe pas Ollama / l'IA locale
+#      ./install.sh --model NAME   # choisit le modele LLM sans menu (ex: llama3.2:3b)
 #
 set -euo pipefail
 cd "$(dirname "$0")"
 
-EARTH=0; NOSMOKE=0; APT=0
-for a in "$@"; do
-  case "$a" in
+EARTH=0; NOSMOKE=0; APT=0; NOAI=0; MODEL_ARG=""
+while [ $# -gt 0 ]; do
+  case "$1" in
     --earth) EARTH=1 ;;
     --no-smoke) NOSMOKE=1 ;;
     --apt) APT=1 ;;
-    *) echo "option inconnue : $a"; exit 2 ;;
+    --no-ai) NOAI=1 ;;
+    --model) shift; MODEL_ARG="${1:-}" ;;
+    *) echo "option inconnue : $1"; exit 2 ;;
   esac
+  shift
 done
 
 # --- detection distribution -------------------------------------------------
@@ -33,8 +38,10 @@ else
   C(){ :; }; R(){ :; }
 fi
 CYAN="96"; GREEN="92"; GREY="90"; WHITE="97;1"; YEL="93"; REDC="91"
-TOTAL=6; [ "$NOSMOKE" = 1 ] && TOTAL=5
-[ "$APT" = 1 ] && TOTAL=$((TOTAL+1))
+TOTAL=5                                   # python, venv, pip, deps, doctor
+[ "$NOSMOKE" != 1 ] && TOTAL=$((TOTAL+1))  # + smoke
+[ "$APT" = 1 ] && TOTAL=$((TOTAL+1))       # + paquets systeme
+[ "$NOAI" != 1 ] && TOTAL=$((TOTAL+1))     # + IA locale (Ollama)
 STEP=0
 
 banner(){
@@ -64,6 +71,85 @@ apt_hint(){
   local sudo=""; [ "$(id -u)" -ne 0 ] && sudo="sudo"
   echo "$(C 97)        $sudo apt-get update && $sudo apt-get install -y $APT_PKGS$(R)"
   echo "$(C $GREY)      puis relance ./install.sh   (ou : ./install.sh --apt)$(R)"
+}
+
+# --- IA locale : catalogue de modeles Ollama (observateur/narrateur) --------
+# nom|taille|RAM mini|vitesse|qualite|note
+MODELS=(
+  "llama3.2:1b|1.3 Go|4 Go|tres rapide|basique|ultra-leger"
+  "llama3.2:3b|2.0 Go|8 Go|rapide|bon|RECOMMANDE (defaut)"
+  "llama3.1:8b|4.7 Go|16 Go|moyen|tres bon|narration riche"
+  "phi3:mini|2.3 Go|8 Go|rapide|bon|compact (Microsoft)"
+  "mistral:7b|4.1 Go|16 Go|moyen|tres bon|polyvalent"
+  "qwen2.5:7b|4.7 Go|16 Go|moyen|tres bon|multilingue FR"
+)
+DEFAULT_MODEL_IDX=2
+
+print_model_table(){
+  echo "$(C $GREY)        #  modele          taille   RAM    vitesse      qualite    note$(R)"
+  local i=1 name size ram speed qual note
+  for m in "${MODELS[@]}"; do
+    IFS='|' read -r name size ram speed qual note <<< "$m"
+    printf "        %-2s %-15s %-8s %-6s %-12s %-10s %s\n" \
+      "$i" "$name" "$size" "$ram" "$speed" "$qual" "$note"
+    i=$((i+1))
+  done
+}
+
+write_llm_config(){
+  printf '{"host": "http://127.0.0.1:11434", "model": "%s"}\n' "$1" > genesis_llm.json
+  done_ "connexion configuree -> genesis_llm.json (modele $1)"
+}
+
+ollama_serving(){ curl -fsS "http://127.0.0.1:11434/api/tags" >/dev/null 2>&1; }
+
+ai_step(){
+  step "IA locale (Ollama) - observateur/narrateur"
+  # 1. Installer Ollama si absent.
+  if command -v ollama >/dev/null 2>&1; then
+    done_ "Ollama deja present"
+  else
+    case "$(uname -s)" in
+      Linux)
+        if command -v curl >/dev/null 2>&1; then
+          echo "$(C $GREY)      curl -fsSL https://ollama.com/install.sh | sh$(R)"
+          curl -fsSL https://ollama.com/install.sh | sh \
+            && done_ "Ollama installe" \
+            || { warn "echec install Ollama - voir https://ollama.com/download"; return 0; }
+        else warn "curl absent - installe Ollama: https://ollama.com/download"; return 0; fi ;;
+      Darwin)
+        if command -v brew >/dev/null 2>&1; then
+          brew install ollama && done_ "Ollama installe (brew)" || { warn "echec brew install ollama"; return 0; }
+        else warn "telecharge Ollama: https://ollama.com/download"; return 0; fi ;;
+      *) warn "OS non reconnu - installe Ollama: https://ollama.com/download"; return 0 ;;
+    esac
+  fi
+  # 2. Demarrer le service si pas deja en ecoute.
+  if ! ollama_serving; then (ollama serve >/dev/null 2>&1 &) ; sleep 2; fi
+  if ollama_serving; then done_ "service Ollama en ecoute (127.0.0.1:11434)"
+  else warn "service Ollama pas encore en ecoute (lance 'ollama serve')"; fi
+  # 3. Choix du modele (menu style, sauf si --model fourni).
+  local choice="$MODEL_ARG" name
+  if [ -z "$choice" ]; then
+    echo; echo "    Choisis le modele a telecharger :"
+    print_model_table; echo
+    if [ -t 0 ]; then
+      printf "      Numero [defaut %s, 0=aucun, ou un nom Ollama] : " "$DEFAULT_MODEL_IDX"
+      read -r choice || choice=""
+    else warn "mode non-interactif -> modele par defaut"; fi
+    [ -z "$choice" ] && choice="$DEFAULT_MODEL_IDX"
+  fi
+  if [ "$choice" = "0" ]; then
+    warn "aucun modele telecharge (fais 'ollama pull <nom>' plus tard)"; return 0
+  elif printf '%s' "$choice" | grep -qE '^[1-9][0-9]*$' && [ "$choice" -le "${#MODELS[@]}" ]; then
+    IFS='|' read -r name _ <<< "${MODELS[$((choice-1))]}"
+  else
+    name="$choice"   # nom de modele tape directement
+  fi
+  # 4. Pull + ecriture de la config (connexion auto).
+  echo "$(C $GREY)      ollama pull $name  (peut prendre quelques minutes)...$(R)"
+  ollama pull "$name" && done_ "modele '$name' pret" || warn "echec du pull de '$name'"
+  write_llm_config "$name"
 }
 
 banner
@@ -123,6 +209,9 @@ echo "$(C $GREY)      pip install -e \".[$EXTRA]\"  (peut prendre 1-3 min)...$(R
 "$VPY" -m pip install -e ".[$EXTRA]" && done_ "Genesis Engine installe en mode editable" \
   || fail "echec installation des dependances"
 
+# --- Etape IA locale (Ollama) ----------------------------------------------
+[ "$NOAI" != 1 ] && ai_step
+
 # --- Etape 5 : doctor -------------------------------------------------------
 step "Diagnostic (doctor) - outils + imports"
 PYTHONPATH=runtime "$VPY" runtime/scripts/doctor.py && done_ "doctor : environnement sain" \
@@ -157,6 +246,19 @@ echo
 echo "    Ouvrir dans un navigateur :"
 echo "      $(C $GREEN)cet ordinateur : $(R)$(C 97)http://127.0.0.1:$PORT/$(R)"
 echo "      $(C $GREEN)reseau local   : $(R)$(C 97)http://$IP:$PORT/$(R)"
+echo
+# Etat de l'IA locale (narrateur).
+AI_MODEL=""
+[ -f genesis_llm.json ] && AI_MODEL="$(sed -n 's/.*"model": *"\([^"]*\)".*/\1/p' genesis_llm.json)"
+echo "$(C "$CYAN;1")  L'IA LOCALE  (Ollama - narrateur, lecture seule)$(R)"
+echo "$(C $GREY)  ------------------------------------------------------------$(R)"
+if [ -n "$AI_MODEL" ]; then
+  echo "      $(C $GREEN)pret$(R) : modele $(C 97)$AI_MODEL$(R) sur http://127.0.0.1:11434"
+  echo "$(C $GREY)      Connexion AUTOMATIQUE : le moteur lit genesis_llm.json.$(R)"
+else
+  echo "$(C $GREY)      Aucun modele configure. Lance : ollama pull llama3.2:3b$(R)"
+fi
+echo "      L'IA DECRIT le monde, elle ne pilote jamais les agents (emergence)."
 echo
 echo "$(C "$CYAN;1")  COMMENT CA MARCHE$(R)"
 echo "$(C $GREY)  ------------------------------------------------------------$(R)"

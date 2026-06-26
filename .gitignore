@@ -77,3 +77,6 @@ logs/
 # --- Generated experiment run outputs (machine-specific, non-deterministic) ---
 # Keep templates/runners/configs; ignore the timestamped <name>_<UTC>Z run dirs.
 runtime/experiments/*_*T*Z/
+
+# Config IA locale (Ollama) ecrite par l_installeur
+genesis_llm.json
