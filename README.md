@@ -8,7 +8,7 @@
 [🇫🇷 Français](README.md) · [🇬🇧 English](README.en.md) · [🇪🇸 Español](README.es.md) · [🇩🇪 Deutsch](README.de.md) · [🇵🇹 Português](README.pt.md) · [🇮🇹 Italiano](README.it.md) · [🇨🇳 中文](README.zh-CN.md) · [🇯🇵 日本語](README.ja.md) · [🇷🇺 Русский](README.ru.md) · [🇰🇷 한국어](README.ko.md) · [🇮🇳 हिन्दी](README.hi.md) · [🇳🇱 Nederlands](README.nl.md) · [🇵🇱 Polski](README.pl.md) · [🇸🇦 العربية](README.ar.md)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
-[![Python 3.11–3.13](https://img.shields.io/badge/python-3.11–3.13-blue.svg)](https://www.python.org/)
+[![Python 3.11–3.14](https://img.shields.io/badge/python-3.11–3.14-blue.svg)](https://www.python.org/)
 [![Rust 1.85](https://img.shields.io/badge/rust-1.85-orange.svg)](https://rust-lang.org/)
 [![Earth realism ~76%](https://img.shields.io/badge/r%C3%A9alisme_Terre-~76%25-orange.svg)](docs/ROADMAP-REALISME-TERRE.md)
 [![Deterministic](https://img.shields.io/badge/deterministic-PRF-purple.svg)](FALSIFIABILITY.md#engine-level-invariants)
@@ -173,7 +173,7 @@ Détail Rust : [`native/world-engine/README.md`](native/world-engine/README.md) 
 
 ### Prérequis logiciels
 
-- **Python 3.11–3.13**
+- **Python 3.11–3.14**
 - **Optionnel** : Rust 1.85+ (`rustup`) pour `native/world-engine`
 - **Optionnel** : `rasterio` + `pyproj` pour Terre réelle (`pip install -e ".[earth]"`)
 

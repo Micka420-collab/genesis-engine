@@ -112,7 +112,7 @@ function Ai-Step {
 Banner
 
 # --- Etape 1 : Python -------------------------------------------------------
-Step "Verification de Python (3.11 - 3.13 recommande)"
+Step "Verification de Python (3.11 - 3.14 supporte)"
 $py = $null
 foreach ($c in @("python", "py -3")) {
     try {
@@ -120,10 +120,10 @@ foreach ($c in @("python", "py -3")) {
         if ($v -match "Python (\d+)\.(\d+)") { $py = $c; $maj=[int]$Matches[1]; $min=[int]$Matches[2]; break }
     } catch {}
 }
-if (-not $py) { Fail "Python introuvable. Installe Python 3.11-3.13 depuis https://www.python.org/" }
+if (-not $py) { Fail "Python introuvable. Installe Python 3.11-3.14 depuis https://www.python.org/" }
 Done "Python detecte : $v  (via '$py')"
 if ($maj -ne 3 -or $min -lt 11) { Fail "Python $maj.$min trop ancien - il faut >= 3.11" }
-if ($min -gt 13) { Write-Host (C "93" "      [!] Python 3.$min non officiellement supporte (cible 3.11-3.13) - on continue.") }
+if ($min -gt 14) { Write-Host (C "93" "      [!] Python 3.$min non officiellement supporte (cible 3.11-3.14) - on continue.") }
 
 # --- Etape 2 : venv ---------------------------------------------------------
 Step "Creation de l'environnement virtuel (.venv)"

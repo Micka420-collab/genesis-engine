@@ -163,19 +163,19 @@ if [ "$APT" = 1 ]; then
 fi
 
 # --- Etape 1 : Python -------------------------------------------------------
-step "Verification de Python (3.11 - 3.13 recommande)"
+step "Verification de Python (3.11 - 3.14 supporte)"
 PY=""; V=""
 for c in python3 python python3.13 python3.12 python3.11; do
   command -v "$c" >/dev/null 2>&1 || continue
   vline="$("$c" --version 2>&1 || true)"
   case "$vline" in Python\ 3.*) PY="$c"; V="$vline"; break ;; esac
 done
-[ -z "$PY" ] && fail "Python 3 introuvable. Installe Python 3.11-3.13 depuis https://www.python.org/"
+[ -z "$PY" ] && fail "Python 3 introuvable. Installe Python 3.11-3.14 depuis https://www.python.org/"
 MAJ="$("$PY" -c 'import sys;print(sys.version_info[0])')"
 MIN="$("$PY" -c 'import sys;print(sys.version_info[1])')"
 done_ "Python detecte : $V  (via '$PY')"
 { [ "$MAJ" -ne 3 ] || [ "$MIN" -lt 11 ]; } && fail "Python $MAJ.$MIN trop ancien - il faut >= 3.11"
-[ "$MIN" -gt 13 ] && warn "Python 3.$MIN non officiellement supporte (cible 3.11-3.13) - on continue."
+[ "$MIN" -gt 14 ] && warn "Python 3.$MIN non officiellement supporte (cible 3.11-3.14) - on continue."
 
 # --- Etape 2 : venv ---------------------------------------------------------
 step "Creation de l'environnement virtuel (.venv)"
