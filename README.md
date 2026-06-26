@@ -226,9 +226,12 @@ cd genesis-engine
 | OS | Commande | Options |
 |----|----------|---------|
 | **Windows** | double-cliquer **`install.bat`** (ou `powershell -ExecutionPolicy Bypass -File install.ps1`) | `-Earth` (Terre réelle), `-NoSmoke` |
-| **Linux / macOS** | `chmod +x install.sh && ./install.sh` | `--earth`, `--no-smoke` |
+| **Ubuntu / Debian** | `chmod +x install.sh && ./install.sh --apt` | `--apt` (paquets système via sudo), `--earth`, `--no-smoke` |
+| **Linux (autre) / macOS** | `chmod +x install.sh && ./install.sh` | `--earth`, `--no-smoke` |
 
 L'installeur crée `.venv`, installe `genesis-engine`, lance `doctor` puis le smoke `p0` et affiche les commandes de démarrage. En cas d'erreur il s'arrête avec un message clair.
+
+> **Ubuntu / Debian** : `python3 -m venv` exige le paquet `python3-venv` (et `python3-dev`/`build-essential` pour compiler les dépendances natives). L'option `--apt` les installe automatiquement (`sudo apt-get install -y python3-venv python3-pip python3-dev build-essential`). Sans `--apt`, si le venv échoue, l'installeur affiche la commande exacte à lancer.
 
 ### Installation manuelle
 

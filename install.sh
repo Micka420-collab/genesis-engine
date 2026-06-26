@@ -1,22 +1,30 @@
 #!/usr/bin/env bash
 #
-#  Genesis Engine - Installeur Linux / macOS
+#  Genesis Engine - Installeur Linux (Ubuntu/Debian) / macOS
 #  Usage :
 #      chmod +x install.sh && ./install.sh
 #      ./install.sh --earth     # + Terre reelle (rasterio/pyproj)
 #      ./install.sh --no-smoke  # saute le test final
+#      ./install.sh --apt       # installe d'abord les paquets systeme (Ubuntu/Debian, sudo)
 #
 set -euo pipefail
 cd "$(dirname "$0")"
 
-EARTH=0; NOSMOKE=0
+EARTH=0; NOSMOKE=0; APT=0
 for a in "$@"; do
   case "$a" in
     --earth) EARTH=1 ;;
     --no-smoke) NOSMOKE=1 ;;
+    --apt) APT=1 ;;
     *) echo "option inconnue : $a"; exit 2 ;;
   esac
 done
+
+# --- detection distribution -------------------------------------------------
+DISTRO="inconnu"
+if [ -r /etc/os-release ]; then DISTRO="$(. /etc/os-release; echo "${ID:-inconnu}")"; fi
+IS_APT=0
+command -v apt-get >/dev/null 2>&1 && IS_APT=1
 
 # --- couleurs ---------------------------------------------------------------
 if [ -t 1 ]; then
@@ -26,6 +34,7 @@ else
 fi
 CYAN="96"; GREEN="92"; GREY="90"; WHITE="97;1"; YEL="93"; REDC="91"
 TOTAL=6; [ "$NOSMOKE" = 1 ] && TOTAL=5
+[ "$APT" = 1 ] && TOTAL=$((TOTAL+1))
 STEP=0
 
 banner(){
@@ -43,7 +52,29 @@ done_(){ echo "      [$(C $GREEN)OK$(R)] $1"; }
 fail(){ echo "      [$(C $REDC)ERREUR$(R)] $1"; exit 1; }
 warn(){ echo "$(C $YEL)      [!] $1$(R)"; }
 
+# Paquets systeme requis sur Ubuntu/Debian (venv + build des deps natives).
+APT_PKGS="python3-venv python3-pip python3-dev build-essential"
+apt_install(){
+  local sudo=""; [ "$(id -u)" -ne 0 ] && sudo="sudo"
+  echo "$(C $GREY)      $sudo apt-get update && $sudo apt-get install -y $APT_PKGS$(R)"
+  $sudo apt-get update -qq && $sudo apt-get install -y $APT_PKGS
+}
+apt_hint(){
+  warn "Sur Ubuntu/Debian, installe d'abord les paquets systeme :"
+  local sudo=""; [ "$(id -u)" -ne 0 ] && sudo="sudo"
+  echo "$(C 97)        $sudo apt-get update && $sudo apt-get install -y $APT_PKGS$(R)"
+  echo "$(C $GREY)      puis relance ./install.sh   (ou : ./install.sh --apt)$(R)"
+}
+
 banner
+
+# --- Etape 0 (optionnelle) : paquets systeme Ubuntu/Debian ------------------
+if [ "$APT" = 1 ]; then
+  step "Paquets systeme (Ubuntu/Debian)"
+  if [ "$IS_APT" = 1 ]; then apt_install && done_ "paquets systeme installes ($APT_PKGS)" \
+      || fail "echec apt-get (droits sudo ?)"
+  else warn "apt-get absent (distro '$DISTRO') - etape ignoree."; fi
+fi
 
 # --- Etape 1 : Python -------------------------------------------------------
 step "Verification de Python (3.11 - 3.13 recommande)"
@@ -62,8 +93,22 @@ done_ "Python detecte : $V  (via '$PY')"
 
 # --- Etape 2 : venv ---------------------------------------------------------
 step "Creation de l'environnement virtuel (.venv)"
-if [ -d .venv ]; then done_ ".venv existe deja - reutilise"
-else "$PY" -m venv .venv && done_ ".venv cree" || fail "echec creation venv"; fi
+if [ -d .venv ]; then
+  done_ ".venv existe deja - reutilise"
+elif "$PY" -m venv .venv 2>/tmp/ge_venv_err; then
+  done_ ".venv cree"
+else
+  cat /tmp/ge_venv_err 2>/dev/null | sed 's/^/        /'
+  # Cas classique Ubuntu/Debian : le module venv/ensurepip manque.
+  if [ "$IS_APT" = 1 ]; then
+    if [ "$APT" = 1 ]; then fail "venv a echoue malgre --apt - voir l'erreur ci-dessus"; fi
+    warn "echec de la creation du venv (paquet python3-venv manquant ?)"
+    apt_hint
+    fail "installe les paquets systeme puis relance"
+  else
+    fail "echec creation venv - voir l'erreur ci-dessus"
+  fi
+fi
 VPY="./.venv/bin/python"
 [ -x "$VPY" ] || fail "python du venv introuvable ($VPY)"
 
