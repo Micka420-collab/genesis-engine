@@ -171,11 +171,47 @@ Détail Rust : [`native/world-engine/README.md`](native/world-engine/README.md) 
 
 ## Démarrage rapide
 
-### Prérequis
+### Prérequis logiciels
 
 - **Python 3.11–3.13**
 - **Optionnel** : Rust 1.85+ (`rustup`) pour `native/world-engine`
 - **Optionnel** : `rasterio` + `pyproj` pour Terre réelle (`pip install -e ".[earth]"`)
+
+### Configuration matérielle
+
+Le cœur de la simulation est **CPU-bound et déterministe** (single-thread pour la reproductibilité bit-pour-bit, multi-thread pour le streaming de chunks). Le GPU n'est utile que pour le **rendu / l'Earth Console** (WebGPU), jamais pour la physique.
+
+| Ressource | Minimum (faire tourner) | Recommandé (confort + runs longs) | Rendu réaliste (max) |
+|-----------|-------------------------|-----------------------------------|----------------------|
+| **OS** | Windows 10/11, Linux x86-64, macOS 12+ | idem 64 bits récent | idem 64 bits récent |
+| **CPU** | 2 cœurs / 4 threads @ ~2 GHz | 8 cœurs+ @ 3 GHz+ (chunks parallèles, runs ≥ 10⁵ ticks) | 16 cœurs+ @ 4 GHz+ (génération monde + tick + encodage frames en parallèle) |
+| **RAM** | **4 Go** (petit monde ~2 km, ≤ 50 fondateurs) | **16 Go+** (mondes larges, biosphère `origins`, snapshots) | **32–64 Go** (planète quasi-complète, agents nombreux, replay long en mémoire) |
+| **VRAM / GPU** | aucun (rendu CPU / headless OK) | GPU WebGPU (Vulkan/Metal/DX12) pour globe 2.5D + Earth Console fluide | **GPU dédié 8–16 Go VRAM** (globe + iso 2.5D + ombres + atmosphère à haute résolution, 60 fps) |
+| **Disque** | **~2 Go** libres (dépôt + venv + wheels) | **10 Go+** SSD (experiments, renders, manifests, replays) | **50 Go+ NVMe** (séquences de frames 4K, vidéos, replays archivés) |
+| **Affichage** | n/a (headless) | 1080p | 1440p / 4K (globe + overlays Earth Console) |
+| **Réseau** | requis seulement à l'install (`pip`, `cargo`) | idem | idem |
+
+Notes :
+- **Sans Rust ni GPU**, le moteur Python tourne intégralement (les smokes gatés par la wheel `genesis_world` sont simplement sautés). C'est la config minimale viable.
+- La **physique reste CPU-bound et déterministe** : un GPU plus puissant n'accélère **jamais** la simulation, il ne sert qu'au **rendu**. La colonne « Rendu réaliste (max) » vise le pipeline visuel complet (globe + iso 2.5D + ombres + atmosphère temporelle — Wave 41) à haute résolution et framerate stable.
+- La **RAM est le facteur limitant côté simulation** : elle croît avec la taille du monde (`size_km`), le nombre d'agents (`founders`) et la durée du run (chunks mutés conservés en mémoire — invariant **I-4**).
+- La **VRAM est le facteur limitant côté rendu** : globe haute résolution + overlays + ombres + atmosphère. En dessous de ~8 Go, baisser la résolution ou désactiver des couches de l'Earth Console.
+- Pour la **biosphère 100 % émergente** (`run.py origins`) et les **runs préenregistrés ≥ 1000 ticks**, viser au moins la colonne recommandée.
+
+#### ⚠ Cible hypothétique — 3D / 4D photoréaliste (PAS encore implémenté)
+
+> **État réel aujourd'hui** : le rendu est un **globe + iso 2.5D** avec ombres et atmosphère temporelle (Wave 41), à un réalisme Terre **~76 %**. Il n'existe **aucun rendu 3D volumétrique ni d'humains photoréalistes** — c'est une cible, pas une fonctionnalité. Conformément à la règle du projet (« aucun claim sans son test »), ce qui suit est une **estimation matérielle prospective**, à ne citer nulle part comme « fait ».
+
+Ce qu'impliquerait une telle cible et le matériel correspondant :
+
+| Étage | Ce que ça suppose d'ajouter | Matériel estimé |
+|-------|------------------------------|-----------------|
+| **3D** (volumétrique) | Maillage planétaire LOD, terrain déplacé, eau/nuages volumétriques, path-tracing temps réel | **GPU 24–48 Go VRAM** (RTX 4090 / 6000 Ada classe), 64–128 Go RAM |
+| **4D** (3D + temps réel-continu) | Le « D » temporel existe déjà partiellement (saisons/solaire Wave 41) — l'étendre à une trajectoire 3D rejouable image par image | + stockage **NVMe 1 To+** pour les séquences/replays, débit ≥ 3 Go/s |
+| **Humains photoréalistes** | Avatars du corps d'agent (déjà : anatomie + blessures + sang 5 L, Wave 34) → skinning, neural rendering / Gaussian splatting | **Multi-GPU** ou render-farm ; VRAM **48 Go+** par nœud |
+| **Échelle « vraie Terre »** | Planète entière à résolution humaine = explosion mémoire/chunks (invariant I-4) | **Cluster** (RAM 256 Go+ agrégée, stockage objet) — hors poste de travail unique |
+
+En clair : le **substrat agent existe déjà** (corps, métabolisme, cognition NEAT, émergence), mais le **rendu photoréaliste 3D/4D est un axe de recherche graphique non commencé**. Le passer de 2.5D à 3D volumétrique photoréaliste est un chantier à part entière, indépendant de la simulation — qui, elle, resterait **CPU-bound et déterministe**.
 
 ### Installation
 
