@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Genesis — Monde Mondial Live</title>
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#121826; --panel2:#0e1420; --line:#1f2a3d;
+    --txt:#cdd9e5; --dim:#7d8aa0; --accent:#6ad0ff; --good:#7bd88f;
+    --warn:#ffcc66; --bad:#ff7a7a; --gold:#ffd166;
+    font-family:'Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);}
+  header{padding:14px 22px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:16px;background:var(--panel2);}
+  header h1{font-size:18px;margin:0;letter-spacing:.5px}
+  header .seed{color:var(--dim);font-size:12px}
+  .live{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12px;color:var(--dim)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 8px var(--bad)}
+  .dot.on{background:var(--good);box-shadow:0 0 8px var(--good)}
+  .wrap{display:grid;grid-template-columns:1fr 340px;gap:14px;padding:14px;max-width:1400px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .map-card{padding:8px;position:relative;min-height:520px}
+  canvas{width:100%;height:auto;display:block;border-radius:8px;background:#05080d;image-rendering:pixelated}
+  .legend{position:absolute;bottom:14px;left:14px;display:flex;gap:10px;flex-wrap:wrap;
+    background:rgba(8,12,20,.7);padding:6px 9px;border-radius:8px;font-size:11px}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .sw{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+  .stat .v{font-size:22px;font-weight:700;color:var(--accent)}
+  .stat .l{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin:0 0 10px}
+  .res-bar{height:8px;background:var(--panel2);border-radius:6px;overflow:hidden;margin:6px 0 2px}
+  .res-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--good));width:0%}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td{padding:6px 4px;border-bottom:1px solid var(--line)}
+  td.pts{text-align:right;color:var(--gold);font-weight:600}
+  .rank{color:var(--dim);width:22px}
+  .plat{color:var(--dim);font-size:11px}
+  .feed{max-height:260px;overflow:auto;font-size:12.5px;line-height:1.7}
+  .feed div{color:var(--dim)}
+  .donate{background:var(--panel2);border:1px dashed var(--line);border-radius:10px;padding:12px;margin-top:14px}
+  .donate code{display:block;background:#05080d;color:var(--good);padding:8px 10px;border-radius:6px;
+    font-size:12px;margin-top:6px;white-space:pre-wrap;word-break:break-all}
+  .grow{animation:flash 1.2s ease}
+  @keyframes flash{0%{color:var(--good)}100%{color:var(--dim)}}
+  @media(max-width:920px){.wrap{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🌍 GENESIS — Monde Mondial</h1>
+  <span class="seed" id="seed">seed —</span>
+  <span class="live"><span class="dot" id="livedot"></span><span id="livetxt">connexion…</span></span>
+</header>
+
+<div class="wrap">
+  <div class="card map-card">
+    <canvas id="map" width="600" height="600"></canvas>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div>
+    <div class="stats">
+      <div class="stat"><div class="v" id="s-power">0</div><div class="l">Puissance (pts)</div></div>
+      <div class="stat"><div class="v" id="s-workers">0</div><div class="l">Contributeurs actifs</div></div>
+      <div class="stat"><div class="v" id="s-chunks">0</div><div class="l">Chunks vivants</div></div>
+      <div class="stat"><div class="v" id="s-agents">0</div><div class="l">Population IA</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Résolution du monde</h2>
+      <div style="display:flex;justify-content:space-between;font-size:13px">
+        <span>Niveau <b id="q-level" style="color:var(--accent)">1</b></span>
+        <span id="q-detail" class="plat">rayon 2 · 64 ticks/u</span>
+      </div>
+      <div class="res-bar"><div class="res-fill" id="q-fill"></div></div>
+      <div class="plat" id="q-next">Plus de puissance → monde plus grand & plus fin.</div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h2>🏆 Donateurs de puissance</h2>
+      <table><tbody id="board"><tr><td class="plat">en attente…</td></tr></tbody></table>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h2>📡 Le monde évolue</h2>
+      <div class="feed" id="feed"></div>
+    </div>
+
+    <div class="donate">
+      <b style="color:var(--accent)">Offrir ta puissance</b>
+      <span class="plat">Une commande, n'importe quelle plateforme :</span>
+      <code id="cmd">python -m network donate --server SERVER --nickname TONNOM</code>
+    </div>
+  </div>
+</div>
+
+<script>
+const BIOME_COLORS = {
+  OCEAN:'#1c3d5a', BEACH:'#d8c89a', GRASSLAND:'#6f9c4a', FOREST:'#2f6b35',
+  DESERT:'#cba868', TUNDRA:'#9fb3b8', MOUNTAIN:'#7d7d85'
+};
+const cv = document.getElementById('map'), ctx = cv.getContext('2d');
+let lastChunks = 0;
+
+function setLive(on){
+  document.getElementById('livedot').classList.toggle('on', on);
+  document.getElementById('livetxt').textContent = on ? 'live' : 'reconnexion…';
+}
+
+function drawMap(chunks){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if(!chunks.length){ ctx.fillStyle='#1a2230'; ctx.font='14px sans-serif';
+    ctx.fillText('En attente de puissance pour générer le monde…',40,300); return; }
+  let minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9;
+  for(const c of chunks){minx=Math.min(minx,c.cx);maxx=Math.max(maxx,c.cx);
+    miny=Math.min(miny,c.cy);maxy=Math.max(maxy,c.cy);}
+  const span = Math.max(maxx-minx, maxy-miny, 1) + 1;
+  const cell = Math.max(2, Math.floor(cv.width / span));
+  const ox = (cv.width - cell*(maxx-minx+1))/2;
+  const oy = (cv.height - cell*(maxy-miny+1))/2;
+  for(const c of chunks){
+    const px = ox + (c.cx-minx)*cell, py = oy + (maxy-c.cy)*cell;
+    ctx.fillStyle = BIOME_COLORS[c.biome] || c.color || '#444';
+    ctx.fillRect(px,py,cell-1,cell-1);
+    if(c.population>0 && cell>=6){ // marqueur de vie IA
+      const r = Math.min(cell/3, 1+Math.log2(1+c.population));
+      ctx.fillStyle='rgba(255,220,120,.9)';
+      ctx.beginPath(); ctx.arc(px+cell/2,py+cell/2,r,0,7); ctx.fill();
+    }
+  }
+}
+
+function legend(){
+  const el=document.getElementById('legend'); el.innerHTML='';
+  for(const [k,v] of Object.entries(BIOME_COLORS)){
+    el.insertAdjacentHTML('beforeend',
+      `<span><i class="sw" style="background:${v}"></i>${k.toLowerCase()}</span>`);
+  }
+  el.insertAdjacentHTML('beforeend',
+    `<span><i class="sw" style="background:#ffdc78;border-radius:50%"></i>vie IA</span>`);
+}
+
+function render(s){
+  setLive(true);
+  document.getElementById('seed').textContent = 'seed 0x'+(s.world_seed>>>0).toString(16);
+  document.getElementById('s-power').textContent = Math.round(s.total_points);
+  document.getElementById('s-workers').textContent = s.active_workers;
+  document.getElementById('s-chunks').textContent = s.chunks_done;
+  document.getElementById('s-agents').textContent = s.quality.agent_budget;
+  document.getElementById('q-level').textContent = s.quality.resolution_level;
+  document.getElementById('q-detail').textContent =
+    `rayon ${s.quality.world_radius_chunks} · ${s.quality.ticks_per_unit} ticks/u`;
+  const pct = Math.min(100, (s.quality.resolution_level/12)*100);
+  document.getElementById('q-fill').style.width = pct+'%';
+
+  const board = document.getElementById('board');
+  board.innerHTML = s.leaderboard.length ? '' : '<tr><td class="plat">aucun donateur encore</td></tr>';
+  s.leaderboard.forEach((c,i)=>{
+    board.insertAdjacentHTML('beforeend',
+      `<tr><td class="rank">${i+1}</td><td>${esc(c.nickname)}
+       <span class="plat">${esc(c.platform)}</span></td>
+       <td class="pts">${c.points.toFixed(1)}</td></tr>`);
+  });
+
+  const feed = document.getElementById('feed');
+  feed.innerHTML = s.recent_events.map(e=>`<div>${esc(e)}</div>`).join('');
+
+  if(s.chunks_done>lastChunks){ document.getElementById('s-chunks').classList.remove('grow');
+    void document.getElementById('s-chunks').offsetWidth;
+    document.getElementById('s-chunks').classList.add('grow'); }
+  lastChunks = s.chunks_done;
+  drawMap(s.chunks||[]);
+}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+document.getElementById('cmd').textContent =
+  `python -m network donate --server ${location.origin} --nickname TONNOM`;
+legend();
+
+// SSE temps réel, fallback polling.
+function connect(){
+  try{
+    const es = new EventSource('/api/events');
+    es.onmessage = e => render(JSON.parse(e.data));
+    es.onerror = () => { setLive(false); es.close(); setTimeout(poll, 2000); };
+  }catch(_){ poll(); }
+}
+function poll(){
+  fetch('/api/state').then(r=>r.json()).then(render).catch(()=>setLive(false))
+    .finally(()=>setTimeout(poll, 2000));
+}
+connect();
+</script>
+</body>
+</html>

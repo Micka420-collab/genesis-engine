@@ -36,6 +36,26 @@ Manifeste complet : **[`docs/EMERGENCE-SIM-v2.md`](docs/EMERGENCE-SIM-v2.md)**
 
 ---
 
+## 🌍 Réseau de calcul mondial communautaire
+
+**Genesis Network** ([`network/`](network/)) ouvre le moteur à la communauté :
+n'importe qui peut **offrir sa puissance de calcul** en une commande, sur toute
+plateforme, et **tout le monde observe** les civilisations IA évoluer en direct
+sur un site public. **Plus la communauté donne de puissance vérifiée, plus le
+monde grandit et gagne en résolution.**
+
+- ⚡ **Donner** : `curl -s URL/client | python3 - --server URL --nickname TOI` (zéro dépendance)
+- 🖥️ **Héberger ton propre monde** : `python -m network coordinator --db world.db --replication 3` + tunnel Cloudflare gratuit
+- 👁️ **Observer** : ouvre l'URL publique → carte live, classement des donateurs, fil d'événements
+
+Découpé en chunks **déterministes** (invariant I‑1), vérifié par **consensus
+(quorum)** anti-triche, **persistant** (le monde survit aux redémarrages).
+→ Comment participer : **[`network/COMMUNITY.md`](network/COMMUNITY.md)** ·
+Héberger : **[`network/deploy/QUICKSTART-VPS.md`](network/deploy/QUICKSTART-VPS.md)** ·
+Sécurité : **[`network/SECURITY-AUDIT.md`](network/SECURITY-AUDIT.md)**
+
+---
+
 ## 🟢 Vérifié et reproductible aujourd'hui
 
 > Tout ce qui suit est ancré dans un smoke vert ou un test pytest qui tourne dans la CI. La règle est : **aucun claim public sans son test correspondant**. Pour les chiffres précis, voir [`NEXT-SPRINT.md`](NEXT-SPRINT.md) et le ledger [`FALSIFIABILITY.md`](FALSIFIABILITY.md).

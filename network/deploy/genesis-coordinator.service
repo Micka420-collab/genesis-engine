@@ -1,0 +1,21 @@
+[Unit]
+Description=Genesis Network — coordinateur de calcul mondial
+After=network.target
+
+[Service]
+Type=simple
+# Adapter User et les chemins (ici : déployé dans /home/genesis/genesis via setup-vps.sh).
+User=genesis
+WorkingDirectory=/home/genesis/genesis
+Environment=PYTHONUTF8=1
+# Écoute en local ; Cloudflare Tunnel (ou nginx) expose vers l'extérieur.
+# --db : persistance. --replication 3 : mode QUORUM (sécurité + délestage total).
+# --verify-fraction 0.1 : petit audit d'intégrité en plus du consensus.
+ExecStart=/home/genesis/genesis/.venv-genesis/bin/python -m network coordinator \
+          --host 127.0.0.1 --port 8770 --db world.db \
+          --replication 3 --verify-fraction 0.1
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
