@@ -98,6 +98,26 @@ becomes visible on the agent-facing chunk path : uplift cools and migrates
 biomes down the cooling ladder, erosion warms and migrates them up. The
 term is identically 0 on a static world, so prior behaviour is unchanged.
 Set ``orographic_coupling=False`` to opt out.
+
+Orographic *precipitation* coupling (live elevation -> chunk rainfall)
+---------------------------------------------------------------------
+
+The precipitation partner of the lapse-rate temperature term, and the
+``precip_mm`` half of AUDIT-DELTA-2026-06-23 backlog #7 ("recoupler
+l'atmosphère -> temp_c/precip_mm"). Each chunk's ``precip_proxy`` — the
+moisture that drives the warming ladder's dry/wet branch (desert vs forest)
+— was frozen at its install-time macro snapshot, blind to the live relief.
+Wave 65 makes it respond to the live ``elevation_m`` by **re-using the
+macro worldgen orographic model verbatim** (``world_genesis.
+_orographic_precipitation`` + ``_base_precip_by_latitude``, SSOT — the same
+windward-uplift gain ``orographic_gain`` and lee-side ``rain_shadow_decay``
+that baked ``world.precip_mm`` at generation): a rising range wrings extra
+rain from the windward air column and casts a **rain shadow** on its lee,
+while erosion relaxes both. The per-chunk anomaly is ``field(live_elev) -
+field(baseline_elev)`` sampled at the chunk centre; it is identically 0 on
+a static world (same elevation -> bit-identical field), reversible (always
+re-derived from the frozen baseline, never compounding) and pure (no RNG,
+no macro write). Set ``orographic_precip_coupling=False`` to opt out.
 """
 from __future__ import annotations
 
@@ -110,7 +130,8 @@ from engine.core import prf_rng
 from engine.earth_laws import LAPSE_K_PER_M
 from engine.world import (CHUNK_SIDE_M, Biome, invalidate_resource_masks,
                           _BIOME_NPP)
-from engine.world_genesis import GenesisAnchor
+from engine.world_genesis import (GenesisAnchor, _base_precip_by_latitude,
+                                  _orographic_precipitation)
 
 
 PIPELINE_LAYER = "Genesis-L2 Climate"
@@ -150,6 +171,15 @@ SECONDS_PER_YEAR = 86_400.0 * 365.0
 # otherwise-disjoint live macro mutation onto the agent-visible chunk path
 # (closes the chunk-path half of D11). It is identically 0 while the macro
 # elevation is unchanged, so static worlds keep their exact prior behaviour.
+
+# --- Orographic (live-elevation) PRECIPITATION coupling -------------------
+# The precipitation partner of the lapse-rate term above. No new tunables:
+# the windward-uplift gain and lee-side rain-shadow decay are read from the
+# world's own ``GenesisParams`` (``orographic_gain`` / ``rain_shadow_decay``)
+# via the worldgen SSOT model ``world_genesis._orographic_precipitation`` —
+# the exact code path that baked ``world.precip_mm`` at generation. The
+# per-chunk precip proxy becomes ``baseline + (field(live_elev) -
+# field(baseline_elev))`` sampled at the chunk centre, clamped at 0 mm.
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +260,11 @@ class ClimateBiomeState:
     # Additive physical coupling: chunk temperature tracks the *live* macro
     # elevation through the lapse rate. On by default ; 0 on static worlds.
     orographic_coupling: bool = True
+    # Precipitation partner: chunk precip proxy tracks the *live* macro relief
+    # through the worldgen orographic model (windward gain / rain shadow).
+    orographic_precip_coupling: bool = True
+    # Sea level (m) for the orographic precip ocean mask (SSOT GenesisParams).
+    sea_level_m: float = 0.0
 
     baseline_temp_c: Dict[Tuple[int, int, int], float] = field(
         default_factory=dict)
@@ -239,11 +274,23 @@ class ClimateBiomeState:
         default_factory=dict)
     chunk_biome_shifted: Dict[Tuple[int, int, int], int] = field(
         default_factory=dict)
+    # Install-time per-chunk precip snapshot (the *baseline*, never mutated).
     chunk_precip_proxy: Dict[Tuple[int, int, int], float] = field(
         default_factory=dict)
+    # Effective per-chunk precip actually fed to the biome ladder this tick
+    # (= baseline + orographic anomaly). Diagnostics + downstream consumers.
+    current_precip_proxy: Dict[Tuple[int, int, int], float] = field(
+        default_factory=dict)
+
+    # Full-field macro baselines for the orographic precip recompute (read-only
+    # snapshots taken at install, before any tectonic mutation).
+    base_elev_field: Optional[np.ndarray] = None
+    base_precip_field: Optional[np.ndarray] = None   # field(base_elev), cached
+    belt_precip_field: Optional[np.ndarray] = None   # latitudinal belt, cached
 
     global_anomaly_c: float = 0.0
     orographic_anomaly_c: float = 0.0
+    orographic_precip_anomaly_mm: float = 0.0
     transitions_total: int = 0
     last_apply_tick: int = -1
 
@@ -252,43 +299,62 @@ class ClimateBiomeState:
 # Helpers — macro sampling at chunk centre
 # ---------------------------------------------------------------------------
 
-def _sample_macro_at_chunk(anchor: GenesisAnchor,
-                            coord: Tuple[int, int, int]) -> Dict[str, float]:
-    """Bilinear macro sample at the centre of a chunk.
+def _chunk_frac_index(anchor: GenesisAnchor,
+                      coord: Tuple[int, int, int]
+                      ) -> Tuple[int, int, float, float]:
+    """Fractional macro-grid index ``(ix, iy, tx, ty)`` at a chunk centre.
 
-    Returns ``{'temp_c': ..., 'precip_mm': ..., 'biome': int}``.
-    Coordinates outside the macro map clamp to the nearest border.
+    Clamped to the macro map (coordinates outside it snap to the nearest
+    border). Shared by every bilinear sampler below.
     """
     world = anchor.world
     p = world.params
     R = p.resolution
     cell_km = p.map_size_km / R
     cx, cy, _cz = coord
-    chunk_center_x_m = (cx + 0.5) * CHUNK_SIDE_M
-    chunk_center_y_m = (cy + 0.5) * CHUNK_SIDE_M
-    x_km = chunk_center_x_m / 1000.0 + anchor.sim_origin_macro_km[0]
-    y_km = chunk_center_y_m / 1000.0 + anchor.sim_origin_macro_km[1]
+    x_km = (cx + 0.5) * CHUNK_SIDE_M / 1000.0 + anchor.sim_origin_macro_km[0]
+    y_km = (cy + 0.5) * CHUNK_SIDE_M / 1000.0 + anchor.sim_origin_macro_km[1]
     fx = float(np.clip(x_km / cell_km - 0.5, 0.0, R - 1.001))
     fy = float(np.clip(y_km / cell_km - 0.5, 0.0, R - 1.001))
     ix = int(np.floor(fx))
     iy = int(np.floor(fy))
-    tx = fx - ix
-    ty = fy - iy
+    return ix, iy, fx - ix, fy - iy
 
-    def _bil(arr: np.ndarray) -> float:
-        a = float(arr[iy, ix])
-        b = float(arr[iy, ix + 1])
-        c = float(arr[iy + 1, ix])
-        d = float(arr[iy + 1, ix + 1])
-        return (a * (1.0 - tx) * (1.0 - ty) + b * tx * (1.0 - ty)
-                + c * (1.0 - tx) * ty + d * tx * ty)
 
+def _bilinear_at(arr: np.ndarray, ix: int, iy: int,
+                 tx: float, ty: float) -> float:
+    """Bilinear interpolation of ``arr`` at fractional index ``(ix+tx, iy+ty)``."""
+    a = float(arr[iy, ix])
+    b = float(arr[iy, ix + 1])
+    c = float(arr[iy + 1, ix])
+    d = float(arr[iy + 1, ix + 1])
+    return (a * (1.0 - tx) * (1.0 - ty) + b * tx * (1.0 - ty)
+            + c * (1.0 - tx) * ty + d * tx * ty)
+
+
+def _sample_macro_at_chunk(anchor: GenesisAnchor,
+                            coord: Tuple[int, int, int]) -> Dict[str, float]:
+    """Bilinear macro sample at the centre of a chunk.
+
+    Returns ``{'temp_c': ..., 'precip_mm': ..., 'elevation_m': ..., 'biome': int}``.
+    Coordinates outside the macro map clamp to the nearest border.
+    """
+    world = anchor.world
+    ix, iy, tx, ty = _chunk_frac_index(anchor, coord)
     return {
-        "temp_c": _bil(world.temp_c),
-        "precip_mm": _bil(world.precip_mm),
-        "elevation_m": _bil(world.elevation_m),
+        "temp_c": _bilinear_at(world.temp_c, ix, iy, tx, ty),
+        "precip_mm": _bilinear_at(world.precip_mm, ix, iy, tx, ty),
+        "elevation_m": _bilinear_at(world.elevation_m, ix, iy, tx, ty),
         "biome": int(world.biome[iy, ix]),
     }
+
+
+def _sample_field_at_chunk(anchor: GenesisAnchor,
+                           coord: Tuple[int, int, int],
+                           arr: np.ndarray) -> float:
+    """Bilinear sample of an arbitrary ``(R, R)`` macro field at a chunk centre."""
+    ix, iy, tx, ty = _chunk_frac_index(anchor, coord)
+    return _bilinear_at(arr, ix, iy, tx, ty)
 
 
 def _ensure_baseline(state: ClimateBiomeState,
@@ -325,6 +391,51 @@ def _orographic_anomaly_for_chunk(state: ClimateBiomeState,
     # temperature in world_genesis, which uses max(elev, 0) / 1000). Elevation
     # excursions below 0 m (submerged land) carry no extra lapse anomaly.
     return float(-LAPSE_K_PER_M * (max(cur, 0.0) - max(base, 0.0)))
+
+
+# ---------------------------------------------------------------------------
+# Helpers — orographic precipitation (live elevation -> rainfall field)
+# ---------------------------------------------------------------------------
+
+def _belt_precip(state: ClimateBiomeState) -> np.ndarray:
+    """Latitudinal precipitation belt (mm/yr), cached. Wind and latitude do
+    not move with relief, so the belt is the install-time SSOT value."""
+    if state.belt_precip_field is None:
+        world = state.anchor.world
+        state.belt_precip_field = _base_precip_by_latitude(
+            world.params, world.latitude_deg)
+    return state.belt_precip_field
+
+
+def _orographic_precip_field(state: ClimateBiomeState,
+                             elev_m: np.ndarray) -> np.ndarray:
+    """Full macro precipitation field (mm/yr) for a given elevation, all else
+    baseline. Re-uses the worldgen orographic model verbatim (SSOT) so a
+    recompute at the baseline elevation reproduces ``world.precip_mm`` exactly.
+    Pure / deterministic — no RNG."""
+    world = state.anchor.world
+    return _orographic_precipitation(
+        world.params, np.asarray(elev_m, dtype=np.float32), _belt_precip(state),
+        world.wind_u, world.wind_v, state.sea_level_m)
+
+
+def _baseline_precip_field(state: ClimateBiomeState) -> np.ndarray:
+    """``P0``: orographic precip at the install-time elevation, cached."""
+    if state.base_precip_field is None:
+        state.base_precip_field = _orographic_precip_field(
+            state, state.base_elev_field)
+    return state.base_precip_field
+
+
+def _ensure_elev_baseline(state: ClimateBiomeState) -> None:
+    """Idempotently snapshot the full macro elevation field + sea level. Set at
+    install (before any mutation) ; this is only a fallback for states built
+    before the precip coupling existed."""
+    if state.base_elev_field is None:
+        world = state.anchor.world
+        state.base_elev_field = np.asarray(
+            world.elevation_m, dtype=np.float32).copy()
+        state.sea_level_m = float(world.params.sea_level_m)
 
 
 def _anomaly_for_tick(state: ClimateBiomeState, sim) -> float:
@@ -385,9 +496,12 @@ def _shift_biomes_array(biome: np.ndarray, warming: bool,
 
 def _apply_shift_to_chunk(sim, state: ClimateBiomeState,
                             coord: Tuple[int, int, int],
-                            chunk, anomaly_c: float) -> int:
+                            chunk, anomaly_c: float,
+                            precip_proxy: float) -> int:
     """Mutate ``chunk.biome`` and ``chunk.food_capacity`` in place. Return
-    the number of cells whose biome was changed in this call."""
+    the number of cells whose biome was changed in this call. ``precip_proxy``
+    is the *effective* (live, orographically-coupled) rainfall fed to the
+    warming dry/wet branch."""
     if abs(anomaly_c) < ANOMALY_DEADBAND_C:
         return 0
 
@@ -414,8 +528,7 @@ def _apply_shift_to_chunk(sim, state: ClimateBiomeState,
         return 0
 
     warming = anomaly_c > 0.0
-    precip_proxy = state.chunk_precip_proxy.get(coord, 800.0)
-    target = _shift_biomes_array(biome, warming, precip_proxy)
+    target = _shift_biomes_array(biome, warming, float(precip_proxy))
 
     # Only cells where the target is different from current matter.
     changed_mask = shift_mask & (target != biome)
@@ -453,6 +566,7 @@ def install_climate_biome(sim,
                             temperature_jitter_amplitude: float = DEFAULT_JITTER_C,
                             transition_speed: float = 0.001,
                             orographic_coupling: bool = True,
+                            orographic_precip_coupling: bool = True,
                             ) -> ClimateBiomeState:
     """Idempotent installer.
 
@@ -473,6 +587,8 @@ def install_climate_biome(sim,
             temperature_jitter_amplitude)
         existing.transition_speed = float(transition_speed)
         existing.orographic_coupling = bool(orographic_coupling)
+        existing.orographic_precip_coupling = bool(orographic_precip_coupling)
+        _ensure_elev_baseline(existing)
         # Top up the baseline for any chunks that have entered cache since
         # the previous install (idempotent ; existing baselines kept).
         for coord in list(sim.streamer.cache.keys()):
@@ -486,8 +602,13 @@ def install_climate_biome(sim,
         temperature_jitter_amplitude=float(temperature_jitter_amplitude),
         transition_speed=float(transition_speed),
         orographic_coupling=bool(orographic_coupling),
+        orographic_precip_coupling=bool(orographic_precip_coupling),
     )
     sim._climate_biome_state = state
+
+    # Snapshot the full macro elevation field NOW (before any tectonic mutation)
+    # so the orographic precip anomaly is measured against the pristine relief.
+    _ensure_elev_baseline(state)
 
     # Snapshot baseline for every chunk already in the cache.
     for coord in list(sim.streamer.cache.keys()):
@@ -533,6 +654,21 @@ def apply_climate_biome_step(sim) -> Dict[str, float]:
     cells_shifted = 0
     jitter_amp = float(state.temperature_jitter_amplitude)
     max_oro = 0.0
+    max_dp = 0.0
+
+    # Live orographic precipitation: recompute the full macro rainfall field for
+    # the current relief and diff it against the install-time baseline. Computed
+    # once per tick (not per chunk) and only when the elevation has actually
+    # moved — on a static world ``precip_delta`` stays None and every chunk keeps
+    # its frozen baseline precip (exact back-compat).
+    precip_delta: Optional[np.ndarray] = None
+    if state.orographic_precip_coupling:
+        _ensure_elev_baseline(state)
+        live_elev = np.asarray(state.anchor.world.elevation_m, dtype=np.float32)
+        if (state.base_elev_field is not None
+                and not np.array_equal(live_elev, state.base_elev_field)):
+            precip_delta = (_orographic_precip_field(state, live_elev)
+                            - _baseline_precip_field(state))
 
     for coord, chunk in list(sim.streamer.cache.items()):
         # Make sure we have a baseline for this chunk (may have been
@@ -558,7 +694,19 @@ def apply_climate_biome_step(sim) -> Dict[str, float]:
             local_dT = float(local_dT + jrng.uniform(-jitter_amp, jitter_amp))
         state.current_anomaly_c[coord] = float(local_dT)
 
-        n = _apply_shift_to_chunk(sim, state, coord, chunk, local_dT)
+        # Effective rainfall fed to the warming dry/wet branch: frozen baseline
+        # plus the live orographic anomaly (windward gain / rain shadow),
+        # clamped at 0 mm. Equals the baseline exactly when relief is unchanged.
+        base_precip = state.chunk_precip_proxy.get(coord, 800.0)
+        eff_precip = base_precip
+        if precip_delta is not None:
+            dp = _sample_field_at_chunk(state.anchor, coord, precip_delta)
+            eff_precip = max(0.0, base_precip + dp)
+            if abs(dp) > abs(max_dp):
+                max_dp = float(dp)
+        state.current_precip_proxy[coord] = float(eff_precip)
+
+        n = _apply_shift_to_chunk(sim, state, coord, chunk, local_dT, eff_precip)
         if n > 0:
             state.chunk_biome_shifted[coord] = (
                 state.chunk_biome_shifted.get(coord, 0) + n)
@@ -566,11 +714,13 @@ def apply_climate_biome_step(sim) -> Dict[str, float]:
 
     state.transitions_total += cells_shifted
     state.orographic_anomaly_c = float(max_oro)
+    state.orographic_precip_anomaly_mm = float(max_dp)
 
     return {
         "cells_shifted_this_step": int(cells_shifted),
         "global_anomaly_c": float(global_dT),
         "orographic_anomaly_c": float(max_oro),
+        "orographic_precip_anomaly_mm": float(max_dp),
     }
 
 
@@ -587,8 +737,10 @@ def climate_biome_state(sim) -> Dict[str, object]:
         "transition_speed": state.transition_speed,
         "temperature_jitter_amplitude": state.temperature_jitter_amplitude,
         "orographic_coupling": bool(state.orographic_coupling),
+        "orographic_precip_coupling": bool(state.orographic_precip_coupling),
         "global_anomaly_c": float(state.global_anomaly_c),
         "orographic_anomaly_c": float(state.orographic_anomaly_c),
+        "orographic_precip_anomaly_mm": float(state.orographic_precip_anomaly_mm),
         "transitions_total": int(state.transitions_total),
         "chunks_tracked": int(len(state.baseline_temp_c)),
         "chunks_with_shifts": int(len(state.chunk_biome_shifted)),
