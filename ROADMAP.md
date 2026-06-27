@@ -1,6 +1,6 @@
 # Genesis Engine — Roadmap Viable
 
-**Derniere mise a jour :** 2026-06-25
+**Derniere mise a jour :** 2026-06-27
 
 Ce fichier est la roadmap stable du projet. La file de sprint vivante reste
 dans [`NEXT-SPRINT.md`](NEXT-SPRINT.md). Ici, l'objectif est simple :
@@ -52,8 +52,16 @@ drives de survie, **sans arbre tech scripté** (le monde décide le résultat).
   percussion. Essayé **avant** KNAP dans `decide()` (le gel a fait le travail → ramasser
   prime). Rendement ∝ `clast_quality` (= base C2 × réponse de gel) : obsidienne froide →
   rasoir, granite froid → arène stérile (mensonge #5). Surface seule → D10 gelé.
+- **C18 / GRIND** (R-J15-2, 2026-06-27) — 4ᵉ capacité branchée, **1ʳᵉ consommation agent
+  du pilier SYMBOLIQUE** (immobile depuis J0). 9ᵉ opérateur orthogonal (broyer), sur un
+  **inventaire dédié** (`inv_pigment`) : un agent curieux qui **voit** une terre rouille
+  d'oxyde la **broie** (`ActionKind.GRIND`) en pigment ∝ `pigment_quality` réelle.
+  Essayé **après** KNAP (l'outil d'abord, puis le symbole). Mensonge #9 : un gossan oxyde
+  (hématite/magnétite) peint, le même chapeau rouille sur pyrite/plomb-zinc ne peint pas
+  (rouille ≠ rouge). Surface seule → D10 gelé. **Reste : le GESTE** (tracer sur le
+  `rock_canvas` C20) — un verbe `MARK`/`PAINT` consommant `inv_pigment`.
 
-**Reste (17 capacités + piliers langage/bâtiments)** : même patron, une tranche
+**Reste (16 capacités + piliers langage/bâtiments)** : même patron, une tranche
 verticale à la fois. Un **registre de capacités** + budget de perception seront
 introduits quand le nombre de branchements le justifiera (éviter la sur-ingénierie).
 

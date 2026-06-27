@@ -62,6 +62,8 @@ class ActionKind(IntEnum):
     KNAP = 19        # debit a knappable outcrop into raw stone + a cutting edge
     # D12 wire (2026-06-25) — frost-shattered surface clast gathering (consumes C14).
     GATHER = 20      # pick up a frost-detached surface clast (no percussion)
+    # D12 wire (2026-06-27) — cold-grind the rusty iron-hat earth into pigment (consumes C18).
+    GRIND = 21       # triturate weathered gossan oxide earth → ochre pigment powder
 
 
 @dataclass
@@ -73,6 +75,7 @@ class EpisodicMemory:
     known_shelters: List[Tuple[float, float]] = field(default_factory=list)
     known_toolstone_locations: List[Tuple[float, float]] = field(default_factory=list)
     known_frost_clast_locations: List[Tuple[float, float]] = field(default_factory=list)
+    known_ochre_locations: List[Tuple[float, float]] = field(default_factory=list)
     capacity_short: int = 32
     capacity_long: int = 256
 
@@ -141,6 +144,7 @@ class AgentRegistry:
     inv_stone: np.ndarray = field(default=None)
     inv_metal: np.ndarray = field(default=None)
     inv_tools: np.ndarray = field(default=None)
+    inv_pigment: np.ndarray = field(default=None)
     inv_capacity_kg: np.ndarray = field(default=None)
 
     action: np.ndarray = field(default=None)
@@ -183,7 +187,7 @@ class AgentRegistry:
             setattr(self, name, np.full(N, 0.5, dtype=np.float32))
         self.last_mating_tick = np.full(N, -1, dtype=np.int64)
         self.offspring_count = np.zeros(N, dtype=np.int32)
-        for name in ("inv_water","inv_food","inv_wood","inv_stone","inv_metal","inv_tools"):
+        for name in ("inv_water","inv_food","inv_wood","inv_stone","inv_metal","inv_tools","inv_pigment"):
             setattr(self, name, np.zeros(N, dtype=np.float32))
         self.inv_capacity_kg = np.full(N, 20.0, dtype=np.float32)
         self.action = np.zeros(N, dtype=np.int32)

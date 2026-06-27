@@ -526,18 +526,23 @@ def decide(agents, obs, sim=None):
     curiosity = float(agents.curiosity[row])
     if curiosity > 0.6:
         # D12 wire: before wandering at random, a curious agent invests idle
-        # time in useful stone it can SEE (survival is already satisfied here).
+        # time in useful resources it can SEE (survival is already satisfied here).
         # Gathering frost-detached clasts (C14) is tried first — where the cold
         # has already broken sound clasts loose at one's feet, stooping to pick
         # them up beats knapping an in-situ outcrop. Else, debit a knappable
-        # outcrop (C2). Both emergent, never scripted; both inert unless their
-        # capability is installed, so neither perturbs the other's scenarios.
+        # outcrop (C2). With tool-stone secured (or none in sight), it then grinds
+        # a usable ochre pigment (C18) — the symbol after the tool, on its own
+        # inventory. All emergent, never scripted; each inert unless its capability
+        # is installed, so none perturbs the others' scenarios.
         fc = _seek_frost_clast(agents, row, obs, sim)
         if fc is not None:
             return fc
         ts = _seek_toolstone(agents, row, obs, sim)
         if ts is not None:
             return ts
+        oc = _seek_ochre(agents, row, obs, sim)
+        if oc is not None:
+            return oc
         ang = float(agents.heading[row]) + (curiosity - 0.5) * 0.8
         tx = obs.pos[0] + math.cos(ang) * 20.0
         ty = obs.pos[1] + math.sin(ang) * 20.0
@@ -660,6 +665,61 @@ def _seek_frost_clast(agents, row, obs, sim):
     conf = 0.30 + 0.20 * float(cue.confidence)
     if d < INTERACT_RADIUS_M:
         return Decision(int(ActionKind.GATHER), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
+def _seek_ochre(agents, row, obs, sim):
+    """Emergent ochre grinding — the agent loop's consumption of C18.
+
+    A survival-satisfied, curious agent that SEES a rusty iron-hat earth it could grind
+    into colour (``ochre_grinding.best_ochre_site_near``) walks there and GRINDS a handful
+    of it into pigment. Utility-based action selection: with tool-stone already secured (or
+    none in sight), investing idle time in a usable pigment beats blind exploration. So
+    this is tried *after* ``_seek_toolstone`` — survival tools first, then symbol. It runs
+    on its OWN inventory (``inv_pigment``), so it never competes with the raw tool-stone
+    pool.
+
+    Nothing is scripted — the agent perceives a rusty weathered earth and *chooses* to
+    grind it; the WORLD decides whether that earth carries a stable colour (the cue's
+    ``pigment_quality`` = oxide chroma × cap richness). An oxide gossan (hematite / magnetite)
+    grinds to lightfast red / black ochre; a pyrite / lead / zinc gossan looks just as rusty
+    but grinds to nothing (``best_ochre_site_near`` only ever returns ``usable`` sites, so the
+    agent walks to a real one; standing on a barren one and grinding teaches the lie #9 —
+    rust ≠ red). The first agent behaviour to advance the SYMBOLIC pillar (pigment = the
+    substrate of the future mark).
+
+    Gated on C18 being installed on the world (its cue cache exists) — so this is fully
+    inert wherever ochre grinding was never installed (every other smoke / the plain
+    bootstrap), exactly like the C2 / C3 / C14 wires gate on their own caches. Two hot-loop
+    safety rules mirror the KNAP / GATHER wires: (1) only *read* an already installed C18 —
+    never ``install_*`` mid-iteration; (2) any error degrades to ``None`` (ordinary
+    exploration), never crashes the tick. Surface grind only (the cue's
+    ``collect_depth_m == 0``) — no geology mutation (D10 frozen).
+
+    Returns a ``Decision`` (GRIND if standing on the ochre earth, else WALK_TO) or ``None``
+    to fall through to ordinary exploration.
+    """
+    if sim is None or getattr(sim, "_ochre_cue_cache", None) is None:
+        return None
+    inv_pig = getattr(agents, "inv_pigment", None)
+    if inv_pig is not None and float(inv_pig[row]) >= PIGMENT_SATED_KG:
+        return None
+    try:
+        from engine import ochre_grinding as og
+        cue = og.best_ochre_site_near(sim, int(row),
+                                      perception_radius_m=OCHRE_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as KNAP / GATHER: above random EXPLORE (0.3), below survival.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.GRIND), tx, ty, conf)
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
@@ -819,6 +879,23 @@ FROST_CLAST_PERCEPT_M = 96.0  # sight range for scree fields (chunk-scale, memoi
 GATHER_STONE_KG = 1.5         # raw clast mass gathered per GATHER on a sparse field
 GATHER_ABUNDANT_MULT = 1.25   # copious scree (talus / strong FCI) → more per stoop
 GATHER_TOOL_YIELD = 0.6       # usable cutting edge per unit of true clast_quality
+
+# D12 wire (2026-06-27) — emergent ochre grinding. The agent loop consumes the C18
+# ``ochre_grinding`` capability: a curious, survival-satisfied agent that PERCEIVES a
+# rusty iron-hat earth it could grind into colour (``ochre_grinding.best_ochre_site_near``)
+# walks there and GRINDS a handful of it. The WORLD decides (via OchreCue.pigment_quality
+# = oxide chroma × cap richness) whether that rusty earth truly yields a stable pigment —
+# an OXIDE gossan (hematite → red ochre, magnetite → black) gives lightfast colour, a
+# pyrite / lead / zinc gossan looks just as rusty but grinds to nothing (mensonge #9:
+# rust ≠ red). This is the FIRST agent consumer to advance the SYMBOLIC pillar: the
+# pigment powder (``inv_pigment``) is the substrate of the future mark / drawing. GRIND
+# is a distinct verb (9th orthogonal operator) on its OWN inventory, so it never
+# competes with the raw tool-stone pool — it is tried after KNAP / GATHER, when no
+# tool-stone is in sight (or the agent is already stone-sated) but pigment is.
+OCHRE_PERCEPT_M = 96.0        # sight range for rusty-earth ochre sites (chunk-scale, memoised)
+PIGMENT_SATED_KG = 2.0        # stop seeking once this much pigment powder is carried
+GRIND_PIGMENT_YIELD = 1.2     # pigment powder won per GRIND, scaled by true pigment_quality
+INV_PIGMENT_MAX = 8.0         # pigment inventory ceiling
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -1094,6 +1171,50 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "stone_kg": round(float(gained), 4),
             "tool_gain": round(float(tool_gain), 4),
             "abundant": bool(cue.abundant),
+        })
+        return events
+
+    if act == int(ActionKind.GRIND):
+        # Cold-grind the rusty iron-hat earth the agent stands on into pigment (C18).
+        # The world never lies about COLOUR: an OXIDE gossan (hematite → red ochre,
+        # magnetite → black) grinds to a stable, lightfast pigment in proportion to its
+        # true quality (oxide chroma × cap richness); a pyrite / lead / zinc gossan looks
+        # just as rusty but grinds to NO usable pigment (mensonge #9: rust ≠ red). A spot
+        # the world says has no gossan yields nothing and isn't remembered. Surface grind
+        # only (cue.collect_depth_m == 0) — NOT a geology mutation (no geo.mine_at), so the
+        # mutation frontier (D10) stays frozen. The first agent behaviour to fill the
+        # SYMBOLIC inventory (inv_pigment), the substrate of the future mark.
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_ochre_cue_cache", None) is None:
+            return events
+        inv_pig = getattr(agents, "inv_pigment", None)
+        if inv_pig is None:
+            return events
+        try:
+            from engine import ochre_grinding as og
+            cue = og.prospect_ochre(sim, px, py)
+        except Exception:
+            return events
+        if cue is None or not cue.usable:
+            return events   # no gossan here, or a rusty-but-barren lie → no pigment
+        pigment_gain = GRIND_PIGMENT_YIELD * float(cue.pigment_quality)
+        inv_pig[row] = float(min(float(inv_pig[row]) + pigment_gain, INV_PIGMENT_MAX))
+        mem = agents.memory[row]
+        if mem is not None:
+            locs = getattr(mem, "known_ochre_locations", None)
+            if locs is not None:
+                locs.append((px, py))
+                if len(locs) > 8:
+                    locs.pop(0)
+            remember_short(agents, row, "ochre",
+                           {"class": cue.pigment_class, "material": cue.mineral})
+        events.append({
+            "kind": "grind",
+            "row": int(row),
+            "pigment_class": cue.pigment_class,
+            "pigment_kg": round(float(pigment_gain), 4),
+            "pigment_quality": round(float(cue.pigment_quality), 4),
+            "hue": list(int(c) for c in cue.hue),
         })
         return events
 

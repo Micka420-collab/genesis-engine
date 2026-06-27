@@ -286,7 +286,7 @@ _MIGRATABLE_SCALAR_FIELDS: Tuple[str, ...] = (
     "aggression", "curiosity", "empathy", "intelligence",
     # Inventory
     "inv_water", "inv_food", "inv_wood", "inv_stone", "inv_metal",
-    "inv_tools", "inv_capacity_kg",
+    "inv_tools", "inv_pigment", "inv_capacity_kg",
     # Action state
     "last_mating_tick", "offspring_count", "action",
     "intent_expires",
