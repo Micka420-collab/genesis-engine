@@ -106,6 +106,7 @@ const BIOME_COLORS = {
 };
 const cv = document.getElementById('map'), ctx = cv.getContext('2d');
 let lastChunks = 0;
+const chunkMap = new Map();   // "cx,cy" -> chunk (accumulé via deltas SSE)
 
 function setLive(on){
   document.getElementById('livedot').classList.toggle('on', on);
@@ -145,7 +146,7 @@ function legend(){
     `<span><i class="sw" style="background:#ffdc78;border-radius:50%"></i>vie IA</span>`);
 }
 
-function render(s){
+function render(s, chunks){
   setLive(true);
   document.getElementById('seed').textContent = 'seed 0x'+(s.world_seed>>>0).toString(16);
   document.getElementById('s-power').textContent = Math.round(s.total_points);
@@ -174,7 +175,7 @@ function render(s){
     void document.getElementById('s-chunks').offsetWidth;
     document.getElementById('s-chunks').classList.add('grow'); }
   lastChunks = s.chunks_done;
-  drawMap(s.chunks||[]);
+  drawMap(chunks||[]);
 }
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 
@@ -182,17 +183,23 @@ document.getElementById('cmd').textContent =
   `python -m network donate --server ${location.origin} --nickname TONNOM`;
 legend();
 
-// SSE temps réel, fallback polling.
+// SSE temps réel en DELTAS, fallback polling complet.
 function connect(){
   try{
     const es = new EventSource('/api/events');
-    es.onmessage = e => render(JSON.parse(e.data));
+    es.onmessage = e => {
+      const m = JSON.parse(e.data);              // { v, chunks:[nouveaux], state }
+      (m.chunks||[]).forEach(c => chunkMap.set(c.cx+','+c.cy, c));
+      render(m.state, [...chunkMap.values()]);
+    };
     es.onerror = () => { setLive(false); es.close(); setTimeout(poll, 2000); };
   }catch(_){ poll(); }
 }
 function poll(){
-  fetch('/api/state').then(r=>r.json()).then(render).catch(()=>setLive(false))
-    .finally(()=>setTimeout(poll, 2000));
+  fetch('/api/state').then(r=>r.json()).then(s=>{
+    (s.chunks||[]).forEach(c => chunkMap.set(c.cx+','+c.cy, c));
+    render(s, [...chunkMap.values()]);
+  }).catch(()=>setLive(false)).finally(()=>setTimeout(poll, 2000));
 }
 connect();
 </script>

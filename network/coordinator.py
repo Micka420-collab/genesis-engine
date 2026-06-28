@@ -14,6 +14,7 @@ pour un VPS self-host on lance simplement ``uvicorn`` dessus.
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 import os
 import secrets
@@ -119,6 +120,7 @@ class Coordinator:
         # scores : cumul DURABLE par pseudo (persisté ; survit aux redémarrages).
         self.scores: Dict[str, dict] = {}
         self.done: Dict[Coord, dict] = {}            # coord -> ChunkSummary dict
+        self._chunk_order: List[Coord] = []          # ordre de finalisation (delta SSE)
         self.assignments: Dict[str, _Assignment] = {}  # unit_id -> assignment
         self.assigned_coords: Dict[Coord, str] = {}    # coord -> unit_id
 
@@ -134,6 +136,7 @@ class Coordinator:
         if store is not None:
             snap = store.load()
             self.done = dict(snap["chunks"])
+            self._chunk_order = list(self.done.keys())
             self.scores = dict(snap["scores"])
             self.total_points = sum(s["points"] for s in self.scores.values())
             meta = snap["meta"]
@@ -432,6 +435,8 @@ class Coordinator:
         return points
 
     def _finalize(self, coord: Coord, summary: dict) -> None:
+        if coord not in self.done:
+            self._chunk_order.append(coord)  # journal ordonné pour les deltas SSE
         self.done[coord] = summary
         self.verified_units += 1
         self.pending.pop(coord, None)
@@ -503,6 +508,32 @@ class Coordinator:
         return SubmitResponse(accepted=True, verified=verified,
                               credited_points=credited_self,
                               total_points=self.total_points, reason=why)
+
+    def chunk_version(self) -> int:
+        """Nombre de chunks finalisés = version monotone du monde (pour deltas)."""
+        with self._lock:
+            return len(self._chunk_order)
+
+    def chunks_since(self, n: int) -> List[ChunkSummary]:
+        """Chunks finalisés depuis l'index ``n`` (delta SSE — n=0 ⇒ tout)."""
+        with self._lock:
+            n = max(0, min(n, len(self._chunk_order)))
+            out = []
+            for coord in self._chunk_order[n:]:
+                s = self.done.get(coord)
+                if s is not None:
+                    out.append(ChunkSummary(**s))
+            return out
+
+    def sse_payload(self, sent: int) -> dict:
+        """Message SSE delta : version + chunks NOUVEAUX depuis ``sent`` + stats
+        légères (sans la carte). ``sent=0`` ⇒ snapshot complet. Pur/testable."""
+        with self._lock:
+            ver = len(self._chunk_order)
+            new = self.chunks_since(sent) if ver > sent else []
+            light = self.state(include_chunks=False)
+            return {"v": ver, "chunks": [c.model_dump() for c in new],
+                    "state": light.model_dump()}
 
     def state(self, include_chunks: bool = True) -> WorldState:
         with self._lock:
@@ -584,14 +615,19 @@ def create_app(coord: Optional[Coordinator] = None) -> FastAPI:
 
     @app.get("/api/events")
     async def events():
+        """Flux live en DELTAS : 1er message = snapshot complet, puis seulement
+        les NOUVEAUX chunks + les stats légères (classement/fil/compteurs).
+        Évite de renvoyer toute la carte chaque seconde (scaling)."""
         async def gen():
-            last = None
+            sent = 0           # nb de chunks déjà envoyés à ce client
+            last_light = None
             while True:
-                snap = coord.state(include_chunks=True)
-                payload = snap.model_dump_json()
-                if payload != last:
-                    yield f"data: {payload}\n\n"
-                    last = payload
+                payload = coord.sse_payload(sent)
+                light_json = json.dumps(payload["state"], sort_keys=True)
+                if sent == 0 or payload["chunks"] or light_json != last_light:
+                    yield f"data: {json.dumps(payload)}\n\n"
+                    last_light = light_json
+                    sent = payload["v"]
                 await asyncio.sleep(1.0)
         return StreamingResponse(gen(), media_type="text/event-stream")
 

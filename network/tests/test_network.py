@@ -492,6 +492,36 @@ def test_client_sha256_matches_served_client(client):
     assert len(j["sha256"]) == 64
 
 
+def test_chunk_version_and_delta():
+    from network.protocol import RegisterRequest
+    coord = Coordinator(world_seed=0xBEEF)
+    _donate(coord, "Seed", 6)
+    v = coord.chunk_version()
+    assert v == len(coord.done) and v >= 6
+    assert len(coord.chunks_since(0)) == v        # snapshot complet
+    assert coord.chunks_since(v) == []            # rien de neuf
+    # Un chunk de plus → delta = exactement 1.
+    reg = coord.register(RegisterRequest(nickname="More"))
+    before = coord.chunk_version()
+    for u in coord.get_work(reg.worker_id).units[:1]:
+        _submit_for(coord, reg, u)
+    assert coord.chunk_version() == before + 1
+    assert len(coord.chunks_since(before)) == 1
+
+
+def test_sse_payload_snapshot_then_delta():
+    """Le payload SSE : snapshot complet à sent=0, puis seulement les nouveaux."""
+    coord = Coordinator(world_seed=0xBEEF)
+    _donate(coord, "Seeder", 5)
+    full = coord.sse_payload(0)                       # 1er message = tout
+    assert {"v", "chunks", "state"} <= set(full)
+    assert full["v"] == coord.chunk_version()
+    assert len(full["chunks"]) == full["v"]
+    assert full["state"]["chunks"] == []             # stats légères, sans carte
+    # Plus rien de neuf depuis la version courante.
+    assert coord.sse_payload(full["v"])["chunks"] == []
+
+
 def test_no_duplicate_chunk_assignment(client):
     """Deux workers ne doivent pas se voir assigner le même chunk simultanément."""
     c, coord = client
