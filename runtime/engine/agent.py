@@ -64,6 +64,8 @@ class ActionKind(IntEnum):
     GATHER = 20      # pick up a frost-detached surface clast (no percussion)
     # D12 wire (2026-06-27) — cold-grind the rusty iron-hat earth into pigment (consumes C18).
     GRIND = 21       # triturate weathered gossan oxide earth → ochre pigment powder
+    # D12 wire (2026-06-28) — leave a pigment mark on a carbonate wall (consumes C20).
+    MARK = 22        # paint held pigment onto a paintable rock wall — the world decides if it lasts
 
 
 @dataclass
@@ -76,6 +78,10 @@ class EpisodicMemory:
     known_toolstone_locations: List[Tuple[float, float]] = field(default_factory=list)
     known_frost_clast_locations: List[Tuple[float, float]] = field(default_factory=list)
     known_ochre_locations: List[Tuple[float, float]] = field(default_factory=list)
+    known_canvas_locations: List[Tuple[float, float]] = field(default_factory=list)
+    # Colour of the pigment last ground (C18) — the hue the agent now CARRIES, so a later
+    # MARK (C20) knows what colour it is painting with (and whether it shows on the wall).
+    last_pigment_hue: Optional[Tuple[int, int, int]] = None
     capacity_short: int = 32
     capacity_long: int = 256
 

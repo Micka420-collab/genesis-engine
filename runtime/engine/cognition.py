@@ -531,9 +531,11 @@ def decide(agents, obs, sim=None):
         # has already broken sound clasts loose at one's feet, stooping to pick
         # them up beats knapping an in-situ outcrop. Else, debit a knappable
         # outcrop (C2). With tool-stone secured (or none in sight), it then grinds
-        # a usable ochre pigment (C18) — the symbol after the tool, on its own
-        # inventory. All emergent, never scripted; each inert unless its capability
-        # is installed, so none perturbs the others' scenarios.
+        # a usable ochre pigment (C18) — the symbol's matter after the tool, on its
+        # own inventory — and, holding a colour, leaves a MARK on a paintable
+        # carbonate wall (C20) — the symbol's mark after its matter. All emergent,
+        # never scripted; each inert unless its capability is installed, so none
+        # perturbs the others' scenarios.
         fc = _seek_frost_clast(agents, row, obs, sim)
         if fc is not None:
             return fc
@@ -543,6 +545,9 @@ def decide(agents, obs, sim=None):
         oc = _seek_ochre(agents, row, obs, sim)
         if oc is not None:
             return oc
+        mk = _seek_canvas(agents, row, obs, sim)
+        if mk is not None:
+            return mk
         ang = float(agents.heading[row]) + (curiosity - 0.5) * 0.8
         tx = obs.pos[0] + math.cos(ang) * 20.0
         ty = obs.pos[1] + math.sin(ang) * 20.0
@@ -723,6 +728,62 @@ def _seek_ochre(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_canvas(agents, row, obs, sim):
+    """Emergent rock-wall marking — the agent loop's consumption of C20.
+
+    A survival-satisfied, curious agent that already HOLDS ground pigment (C18) and SEES a
+    pale carbonate wall it could paint (``rock_canvas.best_canvas_near``) walks there and
+    leaves a MARK, instead of wandering. Utility-based action selection: with a colour in
+    hand, investing idle time in a lasting mark beats blind exploration. So this is tried
+    *after* ``_seek_ochre`` — you must grind the pigment (the symbol's matter) before you
+    can paint with it (the symbol's mark). The SECOND agent behaviour to advance the
+    SYMBOLIC pillar.
+
+    Nothing is scripted — the agent perceives a pale wall and *chooses* to mark it; the
+    WORLD decides whether the mark LASTS (the cue's ``durability`` = adhesion × persistence)
+    and whether it is SEEN (the pigment/wall contrast). A SOUND limestone face seals the
+    mark under a calcite veil; the same conspicuous cliff when KARST / FROST takes the
+    pigment then sheds it (mensonge #11). The agent steers to the BEST wall in sight (most
+    durable) and LIVES the inversion by marking it — a karst wall takes the pigment and
+    flakes it off, teaching ``looks markable ≠ holds a lasting mark``.
+
+    Gated on C20 being installed (its cue cache exists) — so this is fully inert wherever
+    rock canvas was never installed, exactly like the C2 / C3 / C14 / C18 wires gate on
+    their own caches. Two hot-loop safety rules mirror the GRIND wire: (1) only *read* an
+    already installed C20 — never ``install_*`` mid-iteration; (2) any error degrades to
+    ``None`` (ordinary exploration), never crashes the tick. Non-mutating — painting does
+    not consume the rock (no ``geo.mine_at``; D10 frozen).
+
+    Returns a ``Decision`` (MARK if standing on the wall, else WALK_TO) or ``None`` to fall
+    through to ordinary exploration.
+    """
+    if sim is None or getattr(sim, "_canvas_cue_cache", None) is None:
+        return None
+    inv_pig = getattr(agents, "inv_pigment", None)
+    if inv_pig is None or float(inv_pig[row]) < MARK_MIN_PIGMENT_KG:
+        return None   # no colour in hand → nothing to paint with
+    mem = agents.memory[row]
+    hue = getattr(mem, "last_pigment_hue", None) if mem is not None else None
+    if hue is None:
+        return None   # has not ground a known colour yet → nothing to paint with
+    try:
+        from engine import rock_canvas as rc
+        cue = rc.best_canvas_near(sim, int(row), perception_radius_m=CANVAS_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as KNAP / GATHER / GRIND: above random EXPLORE (0.3), below survival.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.MARK), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 def _act_on(agents, row, obs, drive_kind):
     nearest = obs.nearest
     if drive_kind == int(DriveKind.THIRST):
@@ -896,6 +957,23 @@ OCHRE_PERCEPT_M = 96.0        # sight range for rusty-earth ochre sites (chunk-s
 PIGMENT_SATED_KG = 2.0        # stop seeking once this much pigment powder is carried
 GRIND_PIGMENT_YIELD = 1.2     # pigment powder won per GRIND, scaled by true pigment_quality
 INV_PIGMENT_MAX = 8.0         # pigment inventory ceiling
+
+# D12 wire (2026-06-28) — emergent rock-wall marking. The agent loop consumes the C20
+# ``rock_canvas`` capability: a curious, survival-satisfied agent that HOLDS ground pigment
+# (C18) and PERCEIVES a pale carbonate wall it could paint (``rock_canvas.best_canvas_near``)
+# walks there and leaves a MARK. The WORLD decides (via CanvasCue.durability = adhesion ×
+# persistence, plus the pigment/wall contrast) whether the mark LASTS and is VISIBLE — a
+# SOUND limestone face grows a calcite veil that seals the mark for millennia; the same
+# conspicuous cliff when KARST (dissolution) or FROST (spalling) takes the pigment then
+# flakes it off (mensonge #11: looks markable ≠ holds a lasting mark). This is the SECOND
+# agent consumer of the SYMBOLIC pillar (after C18 GRIND): the pigment becomes the mark
+# itself. The gesture / meaning (the figure, the archetype) stays emergent in
+# ``engine.art_discovery`` (L4) — MARK only deposits colour. Tried AFTER GRIND (you must
+# hold a colour before you can paint with it). NON-MUTATING: painting does not consume the
+# rock (no ``geo.mine_at`` — the mutation frontier D10 stays frozen).
+CANVAS_PERCEPT_M = 96.0        # sight range for paintable carbonate walls (chunk-scale, memoised)
+MARK_MIN_PIGMENT_KG = 0.05    # need at least this much pigment in hand to leave a mark
+MARK_PIGMENT_COST_KG = 0.02   # pigment spent per mark
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -1208,6 +1286,9 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
                     locs.pop(0)
             remember_short(agents, row, "ochre",
                            {"class": cue.pigment_class, "material": cue.mineral})
+            # Carry the colour just ground — a later MARK (C20) paints with THIS hue, and
+            # learns whether it shows on the wall (the visibility lie, mensonge #11).
+            mem.last_pigment_hue = tuple(int(c) for c in cue.hue)
         events.append({
             "kind": "grind",
             "row": int(row),
@@ -1215,6 +1296,59 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "pigment_kg": round(float(pigment_gain), 4),
             "pigment_quality": round(float(cue.pigment_quality), 4),
             "hue": list(int(c) for c in cue.hue),
+        })
+        return events
+
+    if act == int(ActionKind.MARK):
+        # Leave a pigment mark on the carbonate wall the agent stands on (C20). The world
+        # never lies about PERMANENCE: a SOUND limestone face (calcite veil) keeps the mark
+        # for millennia; a KARST / FROST wall takes the pigment then flakes it off (mensonge
+        # #11: a conspicuous pale cliff that does not hold a mark). Nor about VISIBILITY: a
+        # pigment matching the wall colour is real paint yet invisible (it is contrast, not
+        # paint, that makes a mark). Painting does NOT consume the rock — no geo.mine_at, so
+        # the mutation frontier (D10) stays frozen. The SECOND agent behaviour on the
+        # SYMBOLIC pillar: the pigment of C18 GRIND becomes the mark itself. The gesture /
+        # meaning (the figure, the archetype) stays emergent in engine.art_discovery (L4) —
+        # MARK only deposits the colour the world says is there.
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_canvas_cue_cache", None) is None:
+            return events
+        inv_pig = getattr(agents, "inv_pigment", None)
+        if inv_pig is None or float(inv_pig[row]) < MARK_MIN_PIGMENT_KG:
+            return events   # no colour in hand → no mark
+        mem = agents.memory[row]
+        hue = getattr(mem, "last_pigment_hue", None) if mem is not None else None
+        if hue is None:
+            return events   # has not ground a known colour yet
+        try:
+            from engine import rock_canvas as rc
+            cue = rc.prospect_canvas(sim, px, py)
+        except Exception:
+            return events
+        if cue is None:
+            return events   # no carbonate wall underfoot → nothing to mark
+        outcome = rc.paint_outcome(cue, tuple(int(c) for c in hue), pigment_lightfast=True)
+        spent = min(MARK_PIGMENT_COST_KG, float(inv_pig[row]))
+        inv_pig[row] = float(inv_pig[row]) - spent
+        if mem is not None:
+            locs = getattr(mem, "known_canvas_locations", None)
+            if locs is not None:
+                locs.append((px, py))
+                if len(locs) > 8:
+                    locs.pop(0)
+            remember_short(agents, row, "mark",
+                           {"material": cue.material, "lasts": bool(outcome["lasts"]),
+                            "visible": bool(outcome["visible"])})
+        events.append({
+            "kind": "mark",
+            "row": int(row),
+            "material": cue.material,
+            "pigment_kg": round(float(spent), 4),
+            "lasts": bool(outcome["lasts"]),
+            "visible": bool(outcome["visible"]),
+            "mark_durability": round(float(outcome["mark_durability"]), 4),
+            "contrast": round(float(outcome["contrast"]), 4),
+            "weather_state": int(cue.weather_state),
         })
         return events
 

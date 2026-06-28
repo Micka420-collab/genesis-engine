@@ -1,6 +1,6 @@
 # Genesis Engine — Roadmap Viable
 
-**Derniere mise a jour :** 2026-06-27
+**Derniere mise a jour :** 2026-06-28
 
 Ce fichier est la roadmap stable du projet. La file de sprint vivante reste
 dans [`NEXT-SPRINT.md`](NEXT-SPRINT.md). Ici, l'objectif est simple :
@@ -58,10 +58,22 @@ drives de survie, **sans arbre tech scripté** (le monde décide le résultat).
   d'oxyde la **broie** (`ActionKind.GRIND`) en pigment ∝ `pigment_quality` réelle.
   Essayé **après** KNAP (l'outil d'abord, puis le symbole). Mensonge #9 : un gossan oxyde
   (hématite/magnétite) peint, le même chapeau rouille sur pyrite/plomb-zinc ne peint pas
-  (rouille ≠ rouge). Surface seule → D10 gelé. **Reste : le GESTE** (tracer sur le
-  `rock_canvas` C20) — un verbe `MARK`/`PAINT` consommant `inv_pigment`.
+  (rouille ≠ rouge). Surface seule → D10 gelé. (Le **GESTE** qui suit — tracer sur le
+  `rock_canvas` C20 — est livré par **C20 / MARK** ci-dessous.)
+- **C20 / MARK** (2026-06-28) — 5ᵉ capacité branchée et **2ᵉ consommation agent du pilier
+  SYMBOLIQUE** : réalise le **GESTE** annoncé par C18, fermant la mini-chaîne *voir l'oxyde
+  → broyer → pigment → **marquer***. Un agent curieux qui **tient** un pigment (C18) et
+  **voit** une paroi carbonatée pâle (C20) y laisse une **marque** (`ActionKind.MARK`) — le
+  *monde* décide si elle **dure** (`durability` = adhérence × persistance, lue de C20) et si
+  elle se **voit** (contraste pigment/paroi). Mensonge #11 : une paroi SAINE garde la marque
+  (voile de calcite) ; la **même** falaise carbonatée en climat humide (KARST) ou gelant
+  (FROST) la prend puis l'**écaille** (« looks markable ≠ holds a lasting mark »). La couleur
+  broyée est **portée** (`EpisodicMemory.last_pigment_hue`), posée par GRIND. Essayé **après**
+  GRIND (la matière du symbole, puis sa marque). Le **sens** du tracé (la figure, l'archétype)
+  reste émergent — `engine.art_discovery` (L4). **Non mutant** (la peinture ne consomme pas la
+  roche → D10 gelé) ; D8 par composition (`PY_TO_RUST` reste 15). 11 tests + smoke p160 8/8.
 
-**Reste (16 capacités + piliers langage/bâtiments)** : même patron, une tranche
+**Reste (15 capacités + piliers langage/bâtiments)** : même patron, une tranche
 verticale à la fois. Un **registre de capacités** + budget de perception seront
 introduits quand le nombre de branchements le justifiera (éviter la sur-ingénierie).
 
