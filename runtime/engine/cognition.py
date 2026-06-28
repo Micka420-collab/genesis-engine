@@ -530,18 +530,22 @@ def decide(agents, obs, sim=None):
         # Gathering frost-detached clasts (C14) is tried first — where the cold
         # has already broken sound clasts loose at one's feet, stooping to pick
         # them up beats knapping an in-situ outcrop. Else, debit a knappable
-        # outcrop (C2). With tool-stone secured (or none in sight), it then grinds
-        # a usable ochre pigment (C18) — the symbol's matter after the tool, on its
-        # own inventory — and, holding a colour, leaves a MARK on a paintable
-        # carbonate wall (C20) — the symbol's mark after its matter. All emergent,
-        # never scripted; each inert unless its capability is installed, so none
-        # perturbs the others' scenarios.
+        # outcrop (C2). With tool-stone secured (or none in sight), if it is chilly
+        # (or has never made fire) it STRIKES a fire (C7, the VOÛTE) — warmth before
+        # art. Then it grinds a usable ochre pigment (C18) — the symbol's matter
+        # after the tool, on its own inventory — and, holding a colour, leaves a
+        # MARK on a paintable carbonate wall (C20) — the symbol's mark after its
+        # matter. All emergent, never scripted; each inert unless its capability is
+        # installed, so none perturbs the others' scenarios.
         fc = _seek_frost_clast(agents, row, obs, sim)
         if fc is not None:
             return fc
         ts = _seek_toolstone(agents, row, obs, sim)
         if ts is not None:
             return ts
+        fs = _seek_firesite(agents, row, obs, sim)
+        if fs is not None:
+            return fs
         oc = _seek_ochre(agents, row, obs, sim)
         if oc is not None:
             return oc
@@ -784,6 +788,62 @@ def _seek_canvas(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_firesite(agents, row, obs, sim):
+    """Emergent fire-making — the agent loop's consumption of C7 (the VOÛTE of the arc).
+
+    A survival-satisfied, curious agent that is mildly chilly (or has never made fire) and
+    SEES a site where a spark can truly take (``fire_ignition.best_firesite_near``) walks
+    there and STRIKES a fire rather than wandering. Utility-based action selection: warming
+    oneself (and learning the firestone→flame link) outranks blind exploration. Tried *after*
+    ``_seek_toolstone`` (secure stone first) and *before* the symbolic ``_seek_ochre`` /
+    ``_seek_canvas`` (warmth before art).
+
+    Nothing is scripted — the agent perceives a brown spark-stone, a hard striker and dry
+    grass, and *chooses* to strike; the WORLD decides whether a spark catches (the cue's
+    ``can_ignite`` / ``method``): PERCUSSION over a pyrite firestone + striker on dry-enough
+    tinder, FRICTION over bone-dry tinder with no minerals; a lush DAMP meadow looks like
+    tinder but a spark won't catch (the fire lie). The agent learns the correlation by acting.
+
+    Self-limiting and honest: it is sought only when warmth is actually wanted
+    (``thermal >= FIRE_SEEK_THERMAL_MIN``) OR on the very first discovery (curiosity), so a
+    warm agent that already knows fire does not re-strike every tick.
+
+    Gated on C7 being installed (its cue cache exists) — fully inert wherever fire_ignition
+    was never installed, exactly like the C2 / C14 / C18 / C20 wires gate on their own caches.
+    Two hot-loop safety rules mirror those wires: (1) only *read* an already installed C7 —
+    never ``install_*`` mid-iteration; (2) any error degrades to ``None`` (ordinary
+    exploration), never crashes the tick. Non-mutating — striking a spark does not consume the
+    rock (no ``geo.mine_at``; D10 frozen).
+
+    Returns a ``Decision`` (IGNITE if standing on the firesite, else WALK_TO) or ``None`` to
+    fall through to ``_seek_ochre`` / ``_seek_canvas`` / ordinary exploration.
+    """
+    if sim is None or getattr(sim, "_ignition_cue_cache", None) is None:
+        return None
+    mem = agents.memory[row]
+    thermal = float(obs.drives[int(DriveKind.THERMAL)])
+    already = bool(getattr(mem, "has_made_fire", False)) if mem is not None else False
+    if thermal < FIRE_SEEK_THERMAL_MIN and already:
+        return None   # warm enough and already knows fire → no need to strike one now
+    try:
+        from engine import fire_ignition as fi
+        cue = fi.best_firesite_near(sim, int(row), perception_radius_m=FIRESITE_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None   # the world says: no fire to be made within sight
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as KNAP / GATHER / GRIND / MARK: above random EXPLORE (0.3),
+    # below survival.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.IGNITE), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 def _act_on(agents, row, obs, drive_kind):
     nearest = obs.nearest
     if drive_kind == int(DriveKind.THIRST):
@@ -974,6 +1034,24 @@ INV_PIGMENT_MAX = 8.0         # pigment inventory ceiling
 CANVAS_PERCEPT_M = 96.0        # sight range for paintable carbonate walls (chunk-scale, memoised)
 MARK_MIN_PIGMENT_KG = 0.05    # need at least this much pigment in hand to leave a mark
 MARK_PIGMENT_COST_KG = 0.02   # pigment spent per mark
+
+# D12 wire (2026-06-28) — emergent fire-making, the VOÛTE of the stone-age arc. The agent
+# loop consumes the C7 ``fire_ignition`` capability: a curious, survival-satisfied agent that
+# is mildly chilly (or has never made fire) and PERCEIVES a site where a spark can truly take
+# (``fire_ignition.best_firesite_near``) walks there and STRIKES a fire (``ActionKind.IGNITE``)
+# instead of wandering. The WORLD decides (via the IgnitionCue) whether a spark actually
+# catches — PERCUSSION where the geology carries a pyrophoric firestone (pyrite gossan, C1) +
+# a hard striker (C2) over dry-enough tinder, FRICTION where bone-dry tinder lets a hand-drill
+# ember take with no minerals at all; a lush DAMP meadow looks like tinder but a spark won't
+# catch (the fire lie). Unlike KNAP / GATHER / GRIND it fills no portable inventory — the
+# product is WARMTH (the agent's own thermal drive eases) and the learned skill
+# (``has_made_fire``), the keystone that makes the C1→C6 matters *actionable* (cook, smelt,
+# fire clay/lime). Tried AFTER KNAP / GATHER (secure stone first) and BEFORE the symbolic
+# GRIND / MARK (warmth before art). NON-MUTATING: striking a spark consumes no geology (no
+# ``geo.mine_at`` — the mutation frontier D10 stays frozen).
+FIRESITE_PERCEPT_M = 96.0      # sight range for fire-makeable sites (chunk-scale, memoised)
+FIRE_SEEK_THERMAL_MIN = 0.15  # seek a fire when at least this chilly (else only on first discovery)
+FIRE_WARMTH_RELIEF = 0.18     # thermal-drive relief from sitting at a struck fire (cf. SEEK_SHELTER 0.20)
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -1349,6 +1427,55 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "mark_durability": round(float(outcome["mark_durability"]), 4),
             "contrast": round(float(outcome["contrast"]), 4),
             "weather_state": int(cue.weather_state),
+        })
+        return events
+
+    if act == int(ActionKind.IGNITE):
+        # Strike a fire at the firestone site the agent stands on (C7 fire_ignition). The
+        # world never lies: a spark takes ONLY where the geology truly carries a pyrophoric
+        # firestone (pyrite gossan, C1) + a hard striker (C2) over dry-enough tinder
+        # (PERCUSSION), or where bone-dry tinder lets a hand-drill ember take with no minerals
+        # (FRICTION); a lush DAMP meadow looks like tinder but a spark won't catch (the fire
+        # lie — prospect_ignition returns None). Unlike KNAP / GATHER / GRIND this fills no
+        # portable inventory — the product is WARMTH (the agent's own thermal drive eases) and
+        # the learned skill (has_made_fire / last_fire_method), the VOÛTE that makes the
+        # C1→C6 matters actionable (cook, smelt, fire clay/lime). NON-MUTATING — striking a
+        # spark consumes no geology (no geo.mine_at), so the mutation frontier (D10) stays
+        # frozen. The agent learns the firestone→flame link by acting.
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_ignition_cue_cache", None) is None:
+            return events
+        try:
+            from engine import fire_ignition as fi
+            cue = fi.prospect_ignition(sim, px, py)
+        except Exception:
+            return events
+        if cue is None or not cue.can_ignite:
+            return events   # the world says: no fire to be made here (damp / no firestone)
+        # Warmth — the honest physical effect of a struck fire (eases only the AGENT's own
+        # thermal state; touches no geology). Curiosity-gated, so it can never mask a freezing
+        # emergency (a critically cold agent took SEEK_SHELTER in the survival branch).
+        agents.thermal[row] = max(0.0, float(agents.thermal[row]) - FIRE_WARMTH_RELIEF)
+        method = cue.method.name
+        mem = agents.memory[row]
+        if mem is not None:
+            locs = getattr(mem, "known_firesite_locations", None)
+            if locs is not None:
+                locs.append((px, py))
+                if len(locs) > 8:
+                    locs.pop(0)
+            mem.has_made_fire = True
+            mem.last_fire_method = method
+            remember_short(agents, row, "fire",
+                           {"method": method, "tinder": cue.tinder_state.name})
+        events.append({
+            "kind": "ignite",
+            "row": int(row),
+            "method": method,
+            "tinder_state": cue.tinder_state.name,
+            "can_percussion": bool(cue.can_percussion),
+            "can_friction": bool(cue.can_friction),
+            "confidence": round(float(cue.confidence), 4),
         })
         return events
 

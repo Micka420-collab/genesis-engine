@@ -66,6 +66,8 @@ class ActionKind(IntEnum):
     GRIND = 21       # triturate weathered gossan oxide earth → ochre pigment powder
     # D12 wire (2026-06-28) — leave a pigment mark on a carbonate wall (consumes C20).
     MARK = 22        # paint held pigment onto a paintable rock wall — the world decides if it lasts
+    # D12 wire (2026-06-28) — strike a fire at a firestone site (consumes C7, the VOÛTE).
+    IGNITE = 23      # kindle a fire (pyrite percussion / dry-tinder friction) — the world decides if a spark takes
 
 
 @dataclass
@@ -79,9 +81,15 @@ class EpisodicMemory:
     known_frost_clast_locations: List[Tuple[float, float]] = field(default_factory=list)
     known_ochre_locations: List[Tuple[float, float]] = field(default_factory=list)
     known_canvas_locations: List[Tuple[float, float]] = field(default_factory=list)
+    known_firesite_locations: List[Tuple[float, float]] = field(default_factory=list)
     # Colour of the pigment last ground (C18) — the hue the agent now CARRIES, so a later
     # MARK (C20) knows what colour it is painting with (and whether it shows on the wall).
     last_pigment_hue: Optional[Tuple[int, int, int]] = None
+    # Fire (C7): the keystone skill, learned by acting. ``has_made_fire`` is the
+    # discovery flag (the agent now knows a spark can be struck here-and-such);
+    # ``last_fire_method`` records HOW (PERCUSSION / FRICTION) — emergent, never told.
+    has_made_fire: bool = False
+    last_fire_method: Optional[str] = None
     capacity_short: int = 32
     capacity_long: int = 256
 

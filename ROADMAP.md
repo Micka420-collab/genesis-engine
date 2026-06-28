@@ -72,8 +72,25 @@ drives de survie, **sans arbre tech scripté** (le monde décide le résultat).
   GRIND (la matière du symbole, puis sa marque). Le **sens** du tracé (la figure, l'archétype)
   reste émergent — `engine.art_discovery` (L4). **Non mutant** (la peinture ne consomme pas la
   roche → D10 gelé) ; D8 par composition (`PY_TO_RUST` reste 15). 11 tests + smoke p160 8/8.
+- **C7 / IGNITE** (2026-06-28) — 6ᵉ capacité branchée et **la VOÛTE de l'arc** : la première
+  fois qu'un agent **allume un feu**. Un agent curieux et survie-satisfaite, **frileux** (ou
+  qui n'a **jamais** fait de feu), qui **voit** un site où une étincelle prend vraiment
+  (`fire_ignition.best_firesite_near`) y va et **frappe** un feu (`ActionKind.IGNITE`). Le
+  *monde* décide si l'étincelle prend : **PERCUSSION** là où la géologie porte un firestone
+  pyrophorique (pyrite/gossan C1) + un percuteur dur (C2) sur amadou assez sec, **FRICTION**
+  là où l'amadou très sec laisse prendre une braise d'archet sans aucun minéral ; une prairie
+  **humide** *paraît* de l'amadou mais l'étincelle n'y prend pas (le mensonge du feu —
+  `prospect_ignition` renvoie None). Contrairement à KNAP/GATHER/GRIND, IGNITE ne remplit
+  **aucun inventaire portable** : le produit est la **CHALEUR** (le drive thermique de l'agent
+  baisse) et le **savoir** (`has_made_fire`/`last_fire_method`) — la clé de voûte qui rend
+  *actionnables* les matières C1→C6 (fondre, brûler, cuire, calciner). Essayé **après** KNAP/
+  GATHER (la pierre d'abord) et **avant** GRIND/MARK (la chaleur avant l'art). **Auto-limité &
+  honnête** : seulement quand on veut de la chaleur (ou à la 1ʳᵉ découverte) → pas de
+  ré-allumage à chaque tick. **Non mutant** (frapper une étincelle ne consomme pas la roche →
+  D10 gelé) ; D8 par composition (`PY_TO_RUST` reste 15, C7 sans `_PROFILE`). 11 tests +
+  smoke p161 8/8.
 
-**Reste (15 capacités + piliers langage/bâtiments)** : même patron, une tranche
+**Reste (14 capacités + piliers langage/bâtiments)** : même patron, une tranche
 verticale à la fois. Un **registre de capacités** + budget de perception seront
 introduits quand le nombre de branchements le justifiera (éviter la sur-ingénierie).
 
