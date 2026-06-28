@@ -22,8 +22,8 @@ import time
 from collections import deque
 from typing import Deque, Dict, Iterator, List, Optional, Tuple
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from . import worldgen
 from .protocol import (
@@ -50,6 +50,9 @@ TRUST_AFTER = 5  # unités vérifiées-correctes avant de passer en échantillon
 MAX_CONTRIBUTORS = 10_000  # garde-fou mémoire contre l'inondation d'inscriptions
 PRUNE_AFTER_S = 3_600.0    # workers inactifs purgés (scores cumulés conservés)
 MAX_BODY_BYTES = 64 * 1024  # taille max d'une requête (anti-DoS payload)
+MAX_INFLIGHT_PER_WORKER = 16  # unités assignées simultanément max (anti-griefing frontière)
+RATE_WINDOW_S = 60.0        # fenêtre du rate-limit par IP
+RATE_MAX_PER_WINDOW = 1_200  # requêtes/min/IP (large : un worker honnête poll souvent)
 
 
 def spiral_coords() -> Iterator[Coord]:
@@ -124,6 +127,7 @@ class Coordinator:
         self.rejected_units = 0
         self._unit_counter = 0
         self.events: Deque[str] = deque(maxlen=60)
+        self._ip_hits: Dict[str, Deque[float]] = {}  # rate-limit glissant par IP
 
         # Restauration depuis le store (le monde survit aux redémarrages).
         restored = 0
@@ -197,6 +201,26 @@ class Coordinator:
     # ---------------------------------------------------------------- #
     # API métier                                                       #
     # ---------------------------------------------------------------- #
+    def allow_ip(self, ip: str) -> bool:
+        """Rate-limit glissant par IP (anti-inondation register/work/submit)."""
+        with self._lock:
+            now = self._clock()
+            hits = self._ip_hits.setdefault(ip, deque())
+            cutoff = now - RATE_WINDOW_S
+            while hits and hits[0] < cutoff:
+                hits.popleft()
+            if len(hits) >= RATE_MAX_PER_WINDOW:
+                return False
+            hits.append(now)
+            # Purge occasionnelle des IP devenues inactives (borne mémoire).
+            if len(self._ip_hits) > 4096:
+                for k in [k for k, d in self._ip_hits.items() if not d or d[-1] < cutoff]:
+                    self._ip_hits.pop(k, None)
+            return True
+
+    def _inflight_for(self, worker_id: str) -> int:
+        return sum(1 for a in self.assignments.values() if a.worker_id == worker_id)
+
     def _prune_workers(self) -> None:
         """Purge les sessions worker inactives (les scores cumulés restent)."""
         now = self._clock()
@@ -238,6 +262,10 @@ class Coordinator:
                 return WorkBatch(units=[], poll_after_s=5.0)
             contrib["last_seen"] = self._clock()
             self._reassign_stale()
+            # Quota d'unités en vol : un worker ne peut pas réserver toute la
+            # frontière sans rendre (anti-griefing).
+            if self._inflight_for(worker_id) >= MAX_INFLIGHT_PER_WORKER:
+                return WorkBatch(units=[], poll_after_s=2.0)
             self._refill_frontier()
             ticks = self.quality().ticks_per_unit
             coords = (self._pick_quorum_coords(worker_id) if self.replication > 1
@@ -507,9 +535,6 @@ class Coordinator:
 
 
 def create_app(coord: Optional[Coordinator] = None) -> FastAPI:
-    from fastapi import HTTPException, Request
-    from fastapi.responses import JSONResponse
-
     coord = coord or Coordinator()
     app = FastAPI(title="Genesis Network Coordinator", version=PROTOCOL_VERSION)
     app.state.coord = coord
@@ -522,21 +547,35 @@ def create_app(coord: Optional[Coordinator] = None) -> FastAPI:
                                 status_code=413)
         return await call_next(request)
 
+    def _client_ip(request: Request) -> str:
+        # Derrière nginx/Cloudflare : la vraie IP est dans X-Forwarded-For.
+        fwd = request.headers.get("x-forwarded-for")
+        if fwd:
+            return fwd.split(",")[0].strip()
+        return request.client.host if request.client else "?"
+
+    def _rate_guard(request: Request) -> None:
+        if not coord.allow_ip(_client_ip(request)):
+            raise HTTPException(status_code=429, detail="trop de requêtes, ralentis")
+
     @app.post("/api/register", response_model=RegisterResponse)
-    def register(req: RegisterRequest) -> RegisterResponse:
+    def register(req: RegisterRequest, request: Request) -> RegisterResponse:
+        _rate_guard(request)
         try:
             return coord.register(req)
         except CapacityError as e:
             raise HTTPException(status_code=429, detail=str(e))
 
     @app.get("/api/work", response_model=WorkBatch)
-    def work(worker_id: str = "") -> WorkBatch:
+    def work(request: Request, worker_id: str = "") -> WorkBatch:
+        _rate_guard(request)
         if len(worker_id) > 64:
             raise HTTPException(status_code=400, detail="worker_id invalide")
         return coord.get_work(worker_id)
 
     @app.post("/api/submit", response_model=SubmitResponse)
-    def submit(res: WorkResult) -> SubmitResponse:
+    def submit(res: WorkResult, request: Request) -> SubmitResponse:
+        _rate_guard(request)
         return coord.submit(res)
 
     @app.get("/api/state", response_model=WorldState)
@@ -564,17 +603,31 @@ def create_app(coord: Optional[Coordinator] = None) -> FastAPI:
                 return fh.read()
         return "<h1>Genesis Network</h1><p>web/index.html manquant.</p>"
 
+    def _client_source() -> str:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "standalone_donate.py")
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
+
     @app.get("/client")
     def client():
         """Sert le client de don autonome mono-fichier (curl ... | python3 -)."""
         from fastapi.responses import PlainTextResponse
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            "standalone_donate.py")
-        with open(path, encoding="utf-8") as fh:
-            return PlainTextResponse(fh.read(), media_type="text/x-python")
+        return PlainTextResponse(_client_source(), media_type="text/x-python")
+
+    @app.get("/client.sha256")
+    def client_sha256() -> dict:
+        """SHA-256 du client servi → un donateur peut VÉRIFIER avant d'exécuter.
+
+            curl -s URL/client | sha256sum   # doit matcher ce hash
+        """
+        import hashlib
+        digest = hashlib.sha256(_client_source().encode("utf-8")).hexdigest()
+        return {"sha256": digest, "file": "standalone_donate.py"}
 
     @app.get("/healthz")
     def healthz() -> dict:
-        return {"ok": True, "protocol": PROTOCOL_VERSION}
+        return {"ok": True, "protocol": PROTOCOL_VERSION,
+                "backend": coord.backend}
 
     return app

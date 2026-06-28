@@ -109,6 +109,10 @@ jobs:
             python "runtime/scripts/$s" || exit 1
           done
 
+      # Module réseau de don de calcul (autonome) : ruff + pytest + smoke E2E.
+      - name: Genesis Network (lint + tests + smoke)
+        run: make network
+
   rust-world-engine:
     runs-on: ubuntu-latest
     steps:

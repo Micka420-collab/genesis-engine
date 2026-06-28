@@ -74,8 +74,12 @@ Le coordinateur ne doit jamais faire confiance à une donnée client sans contr�
 
 ## Avant exposition large (recommandations)
 
-1. **Rate-limiting par IP** (register/submit) en plus du plafond global — via nginx/Cloudflare ou middleware.
+1. ✅ **Rate-limiting par IP** (register/work/submit, fenêtre glissante → 429 ; X-Forwarded-For). Fait 2026-06-28.
 2. ✅ **Redondance + quorum** disponible (`--replication 3`) — l'activer en public.
-3. **Quota d'unités en cours** par worker (anti-griefing frontière).
-4. **Publier le SHA-256 du client** `/client` pour que les donateurs le vérifient.
+3. ✅ **Quota d'unités en cours** par worker (`MAX_INFLIGHT_PER_WORKER`, anti-griefing). Fait 2026-06-28.
+4. ✅ **SHA-256 du client** exposé (`GET /client.sha256`) pour vérification avant exécution. Fait 2026-06-28.
 5. Garder `--verify-fraction` raisonnable (ex. 0.1–0.3) : audit d'intégrité en plus du quorum.
+
+> Tout le trio pré-lancement (1, 3, 4) est livré + testé, et le module est
+> désormais gardé en CI (`make network`). Reste surtout du *scaling* (SSE en
+> deltas) et de l'observabilité — pas de faille ouverte connue sur le pont.

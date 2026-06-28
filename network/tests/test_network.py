@@ -457,6 +457,41 @@ def test_engine_backend_end_to_end():
         assert r2.accepted is False  # backend incompatible → rejeté
 
 
+def test_rate_limit_per_ip(client, monkeypatch):
+    import network.coordinator as co
+    monkeypatch.setattr(co, "RATE_MAX_PER_WINDOW", 3)
+    c, _ = client
+    codes = [c.post("/api/register", json={"nickname": f"R{i}"}).status_code
+             for i in range(6)]
+    assert 429 in codes  # l'inondation depuis une IP est freinée
+
+
+def test_inflight_quota_caps_a_greedy_worker():
+    from network.coordinator import MAX_INFLIGHT_PER_WORKER, BATCH_SIZE
+    from network.protocol import RegisterRequest
+    coord = Coordinator(world_seed=0xBEEF)
+    reg = coord.register(RegisterRequest(nickname="Hog"))
+    total = 0
+    for _ in range(100):  # tente de rafler toute la frontière sans rien rendre
+        u = coord.get_work(reg.worker_id).units
+        if not u:
+            break
+        total += len(u)
+    # Le worker est plafonné (anti-griefing) au lieu de tout réserver.
+    assert total <= MAX_INFLIGHT_PER_WORKER + BATCH_SIZE
+    assert coord.get_work(reg.worker_id).units == []
+
+
+def test_client_sha256_matches_served_client(client):
+    import hashlib
+    c, _ = client
+    src = c.get("/client").text
+    expected = hashlib.sha256(src.encode("utf-8")).hexdigest()
+    j = c.get("/client.sha256").json()
+    assert j["sha256"] == expected
+    assert len(j["sha256"]) == 64
+
+
 def test_no_duplicate_chunk_assignment(client):
     """Deux workers ne doivent pas se voir assigner le même chunk simultanément."""
     c, coord = client

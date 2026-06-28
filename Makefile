@@ -76,6 +76,19 @@ lint:
 smoke:
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p0_smoke.py
 
+# --- Genesis Network (module de don de calcul communautaire) --------------
+# Module autonome (fastapi/uvicorn/pydantic) ; gardé indépendamment de l'arc.
+test-network:
+	$(PYTHON) -m pytest network/tests
+
+lint-network:
+	$(PYTHON) -m ruff check network/
+
+smoke-network:
+	$(PYTHON) network/scripts/network_smoke.py
+
+network: lint-network test-network smoke-network
+
 rust-check:
 	cd native/world-engine && cargo test -p genesis-core -p genesis-biome -p genesis-worldgraph --no-run
 
