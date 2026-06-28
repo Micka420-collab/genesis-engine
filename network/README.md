@@ -107,7 +107,8 @@ inter-redémarrage, voir « Limites » ci-dessous.
 | Fichier | Rôle |
 |---------|------|
 | `protocol.py` | Contrat work-unit / résultat (Pydantic v2). |
-| `worldgen.py` | Génération déterministe d'un chunk (l'unité de travail). |
+| `worldgen.py` | Génération déterministe d'un chunk (backend `builtin`, simplifié). |
+| `worldgen_engine.py` | Backend `engine` : **vrai worldgen Genesis** (relief tectonique, climat, biomes, ressources réels). |
 | `coordinator.py` | Serveur FastAPI : assigne, vérifie, agrège, diffuse (SSE). |
 | `store.py` | Persistance SQLite (monde + scores survivent aux redémarrages). |
 | `worker.py` | Client `genesis donate` (du dépôt). |
@@ -168,9 +169,28 @@ plus tout (sinon il ferait le travail des workers) :
 1. ~~Persistance du monde (SQLite) + reprise après redémarrage.~~ ✅ fait (`--db`).
 2. ~~Échantillonnage de vérification (vrai délestage CPU).~~ ✅ fait (`--verify-fraction` + réputation).
 3. ~~Redondance + quorum (même chunk à N workers, consensus).~~ ✅ fait (`--replication`).
-4. Brancher `engine.sim` derrière le seam (chunks « pleine fidélité »).
+4. ~~Brancher le vrai worldgen Genesis derrière le seam.~~ ✅ fait (`--backend engine` : relief/climat/biomes/ressources réels). Reste : la **simulation d'agents** elle-même (séquentielle/globale) n'est pas shardable de façon déterministe — c'est une limite de fond, pas un oubli.
 5. Flux du **narrateur LLM** (`llm_observer`) dans le fil d'événements du site.
 6. WebSocket bidirectionnel (quand `websockets`/`wsproto` dispo) en plus du SSE.
+
+### Deux backends de monde (`--backend`)
+
+| Backend | Le monde | Workers | Dépendances |
+|---------|----------|---------|-------------|
+| `builtin` (défaut) | Worldgen simplifié déterministe | `curl /client \| python3 -` (zéro dépendance) **et** dépôt | aucune côté worker |
+| `engine` | **Vrai Genesis** : plaques tectoniques + érosion + climat + biomes de Whittaker + ressources réelles | dépôt uniquement (`python -m network donate`) | **numpy + le dépôt** |
+
+```bash
+python -m network coordinator --db world.db --backend engine --replication 3
+```
+
+Le backend `engine` calcule le **macro continental une seule fois par seed**
+(déterministe, mis en cache), puis chaque chunk en échantillonne le vrai relief,
+climat, biome et ressources. Comme il faut numpy + le moteur, le client autonome
+`/client` (zéro-dép) n'est **pas** compatible avec ce backend : les donateurs
+utilisent `python -m network donate` depuis le dépôt (le backend est imposé par
+le serveur et auto-détecté à l'enregistrement). La carte démarre au centre du
+monde (souvent océan) et **atteint les terres en s'étendant** avec la puissance.
 
 ### Mode QUORUM (`--replication N`, recommandé `3` en public)
 

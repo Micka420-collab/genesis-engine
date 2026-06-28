@@ -86,12 +86,22 @@ class Coordinator:
 
     def __init__(self, world_seed: int = DEFAULT_WORLD_SEED,
                  verify_fraction: float = 1.0, clock=time.time, store=None,
-                 replication: int = 1):
+                 replication: int = 1, backend: str = "builtin"):
         self.verify_fraction = verify_fraction
         self.replication = max(1, int(replication))
         self._clock = clock
         self._lock = threading.RLock()
         self.store = store
+        # Backend worldgen : "builtin" (simplifié, zéro-dép) ou "engine" (vrai
+        # Genesis : relief tectonique + climat + biomes + ressources réels).
+        self.backend = backend
+        if backend == "engine":
+            from . import worldgen_engine
+            if not worldgen_engine.available():
+                raise RuntimeError("backend 'engine' indisponible (numpy/engine manquant)")
+            self._gen = worldgen_engine.generate_chunk
+        else:
+            self._gen = worldgen.generate_chunk
         # Mode quorum (replication >= 2) : N volontaires distincts calculent le
         # MÊME chunk, le serveur compare leurs hash (consensus) au lieu de
         # recalculer. quorum = majorité ; on autorise quelques replicas en plus
@@ -218,6 +228,7 @@ class Coordinator:
             self._emit(f"⚡ {nick} ({req.platform}) rejoint le réseau.{back}")
             return RegisterResponse(
                 worker_id=worker_id, token=token, world_seed=self.world_seed,
+                worldgen_backend=self.backend,
                 motd="Merci d'offrir ta puissance au monde Genesis.")
 
     def get_work(self, worker_id: str) -> WorkBatch:
@@ -339,8 +350,8 @@ class Coordinator:
             truth = None
             if self._should_verify(res.unit_id, res.worker_id):
                 # Vérification forte : on recalcule le chunk (coût serveur).
-                truth = worldgen.generate_chunk(self.world_seed, a.unit.cx,
-                                                a.unit.cy, a.unit.ticks)
+                truth = self._gen(self.world_seed, a.unit.cx, a.unit.cy,
+                                  a.unit.ticks)
                 if truth.digest != res.digest:
                     return _reject("digest invalide (recalcul ≠)", ban=True,
                                    verified=True)
@@ -482,7 +493,8 @@ class Coordinator:
             chunks = ([ChunkSummary(**s) for s in self.done.values()]
                       if include_chunks else [])
             return WorldState(
-                world_seed=self.world_seed, total_points=round(self.total_points, 2),
+                world_seed=self.world_seed, worldgen_backend=self.backend,
+                total_points=round(self.total_points, 2),
                 verified_units=self.verified_units, rejected_units=self.rejected_units,
                 active_workers=active, chunks_done=len(self.done),
                 quality=self.quality(), leaderboard=leaderboard,

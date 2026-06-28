@@ -19,6 +19,7 @@ class RegisterResponse(BaseModel):
     token: str
     world_seed: int
     protocol_version: str = PROTOCOL_VERSION
+    worldgen_backend: str = "builtin"  # "builtin" (zéro-dép) ou "engine" (vrai Genesis)
     motd: str = ""
 
 
@@ -88,6 +89,7 @@ class ContributorView(BaseModel):
 class WorldState(BaseModel):
     world_seed: int
     protocol_version: str = PROTOCOL_VERSION
+    worldgen_backend: str = "builtin"
     total_points: float
     verified_units: int
     rejected_units: int

@@ -36,6 +36,10 @@ def main(argv=None) -> int:
                     help="Nb de volontaires distincts par chunk (≥2 = mode "
                          "QUORUM : le serveur compare les hash au lieu de "
                          "recalculer ; recommandé 3 en public).")
+    co.add_argument("--backend", choices=("builtin", "engine"), default="builtin",
+                    help="Worldgen : 'builtin' (simplifié, zéro-dép) ou 'engine' "
+                         "(VRAI Genesis : relief/climat/biomes/ressources réels ; "
+                         "nécessite numpy + workers du dépôt, pas /client).")
 
     do = sub.add_parser("donate", help="Offrir de la puissance (genesis donate).")
     do.add_argument("--server", default="http://127.0.0.1:8770")
@@ -54,8 +58,11 @@ def main(argv=None) -> int:
             store = WorldStore(args.db)
         coord = Coordinator(world_seed=args.seed or DEFAULT_WORLD_SEED,
                             verify_fraction=args.verify_fraction, store=store,
-                            replication=args.replication)
+                            replication=args.replication, backend=args.backend)
         app = create_app(coord)
+        print(f"   Worldgen     : {coord.backend}"
+              + ("  (VRAI Genesis : relief/climat/biomes/ressources réels)"
+                 if coord.backend == "engine" else "  (simplifié, zéro-dép)"))
         if coord.replication > 1:
             print(f"   Mode QUORUM  : {coord.replication} replicas/chunk, "
                   f"consensus à {coord.quorum} (serveur ne recalcule plus)")

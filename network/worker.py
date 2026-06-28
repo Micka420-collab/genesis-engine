@@ -61,6 +61,8 @@ class Worker:
         self.worker_id: Optional[str] = None
         self.token: Optional[str] = None
         self.world_seed: Optional[int] = None
+        self.backend = "builtin"
+        self._gen = worldgen.generate_chunk
         self.stats = WorkerStats()
 
     def register(self) -> None:
@@ -72,13 +74,23 @@ class Worker:
         self.worker_id = resp["worker_id"]
         self.token = resp["token"]
         self.world_seed = resp["world_seed"]
+        # Le serveur impose le backend worldgen : on doit calculer pareil.
+        self.backend = resp.get("worldgen_backend", "builtin")
+        if self.backend == "engine":
+            from . import worldgen_engine
+            if not worldgen_engine.available():
+                raise RuntimeError(
+                    "Ce monde utilise le backend 'engine' (vrai Genesis) : il "
+                    "faut numpy + le dépôt. Lance `python -m network donate` "
+                    "depuis le dépôt (le client autonome /client ne suffit pas).")
+            self._gen = worldgen_engine.generate_chunk
         self.on_event(_c("92", f"✓ Enregistré comme {self.nickname} "
-                               f"(monde {self.world_seed:#x}). {resp.get('motd','')}"))
+                               f"(monde {self.world_seed:#x}, backend {self.backend}). "
+                               f"{resp.get('motd','')}"))
 
     def _do_unit(self, unit: dict) -> bool:
         t0 = time.perf_counter()
-        chunk = worldgen.generate_chunk(unit["world_seed"], unit["cx"],
-                                        unit["cy"], unit["ticks"])
+        chunk = self._gen(unit["world_seed"], unit["cx"], unit["cy"], unit["ticks"])
         compute_ms = (time.perf_counter() - t0) * 1000.0
         resp = self.t.post("/api/submit", {
             "unit_id": unit["unit_id"], "worker_id": self.worker_id,

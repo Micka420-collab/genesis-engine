@@ -417,6 +417,46 @@ def test_quorum_bans_dissenter_without_server_recompute():
     assert coord.scores["Hon1"]["points"] > 0 and coord.scores["Hon2"]["points"] > 0
 
 
+def test_engine_backend_determinism():
+    from network import worldgen_engine as we
+    if not we.available():
+        pytest.skip("backend engine indisponible (numpy/engine)")
+    a = we.generate_chunk(0xBEEF, 3, -2, 128)
+    b = we.generate_chunk(0xBEEF, 3, -2, 128)
+    assert a.digest == b.digest
+    assert a.biome in {
+        "OCEAN", "ICE", "TUNDRA", "BOREAL_FOREST", "TEMPERATE_FOREST",
+        "TEMPERATE_RAINFOREST", "GRASSLAND", "HOT_DESERT", "COLD_DESERT",
+        "SAVANNA", "TROPICAL_DRY_FOREST", "TROPICAL_RAINFOREST"}
+    assert a.digest != we.generate_chunk(0xBEEF, 9, 9, 128).digest
+
+
+def test_engine_backend_end_to_end():
+    """Un chunk calculé par le backend moteur est accepté + vérifié par le serveur."""
+    from network import worldgen_engine as we
+    if not we.available():
+        pytest.skip("backend engine indisponible (numpy/engine)")
+    from network.protocol import RegisterRequest, WorkResult, ChunkSummary
+    coord = Coordinator(world_seed=0xBEEF, backend="engine", verify_fraction=1.0)
+    assert coord.state().worldgen_backend == "engine"
+    reg = coord.register(RegisterRequest(nickname="EngWorker"))
+    u = coord.get_work(reg.worker_id).units[0]
+    ch = we.generate_chunk(u.world_seed, u.cx, u.cy, u.ticks)
+    r = coord.submit(WorkResult(unit_id=u.unit_id, worker_id=reg.worker_id,
+                                token=reg.token, digest=ch.digest,
+                                summary=ChunkSummary(**ch.summary())))
+    assert r.accepted and r.verified
+    # Un chunk builtin (faux pour ce monde) serait rejeté par le serveur moteur.
+    bad = worldgen.generate_chunk(u.world_seed, u.cx, u.cy, u.ticks)
+    if bad.digest != ch.digest:  # quasi toujours vrai (worldgen différent)
+        u2 = coord.get_work(reg.worker_id).units[0]
+        bad2 = worldgen.generate_chunk(u2.world_seed, u2.cx, u2.cy, u2.ticks)
+        r2 = coord.submit(WorkResult(unit_id=u2.unit_id, worker_id=reg.worker_id,
+                                     token=reg.token, digest=bad2.digest,
+                                     summary=ChunkSummary(**bad2.summary())))
+        assert r2.accepted is False  # backend incompatible → rejeté
+
+
 def test_no_duplicate_chunk_assignment(client):
     """Deux workers ne doivent pas se voir assigner le même chunk simultanément."""
     c, coord = client
