@@ -82,6 +82,8 @@ class ActionKind(IntEnum):
     RAKE = 29        # gather the dried salt crust from a solar pan — the world decides if it is harvestable
     # D12 wire (2026-06-29) — glean combustible fuel from a dark exposure (consumes C4, non-fire precursor).
     GLEAN = 30       # collect peat / coal / oil-shale from a fuel exposure — the world decides if it burns now
+    # D12 wire (2026-06-29) — line a hearth with clay into a draught kiln (consumes C11 = C5 clay × C7 fire).
+    RAISE_KILN = 31  # enclose a fire in clay walls → a hotter updraft kiln — the world decides its peak temp
 
 
 @dataclass
@@ -143,6 +145,12 @@ class EpisodicMemory:
     # COAL) — emergent (the agent learns dark-rock→long-fire by burning it, never told).
     known_fuel_locations: List[Tuple[float, float]] = field(default_factory=list)
     last_fuel_class: Optional[str] = None
+    # Kiln (C11): the first APPARATUS the agent builds — enclosing a fire in clay walls to reach a
+    # higher peak temperature (the heat that will redeem C9 vitrification + C10 mortar). Learned by
+    # acting: ``has_built_kiln`` is the discovery flag; ``last_kiln_peak_c`` the peak it last reached.
+    known_kiln_site_locations: List[Tuple[float, float]] = field(default_factory=list)
+    has_built_kiln: bool = False
+    last_kiln_peak_c: Optional[float] = None
     capacity_short: int = 32
     capacity_long: int = 256
 

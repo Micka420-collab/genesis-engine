@@ -110,6 +110,7 @@ jobs:
             p166_lime_burning_loop_smoke.py
             p167_salt_evaporation_loop_smoke.py
             p168_combustible_glean_loop_smoke.py
+            p169_kiln_draft_loop_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="

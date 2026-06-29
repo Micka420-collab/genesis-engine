@@ -1181,6 +1181,53 @@ def _seek_fuel(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_kilnbuild(agents, row, obs, sim):
+    """Emergent kiln building — the agent loop's consumption of C11 (the first APPARATUS it builds).
+
+    An agent that ALREADY KNOWS FIRE (``mem.has_made_fire``, from IGNITE/C7) AND CARRIES clay
+    (``inv_clay`` ≥ ``KILN_CLAY_COST_KG``, from DIG/C5), at a kiln-buildable site
+    (``kiln_draft.best_kiln_site_near``), RAISEs a kiln — lining its fire in clay walls so it burns
+    hotter. Self-limiting: it builds a kiln ONCE (``has_built_kiln``), the discovery of the apparatus
+    (like fire's first strike), rather than rebuilding every tick. Tried after the gather/transform
+    seeks; the heat it unlocks will (a later bite) redeem C9 vitrification and C10 mortar.
+
+    Nothing is scripted — the agent perceives wall-clay around a makeable fire and *chooses* to enclose
+    it; the WORLD decides the peak (``kiln_peak_c``). The lie #19 (inversion-of-the-inversion): COMMON
+    clay walls slump (modest peak), the refractory KAOLIN that under-fires as a *pot* in an open fire
+    (C9) makes the BEST kiln wall — ``best_kiln_site_near`` prefers the hottest. Learned by building.
+
+    Gated on C11 installed (cue cache) AND the two ingredients (fire skill + clay in hand). Two
+    hot-loop safety rules mirror the other wires; NON-MUTATING (consumes inv_clay as the lining, no
+    ``geo.mine_at``; D10 frozen).
+
+    Returns a ``Decision`` (RAISE_KILN if standing on the site, else WALK_TO) or ``None`` to fall through.
+    """
+    if sim is None or getattr(sim, "_kiln_draft_cue_cache", None) is None:
+        return None
+    mem = agents.memory[row]
+    if mem is None or not bool(getattr(mem, "has_made_fire", False)):
+        return None   # cannot enclose a fire you cannot make (C7 dependency)
+    if bool(getattr(mem, "has_built_kiln", False)):
+        return None   # the apparatus is already discovered — self-limiting (one build)
+    if float(agents.inv_clay[row]) < KILN_CLAY_COST_KG:
+        return None   # no clay in hand to line the walls (C5/DIG dependency)
+    try:
+        from engine import kiln_draft as kd
+        cue = kd.best_kiln_site_near(sim, int(row), perception_radius_m=KILN_BUILD_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None   # the world says: no kiln buildable within sight
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.RAISE_KILN), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 # ---------------------------------------------------------------------------
 # Arc-consumption registry (ADR-0009 — D12 debt: « un futur registre de capacités + un budget de
 # perception seront nécessaires »). The ordered list of capability seeks a curious, survival-
@@ -1200,6 +1247,7 @@ _ARC_SEEKS = (
     ("limekiln",    _seek_limekiln),      # CALCINE    · C10 lime_burning
     ("saltpan",     _seek_saltpan),       # RAKE       · C15 salt_evaporation
     ("fuel",        _seek_fuel),          # GLEAN      · C4  combustible_outcrop
+    ("kilnbuild",   _seek_kilnbuild),     # RAISE_KILN · C11 kiln_draft
     ("ochre",       _seek_ochre),         # GRIND      · C18 ochre_grinding
     ("canvas",      _seek_canvas),        # MARK       · C20 rock_canvas
 )
@@ -1542,6 +1590,19 @@ FUEL_PERCEPT_M = 96.0         # sight range for fuel exposures (chunk-scale, mem
 FUEL_SATED_KG = 4.0           # stop seeking fuel once this much is carried
 FUEL_GLEAN_KG = 1.5           # combustible gleaned per GLEAN, scaled by true calorific_grade
 DAMP_FUEL_FACTOR = 0.2        # a wet (not burnable-now) exposure yields little usable fuel (the lie)
+
+# D12 wire (2026-06-29) — line a hearth with clay into a draught kiln (consumes C11 kiln_draft = C5 ×
+# C7, the first APPARATUS the agent builds — the pendant of C7's fire). An agent that ALREADY KNOWS
+# FIRE (``has_made_fire``) AND CARRIES clay (``inv_clay`` ≥ cost, from DIG/C5) at a kiln-buildable site
+# (``kiln_draft.best_kiln_site_near``) RAISEs a kiln: it lines the fire in clay walls, reaching a
+# higher ``kiln_peak_c`` than a bare fire — the heat that will (a later bite) redeem C9 vitrification
+# and C10 hard-burnt mortar. It builds the kiln ONCE (the discovery, ``has_built_kiln``), recording the
+# peak it reached. The lie #19 (inversion-of-the-inversion): COMMON clay walls SLUMP at high heat (low
+# wall_cap → modest peak), while the refractory KAOLIN that *under-fires as a pot* in an open fire (C9)
+# makes the BEST kiln wall; ``best_kiln_site_near`` prefers the hottest (refractory-walled) kiln.
+# Consumes inv_clay (the wall lining); NON-MUTATING (no geo.mine_at; D10 frozen).
+KILN_BUILD_PERCEPT_M = 96.0   # sight range for kiln-buildable sites (chunk-scale, memoised)
+KILN_CLAY_COST_KG = 0.8       # clay consumed to line the kiln walls (from DIG/C5)
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -2319,6 +2380,52 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "calorific_grade": round(float(cue.calorific_grade), 4),
             "burnable_now": burnable,
             "smelting_grade": bool(cue.smelting_grade),
+        })
+        return events
+
+    if act == int(ActionKind.RAISE_KILN):
+        # Line the fire the agent knows how to make with clay it carries, into a draught kiln (C11
+        # kiln_draft — the first APPARATUS the agent builds). It consumes inv_clay (the wall lining)
+        # and records the higher peak temperature the enclosed updraft reaches (kiln_peak_c) — the heat
+        # that will (a later bite) redeem C9 vitrification and C10 hard-burnt mortar. The world never
+        # lies about the PEAK: COMMON clay walls slump (modest peak), refractory kaolin walls survive
+        # (high peak) — the inversion-of-the-inversion (lie #19), learned by building. Requires both
+        # ingredients in hand (has_made_fire + inv_clay). NON-MUTATING (no geo.mine_at; D10 frozen).
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_kiln_draft_cue_cache", None) is None:
+            return events
+        mem = agents.memory[row]
+        if mem is None or not bool(getattr(mem, "has_made_fire", False)):
+            return events   # cannot enclose a fire you cannot make
+        if float(agents.inv_clay[row]) < KILN_CLAY_COST_KG:
+            return events   # no clay in hand to line the walls
+        try:
+            from engine import kiln_draft as kd
+            cue = kd.prospect_kiln(sim, px, py)
+        except Exception:
+            return events
+        if cue is None or not cue.buildable:
+            return events   # the world says: no kiln buildable here (no wall-clay + fire)
+        spent = min(KILN_CLAY_COST_KG, float(agents.inv_clay[row]))
+        agents.inv_clay[row] = float(agents.inv_clay[row]) - spent
+        mem.has_built_kiln = True
+        mem.last_kiln_peak_c = float(cue.kiln_peak_c)
+        locs = getattr(mem, "known_kiln_site_locations", None)
+        if locs is not None:
+            locs.append((px, py))
+            if len(locs) > 8:
+                locs.pop(0)
+        remember_short(agents, row, "kiln",
+                       {"wall": cue.wall_clay_class, "refractory": bool(cue.wall_refractory)})
+        events.append({
+            "kind": "kiln_build",
+            "row": int(row),
+            "wall_clay_class": cue.wall_clay_class,
+            "wall_refractory": bool(cue.wall_refractory),
+            "kiln_peak_c": round(float(cue.kiln_peak_c), 2),
+            "open_fire_peak_c": round(float(cue.open_fire_peak_c), 2),
+            "draft_gain_c": round(float(cue.draft_gain_c), 2),
+            "clay_kg_spent": round(float(spent), 4),
         })
         return events
 
