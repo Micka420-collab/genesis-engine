@@ -28,7 +28,7 @@ from engine import cognition as cog                               # noqa: E402
 # The canonical order the inlined sequence used (frozen here as the contract).
 EXPECTED_ORDER = [
     "frost_clast", "toolstone", "firesite", "tempersite",
-    "clay", "kiln", "ochre", "canvas",
+    "clay", "kiln", "limestone", "ochre", "canvas",
 ]
 
 
@@ -44,6 +44,7 @@ def test_registry_entries_map_to_real_seek_callables():
         "tempersite": cog._seek_tempersite,
         "clay": cog._seek_clay,
         "kiln": cog._seek_kiln,
+        "limestone": cog._seek_limestone,
         "ochre": cog._seek_ochre,
         "canvas": cog._seek_canvas,
     }

@@ -74,6 +74,8 @@ class ActionKind(IntEnum):
     DIG = 25         # gather plastic clay from a surface bank — the world decides if it is workable / ceramic-grade
     # D12 wire (2026-06-29) — fire shaped clay in a fire into pottery (consumes C9 = C5 clay × C7 fire).
     FIRE_CLAY = 26   # bake carried clay in the fire → irreversible ceramic — the world decides if it fires sound
+    # D12 wire (2026-06-29) — quarry carbonate building/lime stone (consumes C6, non-fire precursor to lime).
+    QUARRY = 27      # hew a block of surface limestone — the world decides its purity (mortar-grade?) / soundness
 
 
 @dataclass
@@ -114,6 +116,11 @@ class EpisodicMemory:
     known_kiln_locations: List[Tuple[float, float]] = field(default_factory=list)
     has_fired_pottery: bool = False
     last_ware_quality: Optional[float] = None
+    # Limestone (C6): the binder/builder stone, learned by acting. ``known_limestone_locations``
+    # are remembered carbonate banks; ``last_lime_class`` records WHICH carbonate last quarried —
+    # emergent (the agent learns white-stone→lime by burning it later, never told).
+    known_limestone_locations: List[Tuple[float, float]] = field(default_factory=list)
+    last_lime_class: Optional[str] = None
     capacity_short: int = 32
     capacity_long: int = 256
 
@@ -185,6 +192,7 @@ class AgentRegistry:
     inv_pigment: np.ndarray = field(default=None)
     inv_clay: np.ndarray = field(default=None)
     inv_ceramic: np.ndarray = field(default=None)
+    inv_limestone: np.ndarray = field(default=None)
     inv_capacity_kg: np.ndarray = field(default=None)
 
     action: np.ndarray = field(default=None)
@@ -227,7 +235,7 @@ class AgentRegistry:
             setattr(self, name, np.full(N, 0.5, dtype=np.float32))
         self.last_mating_tick = np.full(N, -1, dtype=np.int64)
         self.offspring_count = np.zeros(N, dtype=np.int32)
-        for name in ("inv_water","inv_food","inv_wood","inv_stone","inv_metal","inv_tools","inv_pigment","inv_clay","inv_ceramic"):
+        for name in ("inv_water","inv_food","inv_wood","inv_stone","inv_metal","inv_tools","inv_pigment","inv_clay","inv_ceramic","inv_limestone"):
             setattr(self, name, np.zeros(N, dtype=np.float32))
         self.inv_capacity_kg = np.full(N, 20.0, dtype=np.float32)
         self.action = np.zeros(N, dtype=np.int32)

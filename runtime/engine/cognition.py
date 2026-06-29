@@ -988,6 +988,56 @@ def _seek_kiln(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_limestone(agents, row, obs, sim):
+    """Emergent limestone quarrying — the agent loop's consumption of C6 (a non-fire precursor:
+    the binder/builder stone, matter the future C10 lime_burning will calcine to quicklime).
+
+    A survival-satisfied, curious agent that SEES a mortar-grade carbonate bank
+    (``limestone_outcrop.best_limestone_near``, require_mortar) walks there and QUARRYs a block into
+    its limestone store (``inv_limestone``). Utility-based: stocking the binder stone beats blind
+    exploration. It runs on its OWN inventory, never competing with stone/clay/pigment pools.
+
+    Nothing is scripted — the agent perceives a white bank and *chooses* to quarry; the WORLD decides
+    whether it is pure enough to one day make a good binder (the cue's ``lime_grade`` × purity). A
+    high-purity sound carbonate quarries rich; a karst-fissured / frost-shattered or dolomitic bank
+    looks just as white but yields a poor-grade stone (mensonge #15 — white ≠ pure lime, learned by
+    quarrying then, later, by burning). ``best_limestone_near`` routes to the highest mortar-grade
+    bank in sight.
+
+    Gated on C6 installed (its cue cache exists) — inert wherever limestone_outcrop was never
+    installed, like every other wire. Two hot-loop safety rules mirror the KNAP / DIG wires: (1) only
+    *read* an already installed C6 — never ``install_*`` mid-iteration; (2) any error degrades to
+    ``None`` (ordinary exploration), never crashes the tick. Surface quarry only — no geology mutation
+    (no ``geo.mine_at``; D10 frozen).
+
+    Returns a ``Decision`` (QUARRY if standing on the bank, else WALK_TO) or ``None`` to fall through.
+    """
+    if sim is None or getattr(sim, "_limestone_cue_cache", None) is None:
+        return None
+    inv_lime = getattr(agents, "inv_limestone", None)
+    if inv_lime is None or float(inv_lime[row]) >= LIMESTONE_SATED_KG:
+        return None
+    if _inventory_mass(agents, row) >= float(agents.inv_capacity_kg[row]) - 1e-3:
+        return None
+    try:
+        from engine import limestone_outcrop as lso
+        cue = lso.best_limestone_near(sim, int(row), perception_radius_m=QUARRY_PERCEPT_M,
+                                      require_mortar=True)
+    except Exception:
+        return None
+    if cue is None:
+        return None
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as KNAP / GATHER / GRIND / DIG: above random EXPLORE (0.3), below survival.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.QUARRY), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 # ---------------------------------------------------------------------------
 # Arc-consumption registry (ADR-0009 — D12 debt: « un futur registre de capacités + un budget de
 # perception seront nécessaires »). The ordered list of capability seeks a curious, survival-
@@ -1003,6 +1053,7 @@ _ARC_SEEKS = (
     ("tempersite",  _seek_tempersite),    # TEMPER     · C8  lithic_tempering
     ("clay",        _seek_clay),          # DIG        · C5  clay_outcrop
     ("kiln",        _seek_kiln),          # FIRE_CLAY  · C9  ceramic_firing
+    ("limestone",   _seek_limestone),     # QUARRY     · C6  limestone_outcrop
     ("ochre",       _seek_ochre),         # GRIND      · C18 ochre_grinding
     ("canvas",      _seek_canvas),        # MARK       · C20 rock_canvas
 )
@@ -1288,6 +1339,19 @@ KILN_PERCEPT_M = 96.0         # sight range for firing sites (chunk-scale, memoi
 FIRE_CLAY_COST_KG = 0.5       # raw clay consumed per firing (the shaped vessel that goes in the fire)
 CERAMIC_YIELD = 0.5           # fired-vessel mass per firing, scaled by true ware_quality (sound firings only)
 CERAMIC_SATED_KG = 3.0        # stop seeking to fire once this much pottery is carried
+
+# D12 wire (2026-06-29) — quarry carbonate stone (consumes C6 limestone_outcrop, a NON-FIRE precursor:
+# the binder/builder stone, and the matter the future C10 lime_burning will calcine to quicklime). A
+# survival-satisfied, curious agent that SEES a mortar-grade carbonate bank
+# (``limestone_outcrop.best_limestone_near``, require_mortar) walks there and QUARRYs a block into its
+# limestone store (``inv_limestone``, a new field mirroring inv_clay/inv_ceramic). The lie #15: a
+# conspicuous white cliff may be KARST-fissured / FROST-shattered (not sound) or an impure / dolomitic
+# carbonate that calcines to a poor binder — yield tracks the world's real ``lime_grade``, learned by
+# quarrying. NON-MUTATING: surface block collection (cue ``collect_depth_m`` shallow), no ``geo.mine_at``
+# (D10 frozen). One-line append to the _ARC_SEEKS registry (placed after the ceramic chain).
+QUARRY_PERCEPT_M = 96.0       # sight range for carbonate banks (chunk-scale, memoised)
+LIMESTONE_SATED_KG = 4.0      # stop seeking limestone once this much is carried
+QUARRY_STONE_KG = 1.5         # carbonate quarried per QUARRY, scaled by true lime_grade
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -1865,6 +1929,55 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "watertight": bool(cue.watertight),
             "clay_kg_spent": round(float(spent), 4),
             "ceramic_kg": round(float(ceramic_gain), 4),
+        })
+        return events
+
+    if act == int(ActionKind.QUARRY):
+        # Quarry a block of carbonate the agent stands on (C6 limestone_outcrop). The world never
+        # lies about PURITY: a high-grade sound limestone quarries into rich binder stock (yield ∝
+        # lime_grade); a karst-fissured / frost-shattered or dolomitic bank looks just as white but
+        # yields a poor-grade carbonate (mensonge #15: white ≠ pure lime — fully revealed only later,
+        # when it is burned). A spot the world says has no carbonate yields nothing. Surface quarry
+        # only (cue.collect_depth_m shallow) — NOT a geology mutation (no geo.mine_at), so the
+        # mutation frontier (D10) stays frozen. Fills inv_limestone (the matter the future C10
+        # lime_burning calcines); a non-fire precursor.
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_limestone_cue_cache", None) is None:
+            return events
+        inv_lime = getattr(agents, "inv_limestone", None)
+        if inv_lime is None:
+            return events
+        cap_left = max(0.0, float(agents.inv_capacity_kg[row]) - _inventory_mass(agents, row))
+        if cap_left <= 1e-3:
+            return events
+        try:
+            from engine import limestone_outcrop as lso
+            cue = lso.prospect_limestone(sim, px, py)
+        except Exception:
+            return events
+        if cue is None:
+            return events   # the world says: no carbonate crops out here
+        gained = min(QUARRY_STONE_KG * float(cue.lime_grade), cap_left)
+        inv_lime[row] = float(inv_lime[row]) + gained
+        mem = agents.memory[row]
+        if mem is not None:
+            locs = getattr(mem, "known_limestone_locations", None)
+            if locs is not None:
+                locs.append((px, py))
+                if len(locs) > 8:
+                    locs.pop(0)
+            mem.last_lime_class = cue.lime_class.name
+            remember_short(agents, row, "limestone",
+                           {"class": cue.lime_class.name, "material": cue.material})
+        events.append({
+            "kind": "quarry",
+            "row": int(row),
+            "lime_class": cue.lime_class.name,
+            "material": cue.material,
+            "limestone_kg": round(float(gained), 4),
+            "lime_grade": round(float(cue.lime_grade), 4),
+            "mortar_grade": bool(cue.mortar_grade),
+            "dressable_now": bool(cue.dressable_now),
         })
         return events
 
