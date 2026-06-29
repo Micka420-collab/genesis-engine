@@ -68,6 +68,8 @@ class ActionKind(IntEnum):
     MARK = 22        # paint held pigment onto a paintable rock wall — the world decides if it lasts
     # D12 wire (2026-06-28) — strike a fire at a firestone site (consumes C7, the VOÛTE).
     IGNITE = 23      # kindle a fire (pyrite percussion / dry-tinder friction) — the world decides if a spark takes
+    # D12 wire (2026-06-29) — heat-treat a silica stone in the fire (consumes C8, fire's first use).
+    TEMPER = 24      # roast a knappable silica nodule → a superior cutting edge — the world decides the gain
 
 
 @dataclass
@@ -90,6 +92,13 @@ class EpisodicMemory:
     # ``last_fire_method`` records HOW (PERCUSSION / FRICTION) — emergent, never told.
     has_made_fire: bool = False
     last_fire_method: Optional[str] = None
+    # Heat treatment (C8): fire's first use ON a material. ``has_tempered_stone``
+    # is the discovery flag (the agent has learned fire+silex → a keener edge);
+    # ``last_temper_gain`` records the last knap-quality premium the heat yielded
+    # — emergent, never told. ``known_temper_locations`` are remembered sites.
+    known_temper_locations: List[Tuple[float, float]] = field(default_factory=list)
+    has_tempered_stone: bool = False
+    last_temper_gain: Optional[float] = None
     capacity_short: int = 32
     capacity_long: int = 256
 

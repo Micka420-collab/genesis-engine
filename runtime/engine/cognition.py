@@ -532,7 +532,9 @@ def decide(agents, obs, sim=None):
         # them up beats knapping an in-situ outcrop. Else, debit a knappable
         # outcrop (C2). With tool-stone secured (or none in sight), if it is chilly
         # (or has never made fire) it STRIKES a fire (C7, the VOÛTE) — warmth before
-        # art. Then it grinds a usable ochre pigment (C18) — the symbol's matter
+        # art. Having made fire, it puts that heat to its FIRST use on matter: it
+        # TEMPERs a silica nodule (C8) for a keener edge than cold stone gives —
+        # tools before art. Then it grinds a usable ochre pigment (C18) — the symbol's matter
         # after the tool, on its own inventory — and, holding a colour, leaves a
         # MARK on a paintable carbonate wall (C20) — the symbol's mark after its
         # matter. All emergent, never scripted; each inert unless its capability is
@@ -546,6 +548,9 @@ def decide(agents, obs, sim=None):
         fs = _seek_firesite(agents, row, obs, sim)
         if fs is not None:
             return fs
+        tp = _seek_tempersite(agents, row, obs, sim)
+        if tp is not None:
+            return tp
         oc = _seek_ochre(agents, row, obs, sim)
         if oc is not None:
             return oc
@@ -844,6 +849,62 @@ def _seek_firesite(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_tempersite(agents, row, obs, sim):
+    """Emergent heat treatment — the agent loop's consumption of C8 (fire's FIRST USE on matter).
+
+    A survival-satisfied, curious agent that ALREADY KNOWS FIRE (``mem.has_made_fire``) and SEES
+    a heat-responsive silica it could roast (``lithic_tempering.best_temper_site_near``) walks
+    there and TEMPERs it — heating a flint/chert nodule in the fire it can make to win a keener
+    cutting edge than cold-knapping the same stone. Utility-based action selection: with warmth
+    secured, investing the fire's heat into a *better tool* outranks blind exploration. The first
+    behaviour that uses C7 fire as a *means* rather than an end — tried *after* ``_seek_firesite``
+    (you must have made fire before you can heat-treat with it) and *before* the symbolic
+    ``_seek_ochre`` / ``_seek_canvas`` (tools before art).
+
+    Nothing is scripted — the agent perceives a silica outcrop beside a fire-makeable spot and
+    *chooses* to roast it; the WORLD decides the gain (the cue's ``tempered_quality`` = C2 base +
+    silica heat response, bounded by ``TEMPER_CEILING``). Cryptocrystalline chert responds strongly,
+    quartzite modestly, and OBSIDIAN — the best raw knapping stone, the obvious-looking candidate —
+    gains NOTHING (already glass): ``best_temper_site_near`` never routes to an obsidian/ no-fire
+    site (gain 0 → no cue), and standing on one and tempering teaches the lie #12 by acting.
+
+    Gated on C8 being installed (its cue cache exists) AND on the fire skill being learned first —
+    so this is fully inert wherever lithic tempering was never installed, or before the agent has
+    ever made a fire, exactly like the C7 wire gates on ``_ignition_cue_cache``. Two hot-loop safety
+    rules mirror those wires: (1) only *read* an already installed C8 — never ``install_*``
+    mid-iteration; (2) any error degrades to ``None`` (ordinary exploration), never crashes the tick.
+    Non-mutating — roasting a nodule consumes no geology (no ``geo.mine_at``; D10 frozen).
+
+    Returns a ``Decision`` (TEMPER if standing on the site, else WALK_TO) or ``None`` to fall
+    through to ``_seek_ochre`` / ``_seek_canvas`` / ordinary exploration.
+    """
+    if sim is None or getattr(sim, "_temper_cue_cache", None) is None:
+        return None
+    mem = agents.memory[row]
+    # Fire's FIRST consumer: you must have learned to make fire before you can heat-treat with it.
+    if mem is None or not bool(getattr(mem, "has_made_fire", False)):
+        return None
+    if float(agents.inv_tools[row]) >= TEMPER_TOOLS_SATED:
+        return None   # already tool-rich → no need to roast more stone now
+    try:
+        from engine import lithic_tempering as lt
+        cue = lt.best_temper_site_near(sim, int(row), perception_radius_m=TEMPER_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None   # the world says: no stone worth roasting (no responsive silica + fire) in sight
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as KNAP / GATHER / GRIND / MARK / IGNITE: above random EXPLORE (0.3),
+    # below survival.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.TEMPER), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 def _act_on(agents, row, obs, drive_kind):
     nearest = obs.nearest
     if drive_kind == int(DriveKind.THIRST):
@@ -1052,6 +1113,23 @@ MARK_PIGMENT_COST_KG = 0.02   # pigment spent per mark
 FIRESITE_PERCEPT_M = 96.0      # sight range for fire-makeable sites (chunk-scale, memoised)
 FIRE_SEEK_THERMAL_MIN = 0.15  # seek a fire when at least this chilly (else only on first discovery)
 FIRE_WARMTH_RELIEF = 0.18     # thermal-drive relief from sitting at a struck fire (cf. SEEK_SHELTER 0.20)
+
+# D12 wire (2026-06-29) — heat-treat a silica stone in the fire (consumes C8 lithic_tempering,
+# fire's FIRST USE on a material — the oldest pyrotechnology). A survival-satisfied, curious
+# agent that ALREADY KNOWS FIRE (``has_made_fire``) and SEES a heat-responsive silica it could
+# roast (``lithic_tempering.best_temper_site_near``) walks there and TEMPERs it → a keener
+# cutting edge than cold-knapping the same stone (``tempered_quality`` ≥ base, the world-committed
+# pyrotechnology premium). The lie made visible #12: OBSIDIAN is the best stone to knap raw
+# (base 1.0) and looks the prime candidate for the fire — yet heat yields it NO gain (already
+# glass); ``best_temper_site_near`` never routes there (gain 0 → no cue), and standing on an
+# obsidian outcrop and tempering teaches it by acting (cue None → no edge). Gated on C8 installed
+# AND on the fire skill being learned first — so TEMPER is fire's first consumer, tried AFTER
+# ``_seek_firesite`` (make fire first) and BEFORE the symbolic GRIND / MARK (tools before art).
+# Reuses ``inv_tools`` (NO new inventory field → no persistence migration). NON-MUTATING: roasting
+# a nodule consumes no geology (no ``geo.mine_at`` — the mutation frontier D10 stays frozen).
+TEMPER_PERCEPT_M = 96.0       # sight range for heat-treatable silica sites (chunk-scale, memoised)
+TEMPER_TOOLS_SATED = 4.0      # stop seeking to temper once this much usable edge is carried (< INV_TOOLS_MAX 5.0)
+TEMPER_TOOL_YIELD = 0.6       # usable cutting edge per unit of true tempered_quality (cf. KNAP_TOOL_YIELD)
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -1476,6 +1554,54 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "can_percussion": bool(cue.can_percussion),
             "can_friction": bool(cue.can_friction),
             "confidence": round(float(cue.confidence), 4),
+        })
+        return events
+
+    if act == int(ActionKind.TEMPER):
+        # Heat-treat the silica stone the agent stands on, in the fire it knows how to make (C8
+        # lithic_tempering — fire's FIRST USE on a material). The world never lies about the GAIN:
+        # a cryptocrystalline chert/flint nodule roasted slow yields a keener edge than cold
+        # knapping (``tempered_quality`` ≥ base, the pyrotechnology premium the world commits to);
+        # quartzite gains modestly; OBSIDIAN — the best raw stone, the obvious-looking candidate —
+        # gains NOTHING (already glass): ``prospect_tempering`` returns None there, so roasting it
+        # teaches the lie #12 by acting (no cue → no edge). Requires the fire skill to be learned
+        # first (``has_made_fire``) — this is C7's first downstream consumer. Reuses ``inv_tools``
+        # (the cutting edge), fills NO new inventory, and is NON-MUTATING: roasting a nodule
+        # consumes no geology (no geo.mine_at), so the mutation frontier (D10) stays frozen.
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_temper_cue_cache", None) is None:
+            return events
+        mem = agents.memory[row]
+        if mem is None or not bool(getattr(mem, "has_made_fire", False)):
+            return events   # cannot heat-treat without first knowing how to make a fire
+        try:
+            from engine import lithic_tempering as lt
+            cue = lt.prospect_tempering(sim, px, py)
+        except Exception:
+            return events
+        if cue is None or not cue.temperable:
+            return events   # obsidian / non-silica / no fire here → the heat yields no edge (the lie)
+        tool_gain = TEMPER_TOOL_YIELD * float(cue.tempered_quality)
+        agents.inv_tools[row] = float(
+            min(float(agents.inv_tools[row]) + tool_gain, INV_TOOLS_MAX))
+        locs = getattr(mem, "known_temper_locations", None)
+        if locs is not None:
+            locs.append((px, py))
+            if len(locs) > 8:
+                locs.pop(0)
+        mem.has_tempered_stone = True
+        mem.last_temper_gain = float(cue.quality_gain)
+        remember_short(agents, row, "temper",
+                       {"silica": cue.silica_kind, "material": cue.stone_material})
+        events.append({
+            "kind": "temper",
+            "row": int(row),
+            "silica_kind": cue.silica_kind,
+            "base_quality": round(float(cue.base_quality), 4),
+            "tempered_quality": round(float(cue.tempered_quality), 4),
+            "quality_gain": round(float(cue.quality_gain), 4),
+            "tool_gain": round(float(tool_gain), 4),
+            "fire_method": cue.fire_method,
         })
         return events
 
