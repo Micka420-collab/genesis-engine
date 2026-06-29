@@ -104,6 +104,7 @@ jobs:
             p160_rock_canvas_mark_loop_smoke.py
             p161_fire_ignition_loop_smoke.py
             p162_lithic_tempering_loop_smoke.py
+            p163_clay_digging_loop_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="

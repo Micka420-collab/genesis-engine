@@ -70,6 +70,8 @@ class ActionKind(IntEnum):
     IGNITE = 23      # kindle a fire (pyrite percussion / dry-tinder friction) — the world decides if a spark takes
     # D12 wire (2026-06-29) — heat-treat a silica stone in the fire (consumes C8, fire's first use).
     TEMPER = 24      # roast a knappable silica nodule → a superior cutting edge — the world decides the gain
+    # D12 wire (2026-06-29) — dig workable clay from a clay exposure (consumes C5, non-fire precursor).
+    DIG = 25         # gather plastic clay from a surface bank — the world decides if it is workable / ceramic-grade
 
 
 @dataclass
@@ -99,6 +101,11 @@ class EpisodicMemory:
     known_temper_locations: List[Tuple[float, float]] = field(default_factory=list)
     has_tempered_stone: bool = False
     last_temper_gain: Optional[float] = None
+    # Clay (C5): the matter of the future pot, learned by acting. ``known_clay_locations``
+    # are remembered banks; ``last_clay_class`` records WHICH clay last dug (SHALE_CLAY /
+    # PLASTIC_CLAY) — emergent, never told (the agent learns plastic→holds-shape by digging).
+    known_clay_locations: List[Tuple[float, float]] = field(default_factory=list)
+    last_clay_class: Optional[str] = None
     capacity_short: int = 32
     capacity_long: int = 256
 
@@ -168,6 +175,7 @@ class AgentRegistry:
     inv_metal: np.ndarray = field(default=None)
     inv_tools: np.ndarray = field(default=None)
     inv_pigment: np.ndarray = field(default=None)
+    inv_clay: np.ndarray = field(default=None)
     inv_capacity_kg: np.ndarray = field(default=None)
 
     action: np.ndarray = field(default=None)
@@ -210,7 +218,7 @@ class AgentRegistry:
             setattr(self, name, np.full(N, 0.5, dtype=np.float32))
         self.last_mating_tick = np.full(N, -1, dtype=np.int64)
         self.offspring_count = np.zeros(N, dtype=np.int32)
-        for name in ("inv_water","inv_food","inv_wood","inv_stone","inv_metal","inv_tools","inv_pigment"):
+        for name in ("inv_water","inv_food","inv_wood","inv_stone","inv_metal","inv_tools","inv_pigment","inv_clay"):
             setattr(self, name, np.zeros(N, dtype=np.float32))
         self.inv_capacity_kg = np.full(N, 20.0, dtype=np.float32)
         self.action = np.zeros(N, dtype=np.int32)

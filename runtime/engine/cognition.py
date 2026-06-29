@@ -534,7 +534,8 @@ def decide(agents, obs, sim=None):
         # (or has never made fire) it STRIKES a fire (C7, the VOÛTE) — warmth before
         # art. Having made fire, it puts that heat to its FIRST use on matter: it
         # TEMPERs a silica nodule (C8) for a keener edge than cold stone gives —
-        # tools before art. Then it grinds a usable ochre pigment (C18) — the symbol's matter
+        # tools before art. It also DIGs workable clay (C5) into its clay store — the
+        # matter of the future pot, a non-fire precursor. Then it grinds a usable ochre pigment (C18) — the symbol's matter
         # after the tool, on its own inventory — and, holding a colour, leaves a
         # MARK on a paintable carbonate wall (C20) — the symbol's mark after its
         # matter. All emergent, never scripted; each inert unless its capability is
@@ -551,6 +552,9 @@ def decide(agents, obs, sim=None):
         tp = _seek_tempersite(agents, row, obs, sim)
         if tp is not None:
             return tp
+        dg = _seek_clay(agents, row, obs, sim)
+        if dg is not None:
+            return dg
         oc = _seek_ochre(agents, row, obs, sim)
         if oc is not None:
             return oc
@@ -905,6 +909,55 @@ def _seek_tempersite(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_clay(agents, row, obs, sim):
+    """Emergent clay digging — the agent loop's consumption of C5 (a non-fire precursor).
+
+    A survival-satisfied, curious agent that SEES a clay bank it could work
+    (``clay_outcrop.best_clay_near``, C5) walks there and DIGs a handful into its clay store
+    (``inv_clay``). Utility-based action selection: with tools/fire already handled, stocking the
+    matter of the future pot beats blind exploration. Tried *after* the tool/fire/temper cluster
+    and *before* the symbolic ``_seek_ochre`` / ``_seek_canvas`` (useful matter before art). It
+    runs on its OWN inventory (``inv_clay``), so it never competes with the stone / pigment pools.
+
+    Nothing is scripted — the agent perceives a smooth ochre bank and *chooses* to dig; the WORLD
+    decides whether that earth is real workable clay (the cue's ``pottery_grade`` × workability). A
+    plastic kaolinite digs into fine ceramic-grade clay; a silty shale bank looks similar but works
+    poorly, and a bank outside the plastic window (too dry / too wet) yields little until conditioned
+    (mensonge #13 — learned only by digging). ``best_clay_near`` routes to the highest-grade bank in
+    sight; standing on a poor one and digging teaches the lie by acting.
+
+    Gated on C5 being installed (its cue cache exists) — fully inert wherever clay_outcrop was never
+    installed, exactly like the C2 / C8 wires gate on their own caches. Two hot-loop safety rules
+    mirror the KNAP wire: (1) only *read* an already installed C5 — never ``install_*`` mid-iteration;
+    (2) any error degrades to ``None`` (ordinary exploration), never crashes the tick. Surface dig
+    only — no geology mutation (no ``geo.mine_at``; D10 frozen).
+
+    Returns a ``Decision`` (DIG if standing on the bank, else WALK_TO) or ``None`` to fall through.
+    """
+    if sim is None or getattr(sim, "_clay_cue_cache", None) is None:
+        return None
+    if float(agents.inv_clay[row]) >= CLAY_SATED_KG:
+        return None
+    if _inventory_mass(agents, row) >= float(agents.inv_capacity_kg[row]) - 1e-3:
+        return None
+    try:
+        from engine import clay_outcrop as clo
+        cue = clo.best_clay_near(sim, int(row), perception_radius_m=CLAY_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as KNAP / GATHER / GRIND / TEMPER: above random EXPLORE (0.3), below survival.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.DIG), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 def _act_on(agents, row, obs, drive_kind):
     nearest = obs.nearest
     if drive_kind == int(DriveKind.THIRST):
@@ -1130,6 +1183,23 @@ FIRE_WARMTH_RELIEF = 0.18     # thermal-drive relief from sitting at a struck fi
 TEMPER_PERCEPT_M = 96.0       # sight range for heat-treatable silica sites (chunk-scale, memoised)
 TEMPER_TOOLS_SATED = 4.0      # stop seeking to temper once this much usable edge is carried (< INV_TOOLS_MAX 5.0)
 TEMPER_TOOL_YIELD = 0.6       # usable cutting edge per unit of true tempered_quality (cf. KNAP_TOOL_YIELD)
+
+# D12 wire (2026-06-29) — dig workable clay from a clay exposure (consumes C5 clay_outcrop, a
+# NON-FIRE precursor — restores the fire/non-fire alternation after IGNITE/TEMPER). A
+# survival-satisfied, curious agent that SEES a clay bank it could work
+# (``clay_outcrop.best_clay_near``) walks there and DIGs a handful into its clay store
+# (``inv_clay``, an EXISTING field shared with river-clay foraging → no new inventory field, no
+# persistence migration). The matter of the future pot: clay is the substrate C9 ceramic_firing
+# will one day consume. The lie made visible #13: a conspicuous clay bank may be OUTSIDE the
+# plastic window right now (too dry to shape / too wet a slurry → ``workable_now`` False) or a
+# silty SHALE_CLAY that fires poorly vs a PLASTIC_CLAY kaolinite — the yield tracks the world's
+# real ``pottery_grade`` × workability, learned only by digging. Tried after the tool/fire/temper
+# cluster and before the symbolic GRIND / MARK (useful matter before art). NON-MUTATING: surface
+# clay collection (cue ``collect_depth_m`` shallow), no ``geo.mine_at`` (D10 frozen).
+CLAY_PERCEPT_M = 96.0         # sight range for clay banks (chunk-scale, memoised)
+CLAY_SATED_KG = 4.0           # stop seeking clay once this much is carried
+CLAY_DIG_KG = 1.5             # raw clay dug per DIG, scaled by true pottery_grade
+DAMP_CLAY_FACTOR = 0.25       # clay outside the plastic window yields little usable clay (the lie)
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -1602,6 +1672,55 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "quality_gain": round(float(cue.quality_gain), 4),
             "tool_gain": round(float(tool_gain), 4),
             "fire_method": cue.fire_method,
+        })
+        return events
+
+    if act == int(ActionKind.DIG):
+        # Dig workable clay from the bank the agent stands on (C5 clay_outcrop). The world never
+        # lies about WORKABILITY or GRADE: a plastic kaolinite inside its plastic window digs into
+        # fine ceramic-grade clay (yield ∝ pottery_grade); a silty SHALE_CLAY looks similar but
+        # works poorly, and a bank too dry to shape / too wet a slurry yields little usable clay
+        # until conditioned (mensonge #13: a conspicuous clay bank that won't hold a shape now). A
+        # spot the world says has no clay yields nothing and isn't remembered. Surface dig only
+        # (cue.collect_depth_m shallow) — NOT a geology mutation (no geo.mine_at), so the mutation
+        # frontier (D10) stays frozen. Fills inv_clay (the matter the future C9 ceramic_firing
+        # consumes); a non-fire precursor that restores the fire/non-fire alternation.
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_clay_cue_cache", None) is None:
+            return events
+        cap_left = max(0.0, float(agents.inv_capacity_kg[row]) - _inventory_mass(agents, row))
+        if cap_left <= 1e-3:
+            return events
+        try:
+            from engine import clay_outcrop as clo
+            cue = clo.prospect_clay(sim, px, py)
+        except Exception:
+            return events
+        if cue is None:
+            return events   # the world says: no clay bank crops out here
+        workable = bool(cue.workable_now)
+        nominal = CLAY_DIG_KG * float(cue.pottery_grade) * (1.0 if workable else DAMP_CLAY_FACTOR)
+        gained = min(nominal, cap_left)
+        agents.inv_clay[row] = float(agents.inv_clay[row]) + gained
+        mem = agents.memory[row]
+        if mem is not None:
+            locs = getattr(mem, "known_clay_locations", None)
+            if locs is not None:
+                locs.append((px, py))
+                if len(locs) > 8:
+                    locs.pop(0)
+            mem.last_clay_class = cue.clay_class.name
+            remember_short(agents, row, "clay",
+                           {"class": cue.clay_class.name, "material": cue.material})
+        events.append({
+            "kind": "dig",
+            "row": int(row),
+            "clay_class": cue.clay_class.name,
+            "material": cue.material,
+            "clay_kg": round(float(gained), 4),
+            "pottery_grade": round(float(cue.pottery_grade), 4),
+            "workable_now": workable,
+            "ceramic_grade": bool(cue.ceramic_grade),
         })
         return events
 
