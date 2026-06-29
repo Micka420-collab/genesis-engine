@@ -80,6 +80,8 @@ class ActionKind(IntEnum):
     CALCINE = 28     # decarbonate limestone in the fire → caustic quicklime — the world decides if it burns well
     # D12 wire (2026-06-29) — rake solar salt from an arid brine pan (consumes C15, non-fire / non-thermal).
     RAKE = 29        # gather the dried salt crust from a solar pan — the world decides if it is harvestable
+    # D12 wire (2026-06-29) — glean combustible fuel from a dark exposure (consumes C4, non-fire precursor).
+    GLEAN = 30       # collect peat / coal / oil-shale from a fuel exposure — the world decides if it burns now
 
 
 @dataclass
@@ -136,6 +138,11 @@ class EpisodicMemory:
     # zone last raked (hyperarid / arid / semiarid) — emergent, never told.
     known_saltpan_locations: List[Tuple[float, float]] = field(default_factory=list)
     last_salt_zone: Optional[str] = None
+    # Fuel (C4): durable combustible (peat / coal / oil-shale), learned by acting. ``known_fuel_locations``
+    # are remembered exposures; ``last_fuel_class`` records WHICH fuel last gleaned (PEAT / OIL_SHALE /
+    # COAL) — emergent (the agent learns dark-rock→long-fire by burning it, never told).
+    known_fuel_locations: List[Tuple[float, float]] = field(default_factory=list)
+    last_fuel_class: Optional[str] = None
     capacity_short: int = 32
     capacity_long: int = 256
 
@@ -210,6 +217,7 @@ class AgentRegistry:
     inv_limestone: np.ndarray = field(default=None)
     inv_lime: np.ndarray = field(default=None)
     inv_salt: np.ndarray = field(default=None)
+    inv_fuel: np.ndarray = field(default=None)
     inv_capacity_kg: np.ndarray = field(default=None)
 
     action: np.ndarray = field(default=None)
@@ -252,7 +260,7 @@ class AgentRegistry:
             setattr(self, name, np.full(N, 0.5, dtype=np.float32))
         self.last_mating_tick = np.full(N, -1, dtype=np.int64)
         self.offspring_count = np.zeros(N, dtype=np.int32)
-        for name in ("inv_water","inv_food","inv_wood","inv_stone","inv_metal","inv_tools","inv_pigment","inv_clay","inv_ceramic","inv_limestone","inv_lime","inv_salt"):
+        for name in ("inv_water","inv_food","inv_wood","inv_stone","inv_metal","inv_tools","inv_pigment","inv_clay","inv_ceramic","inv_limestone","inv_lime","inv_salt","inv_fuel"):
             setattr(self, name, np.zeros(N, dtype=np.float32))
         self.inv_capacity_kg = np.full(N, 20.0, dtype=np.float32)
         self.action = np.zeros(N, dtype=np.int32)

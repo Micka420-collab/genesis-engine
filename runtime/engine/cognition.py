@@ -1136,6 +1136,51 @@ def _seek_saltpan(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_fuel(agents, row, obs, sim):
+    """Emergent fuel gleaning — the agent loop's consumption of C4 (a non-fire precursor: the fuel
+    that will FEED fires and kilns rather than be one).
+
+    A survival-satisfied, curious agent that SEES a burnable fuel exposure (``combustible_outcrop.
+    best_fuel_near``, require_burnable) walks there and GLEANs peat / oil-shale / coal into its fuel
+    store (``inv_fuel``). Utility-based: a store of long-burning fuel beats blind exploration. Runs on
+    its OWN inventory, never competing with stone / salt / clay pools.
+
+    Nothing is scripted — the agent perceives a dark matte exposure and *chooses* to glean; the WORLD
+    decides the grade (the cue's ``calorific_grade``) and whether it burns now. A spongy PEAT bog looks
+    like fuel but is too WET to burn (``burnable_now`` False → only a damp fraction until cut & dried,
+    the lie #18); ``best_fuel_near(require_burnable)`` routes to a dry source. Coal is the only
+    smelting-grade fuel — the future enabler of metallurgy.
+
+    Gated on C4 installed (cue cache) — inert wherever combustible_outcrop was never installed. Two
+    hot-loop safety rules mirror the gather wires; NON-MUTATING surface collection (no ``geo.mine_at``;
+    D10 frozen).
+
+    Returns a ``Decision`` (GLEAN if standing on the exposure, else WALK_TO) or ``None`` to fall through.
+    """
+    if sim is None or getattr(sim, "_combustible_cue_cache", None) is None:
+        return None
+    inv_fuel = getattr(agents, "inv_fuel", None)
+    if inv_fuel is None or float(inv_fuel[row]) >= FUEL_SATED_KG:
+        return None
+    if _inventory_mass(agents, row) >= float(agents.inv_capacity_kg[row]) - 1e-3:
+        return None
+    try:
+        from engine import combustible_outcrop as co
+        cue = co.best_fuel_near(sim, int(row), perception_radius_m=FUEL_PERCEPT_M, require_burnable=True)
+    except Exception:
+        return None
+    if cue is None:
+        return None
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.GLEAN), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 # ---------------------------------------------------------------------------
 # Arc-consumption registry (ADR-0009 — D12 debt: « un futur registre de capacités + un budget de
 # perception seront nécessaires »). The ordered list of capability seeks a curious, survival-
@@ -1154,6 +1199,7 @@ _ARC_SEEKS = (
     ("limestone",   _seek_limestone),     # QUARRY     · C6  limestone_outcrop
     ("limekiln",    _seek_limekiln),      # CALCINE    · C10 lime_burning
     ("saltpan",     _seek_saltpan),       # RAKE       · C15 salt_evaporation
+    ("fuel",        _seek_fuel),          # GLEAN      · C4  combustible_outcrop
     ("ochre",       _seek_ochre),         # GRIND      · C18 ochre_grinding
     ("canvas",      _seek_canvas),        # MARK       · C20 rock_canvas
 )
@@ -1481,6 +1527,21 @@ SALTPAN_PERCEPT_M = 160.0     # sight range for salt pans (sparser than outcrops
 SALT_SATED_KG = 3.0           # stop seeking salt once this much is carried
 SALT_HARVEST_KG = 1.5         # salt raked per RAKE on a harvestable pan
 SALT_ABUNDANT_MULT = 1.25     # a copious salar (abundant) yields more per raking
+
+# D12 wire (2026-06-29) — glean durable combustible from a dark exposure (consumes C4
+# combustible_outcrop, a NON-FIRE precursor: the fuel that will FEED fires/kilns rather than be one).
+# A survival-satisfied, curious agent that SEES a burnable fuel exposure (``combustible_outcrop.
+# best_fuel_near``, require_burnable) walks there and GLEANs peat / oil-shale / coal into its fuel
+# store (``inv_fuel``) ∝ its true ``calorific_grade``. The lie #18: a spongy PEAT bog looks like fuel
+# but is too WET to burn now (``burnable_now`` False, ``dry_to_burn`` True → only a damp fraction
+# until cut & dried); ``best_fuel_near(require_burnable)`` routes to a dry source, and gleaning a wet
+# bog teaches it by acting. Coal is the only smelting-grade fuel here — the future enabler of C13
+# metallurgy. NON-MUTATING surface collection (cue ``collect_depth_m`` shallow; no ``geo.mine_at``;
+# D10 frozen). One-line append to the registry (placed after the salt gather).
+FUEL_PERCEPT_M = 96.0         # sight range for fuel exposures (chunk-scale, memoised)
+FUEL_SATED_KG = 4.0           # stop seeking fuel once this much is carried
+FUEL_GLEAN_KG = 1.5           # combustible gleaned per GLEAN, scaled by true calorific_grade
+DAMP_FUEL_FACTOR = 0.2        # a wet (not burnable-now) exposure yields little usable fuel (the lie)
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -2208,6 +2269,56 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "salt_kg": round(float(gained), 4),
             "salinity_ppt": round(float(cue.salinity_ppt), 4),
             "abundant": bool(cue.abundant),
+        })
+        return events
+
+    if act == int(ActionKind.GLEAN):
+        # Glean durable combustible from the dark exposure the agent stands on (C4 combustible_outcrop).
+        # The world never lies about the GRADE or the WET: coal/oil-shale exposed dry glean into rich
+        # long-burning fuel (yield ∝ calorific_grade); a spongy PEAT bog looks like fuel but is too wet
+        # to burn now (burnable_now False → only the damp fraction until cut & dried — mensonge #18). A
+        # spot the world says has no fuel yields nothing. NON-MUTATING surface collection (cue
+        # collect_depth_m shallow; no geo.mine_at), so the mutation frontier (D10) stays frozen. Fills
+        # inv_fuel — the combustible that will FEED fires/kilns (coal is the only smelting-grade fuel).
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_combustible_cue_cache", None) is None:
+            return events
+        inv_fuel = getattr(agents, "inv_fuel", None)
+        if inv_fuel is None:
+            return events
+        cap_left = max(0.0, float(agents.inv_capacity_kg[row]) - _inventory_mass(agents, row))
+        if cap_left <= 1e-3:
+            return events
+        try:
+            from engine import combustible_outcrop as co
+            cue = co.prospect_fuel(sim, px, py)
+        except Exception:
+            return events
+        if cue is None:
+            return events   # the world says: no combustible crops out here
+        burnable = bool(cue.burnable_now)
+        nominal = FUEL_GLEAN_KG * float(cue.calorific_grade) * (1.0 if burnable else DAMP_FUEL_FACTOR)
+        gained = min(nominal, cap_left)
+        inv_fuel[row] = float(inv_fuel[row]) + gained
+        mem = agents.memory[row]
+        if mem is not None:
+            locs = getattr(mem, "known_fuel_locations", None)
+            if locs is not None:
+                locs.append((px, py))
+                if len(locs) > 8:
+                    locs.pop(0)
+            mem.last_fuel_class = cue.fuel_class.name
+            remember_short(agents, row, "fuel",
+                           {"class": cue.fuel_class.name, "material": cue.material})
+        events.append({
+            "kind": "glean",
+            "row": int(row),
+            "fuel_class": cue.fuel_class.name,
+            "material": cue.material,
+            "fuel_kg": round(float(gained), 4),
+            "calorific_grade": round(float(cue.calorific_grade), 4),
+            "burnable_now": burnable,
+            "smelting_grade": bool(cue.smelting_grade),
         })
         return events
 
