@@ -1090,6 +1090,52 @@ def _seek_limekiln(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_saltpan(agents, row, obs, sim):
+    """Emergent solar-salt raking — the agent loop's consumption of C15 (a non-fire / non-thermal
+    precursor; the sun does the work).
+
+    A survival-satisfied, curious agent that SEES a harvestable salt crust
+    (``salt_evaporation.best_saltpan_near``) walks there and RAKEs it into its salt store
+    (``inv_salt``). Utility-based: salt — « white gold », the preservative that will let the future
+    C16 keep meat and fish — beats blind exploration. It runs on its OWN inventory, never competing
+    with stone/clay/limestone pools.
+
+    Nothing is scripted — the agent perceives a white efflorescence on an arid flat and *chooses* to
+    rake; the WORLD decides whether the crust is real (the cue's ``harvestable`` = brine salinity ×
+    arid evaporative deficit) and how rich (``salt_yield``). A salty lagoon in a HUMID climate looks
+    just as wet but never crusts (the lie #17 — the sun never wins against the rain);
+    ``best_saltpan_near`` only ever routes to a real crusted pan.
+
+    Gated on C15 installed (cue cache) — inert wherever salt_evaporation was never installed, like
+    every wire. Two hot-loop safety rules mirror the gather wires: (1) only *read* an installed C15;
+    (2) any error degrades to ``None``. NON-MUTATING surface harvest (no ``geo.mine_at``; D10 frozen).
+
+    Returns a ``Decision`` (RAKE if standing on the pan, else WALK_TO) or ``None`` to fall through.
+    """
+    if sim is None or getattr(sim, "_saltpan_cue_cache", None) is None:
+        return None
+    inv_salt = getattr(agents, "inv_salt", None)
+    if inv_salt is None or float(inv_salt[row]) >= SALT_SATED_KG:
+        return None
+    if _inventory_mass(agents, row) >= float(agents.inv_capacity_kg[row]) - 1e-3:
+        return None
+    try:
+        from engine import salt_evaporation as se
+        cue = se.best_saltpan_near(sim, int(row), perception_radius_m=SALTPAN_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.RAKE), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 # ---------------------------------------------------------------------------
 # Arc-consumption registry (ADR-0009 — D12 debt: « un futur registre de capacités + un budget de
 # perception seront nécessaires »). The ordered list of capability seeks a curious, survival-
@@ -1107,6 +1153,7 @@ _ARC_SEEKS = (
     ("kiln",        _seek_kiln),          # FIRE_CLAY  · C9  ceramic_firing
     ("limestone",   _seek_limestone),     # QUARRY     · C6  limestone_outcrop
     ("limekiln",    _seek_limekiln),      # CALCINE    · C10 lime_burning
+    ("saltpan",     _seek_saltpan),       # RAKE       · C15 salt_evaporation
     ("ochre",       _seek_ochre),         # GRIND      · C18 ochre_grinding
     ("canvas",      _seek_canvas),        # MARK       · C20 rock_canvas
 )
@@ -1420,6 +1467,20 @@ LIMEKILN_PERCEPT_M = 96.0     # sight range for lime-burning sites (chunk-scale,
 CALCINE_STONE_COST_KG = 0.5   # limestone consumed per burn (the block that goes in the fire)
 LIME_YIELD = 0.5              # quicklime mass per burn, scaled by true lime_yield (well-burnt only)
 LIME_SATED_KG = 3.0           # stop seeking to burn once this much quicklime is carried
+
+# D12 wire (2026-06-29) — rake solar salt from an arid brine pan (consumes C15 salt_evaporation, a
+# NON-FIRE / non-thermal precursor: the sun does the work). A survival-satisfied, curious agent that
+# SEES a harvestable salt crust (``salt_evaporation.best_saltpan_near``) walks there and RAKEs it
+# into its salt store (``inv_salt``). Salt is « white gold » — the preservative that will let the
+# future C16 food_curing keep meat and fish, and that structures neolithic trade. The lie #17: a
+# salty lagoon in a HUMID climate looks just as wet but never crusts (``harvestable`` False — the sun
+# never wins against the rain); ``best_saltpan_near`` only ever routes to a real crusted pan, and the
+# yield tracks the world's ``salt_yield`` (abundant salars give more). NON-MUTATING surface harvest
+# (no ``geo.mine_at``; D10 frozen). One-line append to the registry (placed after the lime chain).
+SALTPAN_PERCEPT_M = 160.0     # sight range for salt pans (sparser than outcrops → wider scan)
+SALT_SATED_KG = 3.0           # stop seeking salt once this much is carried
+SALT_HARVEST_KG = 1.5         # salt raked per RAKE on a harvestable pan
+SALT_ABUNDANT_MULT = 1.25     # a copious salar (abundant) yields more per raking
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -2100,6 +2161,53 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "lime_yield": round(float(cue.lime_yield), 4),
             "limestone_kg_spent": round(float(spent), 4),
             "lime_kg": round(float(lime_gain), 4),
+        })
+        return events
+
+    if act == int(ActionKind.RAKE):
+        # Rake the dried salt crust the agent stands on (C15 salt_evaporation). The world never lies
+        # about the CRUST: a brine pan in an arid evaporative climate has a real harvestable salt
+        # crust (yield ∝ salt_yield, more on a copious salar); a salty lagoon in a HUMID climate looks
+        # just as wet but never crusts (mensonge #17 — the sun never wins against the rain, harvestable
+        # False → nothing). A spot the world says has no pan yields nothing. NON-MUTATING surface
+        # harvest (the sun deposited the salt; no geo.mine_at), so the mutation frontier (D10) stays
+        # frozen. Fills inv_salt (« white gold » — the preservative the future C16 food_curing needs).
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_saltpan_cue_cache", None) is None:
+            return events
+        inv_salt = getattr(agents, "inv_salt", None)
+        if inv_salt is None:
+            return events
+        cap_left = max(0.0, float(agents.inv_capacity_kg[row]) - _inventory_mass(agents, row))
+        if cap_left <= 1e-3:
+            return events
+        try:
+            from engine import salt_evaporation as se
+            cue = se.prospect_saltpan(sim, px, py)
+        except Exception:
+            return events
+        if cue is None or not cue.harvestable:
+            return events   # no pan here, or a salty-but-humid lagoon that never crusts → no salt
+        nominal = SALT_HARVEST_KG * (SALT_ABUNDANT_MULT if cue.abundant else 1.0)
+        gained = min(nominal, cap_left)
+        inv_salt[row] = float(inv_salt[row]) + gained
+        mem = agents.memory[row]
+        if mem is not None:
+            locs = getattr(mem, "known_saltpan_locations", None)
+            if locs is not None:
+                locs.append((px, py))
+                if len(locs) > 8:
+                    locs.pop(0)
+            mem.last_salt_zone = cue.zone
+            remember_short(agents, row, "salt",
+                           {"zone": cue.zone, "source": cue.source})
+        events.append({
+            "kind": "rake",
+            "row": int(row),
+            "zone": cue.zone,
+            "salt_kg": round(float(gained), 4),
+            "salinity_ppt": round(float(cue.salinity_ppt), 4),
+            "abundant": bool(cue.abundant),
         })
         return events
 
