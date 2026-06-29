@@ -126,7 +126,7 @@ _AGENT_FIELDS_TO_SAVE = (
     "aggression", "curiosity", "empathy", "intelligence",
     # Inventory
     "inv_water", "inv_food", "inv_wood", "inv_stone", "inv_metal",
-    "inv_tools", "inv_pigment", "inv_clay", "inv_ceramic", "inv_limestone", "inv_capacity_kg",
+    "inv_tools", "inv_pigment", "inv_clay", "inv_ceramic", "inv_limestone", "inv_lime", "inv_capacity_kg",
     # Action state
     "last_mating_tick", "offspring_count", "action",
     "target_x", "target_y", "intent_expires",

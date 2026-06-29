@@ -206,6 +206,7 @@ validate-all: test-python
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p163_clay_digging_loop_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p164_ceramic_firing_loop_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p165_limestone_quarry_loop_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p166_lime_burning_loop_smoke.py
 
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release

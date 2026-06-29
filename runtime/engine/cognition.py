@@ -1038,6 +1038,58 @@ def _seek_limestone(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_limekiln(agents, row, obs, sim):
+    """Emergent lime burning — the agent loop's consumption of C10 (the 2nd two-ingredient
+    transformation, exact mirror of C9: clay→pot :: limestone→lime).
+
+    An agent that ALREADY KNOWS FIRE (``mem.has_made_fire``, from IGNITE/C7) AND CARRIES limestone
+    (``inv_limestone`` ≥ ``CALCINE_STONE_COST_KG``, from QUARRY/C6) and SEES a lime-burning site
+    (``lime_burning.best_burning_site_near``, require_well_burnt) walks there and CALCINEs it into
+    caustic quicklime (``inv_lime``). Utility-based: with the binder stone in hand and fire known, a
+    light caustic lime beats blind exploration. Tried *after* ``_seek_limestone`` (you must have
+    quarried the stone first) — the carbonate analogue of the clay→kiln pair.
+
+    Nothing is scripted — the agent perceives a white stone + a big fire and *chooses* to burn; the
+    WORLD decides the result (the cue's ``lime_yield`` / ``well_burnt``). An open fire only ever
+    SOFT-burns aerial lime — never the hard-burn mortar temperature (``mortar_ready`` always False,
+    that needs a kiln); an under-burnt stone spends the limestone for no usable lime (the refractory
+    inversion, lie #16, learned by acting). ``best_burning_site_near(require_well_burnt)`` routes to
+    the usable burn.
+
+    Gated on C10 installed (cue cache) AND the two ingredients in hand — inert wherever lime_burning
+    was never installed, before the agent has quarried limestone, or before it has ever made fire.
+    Two hot-loop safety rules mirror the other wires; NON-MUTATING (no ``geo.mine_at``; D10 frozen).
+
+    Returns a ``Decision`` (CALCINE if standing on the site, else WALK_TO) or ``None`` to fall through.
+    """
+    if sim is None or getattr(sim, "_lime_burn_cue_cache", None) is None:
+        return None
+    mem = agents.memory[row]
+    if mem is None or not bool(getattr(mem, "has_made_fire", False)):
+        return None   # cannot burn lime without first knowing how to make a fire (C7 dependency)
+    if float(agents.inv_limestone[row]) < CALCINE_STONE_COST_KG:
+        return None   # no quarried limestone in hand to burn (C6/QUARRY dependency)
+    inv_lime = getattr(agents, "inv_lime", None)
+    if inv_lime is not None and float(inv_lime[row]) >= LIME_SATED_KG:
+        return None
+    try:
+        from engine import lime_burning as lb
+        cue = lb.best_burning_site_near(sim, int(row), perception_radius_m=LIMEKILN_PERCEPT_M,
+                                        require_well_burnt=True)
+    except Exception:
+        return None
+    if cue is None:
+        return None   # the world says: no usable lime to be burnt within sight
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.CALCINE), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 # ---------------------------------------------------------------------------
 # Arc-consumption registry (ADR-0009 — D12 debt: « un futur registre de capacités + un budget de
 # perception seront nécessaires »). The ordered list of capability seeks a curious, survival-
@@ -1054,6 +1106,7 @@ _ARC_SEEKS = (
     ("clay",        _seek_clay),          # DIG        · C5  clay_outcrop
     ("kiln",        _seek_kiln),          # FIRE_CLAY  · C9  ceramic_firing
     ("limestone",   _seek_limestone),     # QUARRY     · C6  limestone_outcrop
+    ("limekiln",    _seek_limekiln),      # CALCINE    · C10 lime_burning
     ("ochre",       _seek_ochre),         # GRIND      · C18 ochre_grinding
     ("canvas",      _seek_canvas),        # MARK       · C20 rock_canvas
 )
@@ -1352,6 +1405,21 @@ CERAMIC_SATED_KG = 3.0        # stop seeking to fire once this much pottery is c
 QUARRY_PERCEPT_M = 96.0       # sight range for carbonate banks (chunk-scale, memoised)
 LIMESTONE_SATED_KG = 4.0      # stop seeking limestone once this much is carried
 QUARRY_STONE_KG = 1.5         # carbonate quarried per QUARRY, scaled by true lime_grade
+
+# D12 wire (2026-06-29) — burn carried limestone into quicklime (consumes C10 lime_burning = C6 ×
+# C7, the 2nd two-ingredient transformation, exact mirror of C9 FIRE_CLAY: clay→pot :: limestone→lime).
+# An agent that KNOWS FIRE (``has_made_fire``) AND CARRIES limestone (``inv_limestone`` ≥ cost, from
+# QUARRY/C6) at a burning site (``lime_burning.best_burning_site_near``) CALCINEs it → caustic
+# quicklime (``inv_lime``) ∝ the world-committed ``lime_yield``. The lie #16 (the same refractory
+# inversion as C9): an OPEN fire only ever SOFT-burns aerial lime — it never reaches hard-burn /
+# mortar temperature (``mortar_ready`` always False, needs a kiln); and an under-burnt stone (fire too
+# cool / impure carbonate) spends the limestone for NO usable lime (a raw core that re-carbonates).
+# ``best_burning_site_near(require_well_burnt)`` routes to the usable burn; learned by acting. Gated on
+# C10 installed AND limestone-in-hand AND the fire skill. NON-MUTATING (no geo.mine_at; D10 frozen).
+LIMEKILN_PERCEPT_M = 96.0     # sight range for lime-burning sites (chunk-scale, memoised)
+CALCINE_STONE_COST_KG = 0.5   # limestone consumed per burn (the block that goes in the fire)
+LIME_YIELD = 0.5              # quicklime mass per burn, scaled by true lime_yield (well-burnt only)
+LIME_SATED_KG = 3.0           # stop seeking to burn once this much quicklime is carried
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -1978,6 +2046,60 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "lime_grade": round(float(cue.lime_grade), 4),
             "mortar_grade": bool(cue.mortar_grade),
             "dressable_now": bool(cue.dressable_now),
+        })
+        return events
+
+    if act == int(ActionKind.CALCINE):
+        # Burn carried limestone the agent quarried (C6) in the fire it knows how to make (C10
+        # lime_burning — the 2nd two-ingredient transformation, mirror of C9 FIRE_CLAY). It spends
+        # inv_limestone and, if the burn is WELL-BURNT, yields caustic quicklime (inv_lime ∝
+        # lime_yield). The world never lies about the RESULT: an open fire only ever SOFT-burns aerial
+        # lime — never the hard-burn mortar temperature (cue.mortar_ready always False, needs a kiln);
+        # an under-burnt stone (fire too cool / impure carbonate) is spent for no usable lime — a raw
+        # core that re-carbonates (the refractory inversion, lie #16, learned by acting). Requires both
+        # ingredients in hand (has_made_fire + inv_limestone). NON-MUTATING (no geo.mine_at; D10 frozen).
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_lime_burn_cue_cache", None) is None:
+            return events
+        mem = agents.memory[row]
+        if mem is None or not bool(getattr(mem, "has_made_fire", False)):
+            return events   # cannot burn lime without first knowing how to make a fire
+        if float(agents.inv_limestone[row]) < CALCINE_STONE_COST_KG:
+            return events   # no quarried limestone in hand to burn
+        try:
+            from engine import lime_burning as lb
+            cue = lb.prospect_lime_burning(sim, px, py)
+        except Exception:
+            return events
+        if cue is None or not cue.burnable:
+            return events   # the world says: no carbonate+fire here → nothing to burn
+        # The block goes into the fire — the limestone is spent whether or not it burns well.
+        spent = min(CALCINE_STONE_COST_KG, float(agents.inv_limestone[row]))
+        agents.inv_limestone[row] = float(agents.inv_limestone[row]) - spent
+        lime_gain = 0.0
+        if cue.well_burnt:
+            lime_gain = LIME_YIELD * float(cue.lime_yield)
+            agents.inv_lime[row] = float(agents.inv_lime[row]) + lime_gain
+            mem.has_burnt_lime = True
+            mem.last_lime_yield = float(cue.lime_yield)
+        # else: under-burnt — a raw core that re-carbonates, no usable lime (the lie, learned by acting).
+        locs = getattr(mem, "known_limekiln_locations", None)
+        if locs is not None:
+            locs.append((px, py))
+            if len(locs) > 8:
+                locs.pop(0)
+        remember_short(agents, row, "lime",
+                       {"class": cue.lime_class, "well_burnt": bool(cue.well_burnt)})
+        events.append({
+            "kind": "calcine",
+            "row": int(row),
+            "lime_class": cue.lime_class,
+            "calcination_extent": round(float(cue.calcination_extent), 4),
+            "well_burnt": bool(cue.well_burnt),
+            "mortar_ready": bool(cue.mortar_ready),
+            "lime_yield": round(float(cue.lime_yield), 4),
+            "limestone_kg_spent": round(float(spent), 4),
+            "lime_kg": round(float(lime_gain), 4),
         })
         return events
 
