@@ -32,6 +32,16 @@ dev = [
   # but the file checks fail. Listing here keeps `make doctor` + CI honest.
   "Pillow>=10",
 ]
+# Compute-donation network module (`network/`, agrégé par `make network`). Autonome —
+# pas requis pour runtime/engine, mais le step CI « Genesis Network (lint + tests +
+# smoke) » importe ces deps. Sans ce groupe, `make network` casse à l'import fastapi
+# (audit 2026-06-29 : la dépendance n'avait jamais été déclarée depuis l'ajout du step
+# CI en 75c47fd, masqué par les échecs précoces lint/pytest).
+network = [
+  "fastapi>=0.110",
+  "uvicorn>=0.27",
+  "pydantic>=2.5",
+]
 
 [tool.setuptools]
 package-dir = { "" = "runtime" }
