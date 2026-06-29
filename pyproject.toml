@@ -41,6 +41,10 @@ network = [
   "fastapi>=0.110",
   "uvicorn>=0.27",
   "pydantic>=2.5",
+  # `network/tests/test_network.py` uses fastapi.testclient (starlette.TestClient),
+  # which requires httpx at runtime. Not a transitive of fastapi itself in recent
+  # versions, so it must be declared.
+  "httpx>=0.27",
 ]
 
 [tool.setuptools]
