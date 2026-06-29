@@ -84,6 +84,10 @@ class ActionKind(IntEnum):
     GLEAN = 30       # collect peat / coal / oil-shale from a fuel exposure — the world decides if it burns now
     # D12 wire (2026-06-29) — line a hearth with clay into a draught kiln (consumes C11 = C5 clay × C7 fire).
     RAISE_KILN = 31  # enclose a fire in clay walls → a hotter updraft kiln — the world decides its peak temp
+    # D12 wire (2026-06-29) — preserve raw food with carried salt (consumes C16 food_curing × C15 salt).
+    # 1ʳᵉ capacité dont l'intrant est le PRODUIT d'une cap. précédente (le sel raté à RAKE) ET de la nourriture
+    # foragée — la chaîne « ramasser → saler → garder ». NON-FIRE / non-thermal (osmose du sel, pas la chaleur).
+    CURE = 32        # salt raw food into preserved cured food — the world decides the shelf life
 
 
 @dataclass
@@ -151,6 +155,13 @@ class EpisodicMemory:
     known_kiln_site_locations: List[Tuple[float, float]] = field(default_factory=list)
     has_built_kiln: bool = False
     last_kiln_peak_c: Optional[float] = None
+    # Salaison (C16): la 1ʳᵉ conservation, apprise en agissant. ``has_cured_food`` est le drapeau de
+    # découverte (l'agent sait désormais que sel + viande crue → réserve qui tient des mois) ;
+    # ``last_preservation_class`` enregistre la CLASSE de conservation atteinte (PERISHABLE /
+    # SEMI_CURED / CURED / SHELF_STABLE) — émergent, jamais dit (l'agent l'apprend en regardant
+    # ses propres provisions tenir ou pourrir).
+    has_cured_food: bool = False
+    last_preservation_class: Optional[str] = None
     capacity_short: int = 32
     capacity_long: int = 256
 
@@ -226,6 +237,12 @@ class AgentRegistry:
     inv_lime: np.ndarray = field(default=None)
     inv_salt: np.ndarray = field(default=None)
     inv_fuel: np.ndarray = field(default=None)
+    # D12 wire (C16 food_curing) — la nourriture salée mise en réserve. Garde la dichotomie
+    # ``inv_food`` (frais, périssable, mais le plus appétissant — le mensonge #7) vs
+    # ``inv_cured_food`` (terne, salé, mais tient des mois). Sépare les pools pour qu'EAT
+    # arbitre l'attrait immédiat contre la conservation, plutôt que d'écraser un produit
+    # de transformation dans le pool des intrants bruts.
+    inv_cured_food: np.ndarray = field(default=None)
     inv_capacity_kg: np.ndarray = field(default=None)
 
     action: np.ndarray = field(default=None)
@@ -268,7 +285,7 @@ class AgentRegistry:
             setattr(self, name, np.full(N, 0.5, dtype=np.float32))
         self.last_mating_tick = np.full(N, -1, dtype=np.int64)
         self.offspring_count = np.zeros(N, dtype=np.int32)
-        for name in ("inv_water","inv_food","inv_wood","inv_stone","inv_metal","inv_tools","inv_pigment","inv_clay","inv_ceramic","inv_limestone","inv_lime","inv_salt","inv_fuel"):
+        for name in ("inv_water","inv_food","inv_wood","inv_stone","inv_metal","inv_tools","inv_pigment","inv_clay","inv_ceramic","inv_limestone","inv_lime","inv_salt","inv_fuel","inv_cured_food"):
             setattr(self, name, np.zeros(N, dtype=np.float32))
         self.inv_capacity_kg = np.full(N, 20.0, dtype=np.float32)
         self.action = np.zeros(N, dtype=np.int32)
