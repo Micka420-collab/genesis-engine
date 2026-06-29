@@ -535,7 +535,8 @@ def decide(agents, obs, sim=None):
         # art. Having made fire, it puts that heat to its FIRST use on matter: it
         # TEMPERs a silica nodule (C8) for a keener edge than cold stone gives —
         # tools before art. It also DIGs workable clay (C5) into its clay store — the
-        # matter of the future pot, a non-fire precursor. Then it grinds a usable ochre pigment (C18) — the symbol's matter
+        # matter of the future pot, a non-fire precursor — and, holding clay AND knowing fire, FIREs
+        # it into irreversible pottery (C9, the arc closing on itself: clay→fire→pot). Then it grinds a usable ochre pigment (C18) — the symbol's matter
         # after the tool, on its own inventory — and, holding a colour, leaves a
         # MARK on a paintable carbonate wall (C20) — the symbol's mark after its
         # matter. All emergent, never scripted; each inert unless its capability is
@@ -555,6 +556,9 @@ def decide(agents, obs, sim=None):
         dg = _seek_clay(agents, row, obs, sim)
         if dg is not None:
             return dg
+        kn = _seek_kiln(agents, row, obs, sim)
+        if kn is not None:
+            return kn
         oc = _seek_ochre(agents, row, obs, sim)
         if oc is not None:
             return oc
@@ -958,6 +962,62 @@ def _seek_clay(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_kiln(agents, row, obs, sim):
+    """Emergent pottery firing — the agent loop's consumption of C9 (the founding neolithic
+    transformation, and the FIRST wire whose inputs are two prior wires' products).
+
+    An agent that ALREADY KNOWS FIRE (``mem.has_made_fire``, from IGNITE/C7) AND CARRIES dug clay
+    (``inv_clay`` ≥ ``FIRE_CLAY_COST_KG``, from DIG/C5) and SEES a firing site
+    (``ceramic_firing.best_firing_site_near``) walks there and FIREs its clay into pottery instead
+    of wandering. Utility-based action selection: with clay in hand and fire known, an irreversible
+    vessel beats blind exploration. Tried *after* ``_seek_clay`` (you must have dug clay first) and
+    before the symbolic ``_seek_ochre`` / ``_seek_canvas``. This is the arc closing on itself:
+    clay→fire→pot.
+
+    Nothing is scripted — the agent perceives a clay+fire spot and *chooses* to fire; the WORLD
+    decides the result (the cue's ``ware_quality`` / ``is_sound``). An open fire never reaches kiln
+    heat: the humble earthenware shale fires SOUND, while the pretty kaolin stays under-fired
+    (``best_firing_site_near`` with ``require_sound`` routes to the sound ware; firing an under-fired
+    site spends the clay for no vessel — the refractory inversion lie #14, learned by acting).
+
+    Gated on C9 installed (its cue cache exists) AND on the two ingredients being in hand — so this
+    is fully inert wherever ceramic_firing was never installed, before the agent has dug clay, or
+    before it has ever made fire. Two hot-loop safety rules mirror the other wires: (1) only *read* an
+    already installed C9 — never ``install_*`` mid-iteration; (2) any error degrades to ``None``
+    (ordinary exploration), never crashes the tick. NON-MUTATING — firing consumes no geology (no
+    ``geo.mine_at``; D10 frozen).
+
+    Returns a ``Decision`` (FIRE_CLAY if standing on the site, else WALK_TO) or ``None`` to fall through.
+    """
+    if sim is None or getattr(sim, "_firing_cue_cache", None) is None:
+        return None
+    mem = agents.memory[row]
+    if mem is None or not bool(getattr(mem, "has_made_fire", False)):
+        return None   # cannot fire pottery without first knowing how to make a fire (C7 dependency)
+    if float(agents.inv_clay[row]) < FIRE_CLAY_COST_KG:
+        return None   # no shaped clay in hand to fire (C5/DIG dependency — the milestone)
+    inv_cer = getattr(agents, "inv_ceramic", None)
+    if inv_cer is not None and float(inv_cer[row]) >= CERAMIC_SATED_KG:
+        return None
+    try:
+        from engine import ceramic_firing as cf
+        cue = cf.best_firing_site_near(sim, int(row), perception_radius_m=KILN_PERCEPT_M,
+                                       require_sound=True)
+    except Exception:
+        return None
+    if cue is None:
+        return None   # the world says: no sound pot to be fired within sight
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as the other wires: above random EXPLORE (0.3), below survival.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.FIRE_CLAY), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 def _act_on(agents, row, obs, drive_kind):
     nearest = obs.nearest
     if drive_kind == int(DriveKind.THIRST):
@@ -1200,6 +1260,22 @@ CLAY_PERCEPT_M = 96.0         # sight range for clay banks (chunk-scale, memoise
 CLAY_SATED_KG = 4.0           # stop seeking clay once this much is carried
 CLAY_DIG_KG = 1.5             # raw clay dug per DIG, scaled by true pottery_grade
 DAMP_CLAY_FACTOR = 0.25       # clay outside the plastic window yields little usable clay (the lie)
+
+# D12 wire (2026-06-29) — fire shaped clay into pottery (consumes C9 ceramic_firing = C5 clay × C7
+# fire — the founding NEOLITHIC TRANSFORMATION, and the FIRST wire to consume a material another
+# wire makes harvestable). An agent that ALREADY KNOWS FIRE (``has_made_fire``) AND CARRIES dug clay
+# (``inv_clay`` ≥ cost, from DIG/C5) at a firing site (``ceramic_firing.best_firing_site_near``) FIRES
+# it → irreversible ceramic (``inv_ceramic``) ∝ the world-committed ``ware_quality``. This closes the
+# arc clay→fire→pot: the first behaviour whose inputs are TWO prior wires' products. The lie #14 (the
+# refractory inversion): an OPEN fire never reaches kiln temperature, so the humble earthenware shale
+# fires SOUND while the *pretty* kaolin stays under-fired (chalky, re-slakes) — ``best_firing_site_near``
+# routes to the sound ware, and firing an under-fired site spends the clay for no usable vessel
+# (learned by acting). Tried after ``_seek_clay`` (you must have dug clay first). NON-MUTATING: no
+# ``geo.mine_at`` (D10 frozen). Gated on C9 installed AND clay-in-hand AND the fire skill.
+KILN_PERCEPT_M = 96.0         # sight range for firing sites (chunk-scale, memoised)
+FIRE_CLAY_COST_KG = 0.5       # raw clay consumed per firing (the shaped vessel that goes in the fire)
+CERAMIC_YIELD = 0.5           # fired-vessel mass per firing, scaled by true ware_quality (sound firings only)
+CERAMIC_SATED_KG = 3.0        # stop seeking to fire once this much pottery is carried
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -1721,6 +1797,62 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "pottery_grade": round(float(cue.pottery_grade), 4),
             "workable_now": workable,
             "ceramic_grade": bool(cue.ceramic_grade),
+        })
+        return events
+
+    if act == int(ActionKind.FIRE_CLAY):
+        # Fire shaped clay the agent CARRIES in the fire it knows how to make (C9 ceramic_firing —
+        # the founding neolithic transformation, and the FIRST consumer of a material another wire
+        # makes: it spends inv_clay (dug by DIG/C5) and, knowing fire (IGNITE/C7), bakes it into
+        # irreversible pottery. The world never lies about the RESULT: an open fire never reaches
+        # kiln heat, so the humble earthenware shale fires SOUND (inv_ceramic ∝ ware_quality) while
+        # the pretty kaolin stays UNDER-FIRED — chalky, re-slakes — and the clay is spent for no
+        # usable vessel (the refractory inversion, lie #14, learned by acting). Requires both
+        # ingredients in hand (has_made_fire + inv_clay) — the arc closing on itself, clay→fire→pot.
+        # NON-MUTATING: firing consumes no geology (no geo.mine_at), so the mutation frontier (D10)
+        # stays frozen.
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_firing_cue_cache", None) is None:
+            return events
+        mem = agents.memory[row]
+        if mem is None or not bool(getattr(mem, "has_made_fire", False)):
+            return events   # cannot fire pottery without first knowing how to make a fire
+        if float(agents.inv_clay[row]) < FIRE_CLAY_COST_KG:
+            return events   # no shaped clay in hand to fire
+        try:
+            from engine import ceramic_firing as cf
+            cue = cf.prospect_firing(sim, px, py)
+        except Exception:
+            return events
+        if cue is None or not cue.fireable:
+            return events   # the world says: no clay+fire here → nothing to fire
+        # The shaped vessel goes into the fire — the clay is spent whether or not it fires sound.
+        spent = min(FIRE_CLAY_COST_KG, float(agents.inv_clay[row]))
+        agents.inv_clay[row] = float(agents.inv_clay[row]) - spent
+        ceramic_gain = 0.0
+        if cue.is_sound:
+            ceramic_gain = CERAMIC_YIELD * float(cue.ware_quality)
+            agents.inv_ceramic[row] = float(agents.inv_ceramic[row]) + ceramic_gain
+            mem.has_fired_pottery = True
+            mem.last_ware_quality = float(cue.ware_quality)
+        # else: under-fired — the clay crumbled, no usable vessel (the lie, learned by acting).
+        locs = getattr(mem, "known_kiln_locations", None)
+        if locs is not None:
+            locs.append((px, py))
+            if len(locs) > 8:
+                locs.pop(0)
+        remember_short(agents, row, "firing",
+                       {"clay": cue.clay_class, "sound": bool(cue.is_sound)})
+        events.append({
+            "kind": "fire_clay",
+            "row": int(row),
+            "clay_class": cue.clay_class,
+            "ware_quality": round(float(cue.ware_quality), 4),
+            "firedness": round(float(cue.firedness), 4),
+            "is_sound": bool(cue.is_sound),
+            "watertight": bool(cue.watertight),
+            "clay_kg_spent": round(float(spent), 4),
+            "ceramic_kg": round(float(ceramic_gain), 4),
         })
         return events
 
