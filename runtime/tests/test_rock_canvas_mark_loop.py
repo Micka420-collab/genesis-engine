@@ -137,6 +137,13 @@ def _calm_curious(sim, row):
     for inv in ("inv_food", "inv_water", "inv_wood", "inv_stone",
                 "inv_metal", "inv_tools", "inv_pigment"):
         getattr(sim.agents, inv)[row] = 0.0
+    # Pre-saturate ``inv_limestone`` past ``LIMESTONE_SATED_KG`` so the limestone seek skips. The
+    # rock-canvas installer (C20) transitively installs C6 limestone_outcrop, so a curious agent
+    # standing on a paintable carbonate wall would otherwise prefer QUARRY over MARK (the
+    # limestone seek precedes canvas in the registry). This mirrors a real agent that has already
+    # gathered limestone — the canvas mark is its NEXT step. Discovered after CI surfaced the
+    # registry-composition collision once the lint short-circuit was lifted (2026-06-29).
+    sim.agents.inv_limestone[row] = cog.LIMESTONE_SATED_KG + 0.1
     sim.agents.memory[row].known_canvas_locations.clear()
     sim.agents.memory[row].last_pigment_hue = None
 
