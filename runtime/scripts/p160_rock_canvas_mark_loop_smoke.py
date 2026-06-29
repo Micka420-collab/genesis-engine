@@ -149,6 +149,11 @@ def _calm_curious(sim, row):
     for inv in ("inv_food", "inv_water", "inv_wood", "inv_stone",
                 "inv_metal", "inv_tools", "inv_pigment"):
         getattr(sim.agents, inv)[row] = 0.0
+    # Pre-saturate ``inv_limestone`` past sated: rock_canvas (C20) transitively installs C6
+    # limestone_outcrop, so the limestone seek would otherwise prefer QUARRY over MARK on a
+    # paintable carbonate wall (limestone precedes canvas in the registry). Mirrors a real
+    # agent that has already gathered limestone — its NEXT step is the mark.
+    sim.agents.inv_limestone[row] = cog.LIMESTONE_SATED_KG + 0.1
     sim.agents.memory[row].known_canvas_locations.clear()
     sim.agents.memory[row].last_pigment_hue = None
 
