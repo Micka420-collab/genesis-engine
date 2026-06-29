@@ -525,46 +525,16 @@ def decide(agents, obs, sim=None):
 
     curiosity = float(agents.curiosity[row])
     if curiosity > 0.6:
-        # D12 wire: before wandering at random, a curious agent invests idle
-        # time in useful resources it can SEE (survival is already satisfied here).
-        # Gathering frost-detached clasts (C14) is tried first — where the cold
-        # has already broken sound clasts loose at one's feet, stooping to pick
-        # them up beats knapping an in-situ outcrop. Else, debit a knappable
-        # outcrop (C2). With tool-stone secured (or none in sight), if it is chilly
-        # (or has never made fire) it STRIKES a fire (C7, the VOÛTE) — warmth before
-        # art. Having made fire, it puts that heat to its FIRST use on matter: it
-        # TEMPERs a silica nodule (C8) for a keener edge than cold stone gives —
-        # tools before art. It also DIGs workable clay (C5) into its clay store — the
-        # matter of the future pot, a non-fire precursor — and, holding clay AND knowing fire, FIREs
-        # it into irreversible pottery (C9, the arc closing on itself: clay→fire→pot). Then it grinds a usable ochre pigment (C18) — the symbol's matter
-        # after the tool, on its own inventory — and, holding a colour, leaves a
-        # MARK on a paintable carbonate wall (C20) — the symbol's mark after its
-        # matter. All emergent, never scripted; each inert unless its capability is
-        # installed, so none perturbs the others' scenarios.
-        fc = _seek_frost_clast(agents, row, obs, sim)
-        if fc is not None:
-            return fc
-        ts = _seek_toolstone(agents, row, obs, sim)
-        if ts is not None:
-            return ts
-        fs = _seek_firesite(agents, row, obs, sim)
-        if fs is not None:
-            return fs
-        tp = _seek_tempersite(agents, row, obs, sim)
-        if tp is not None:
-            return tp
-        dg = _seek_clay(agents, row, obs, sim)
-        if dg is not None:
-            return dg
-        kn = _seek_kiln(agents, row, obs, sim)
-        if kn is not None:
-            return kn
-        oc = _seek_ochre(agents, row, obs, sim)
-        if oc is not None:
-            return oc
-        mk = _seek_canvas(agents, row, obs, sim)
-        if mk is not None:
-            return mk
+        # D12 (ADR-0009): before wandering at random, a curious agent invests idle time in useful
+        # resources it can SEE (survival is already satisfied here). The capabilities it can consume
+        # live in the ordered ``_ARC_SEEKS`` registry — survival/tools → fire → transforms → symbol —
+        # evaluated in canonical order under a perception budget; the FIRST actionable one wins. Each
+        # seek is gated on its capability's cue cache (inert if the capability isn't installed), so
+        # none perturbs the others' scenarios. Adding a wire is a one-line append to the registry —
+        # the decide() body no longer grows with the arc. All emergent, never scripted.
+        d = _run_arc_seeks(agents, row, obs, sim)
+        if d is not None:
+            return d
         ang = float(agents.heading[row]) + (curiosity - 0.5) * 0.8
         tx = obs.pos[0] + math.cos(ang) * 20.0
         ty = obs.pos[1] + math.sin(ang) * 20.0
@@ -1016,6 +986,48 @@ def _seek_kiln(agents, row, obs, sim):
     if d < INTERACT_RADIUS_M:
         return Decision(int(ActionKind.FIRE_CLAY), tx, ty, conf)
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
+# ---------------------------------------------------------------------------
+# Arc-consumption registry (ADR-0009 — D12 debt: « un futur registre de capacités + un budget de
+# perception seront nécessaires »). The ordered list of capability seeks a curious, survival-
+# satisfied agent evaluates before falling back to EXPLORE. ORDER IS LOAD-BEARING and canonical:
+# survival/tools (GATHER, KNAP) → fire (IGNITE) → fire-transforms (TEMPER, then DIG clay feeding
+# FIRE_CLAY) → symbol (GRIND, MARK). Adding a wire = append one tuple here; ``decide()`` no longer
+# grows. Each seek self-gates on its capability's cue cache, so an entry is inert wherever its
+# capability isn't installed. Kept in sync with ``ActionKind`` by ``test_arc_seek_registry``.
+_ARC_SEEKS = (
+    ("frost_clast", _seek_frost_clast),   # GATHER     · C14 cryoclasty
+    ("toolstone",   _seek_toolstone),     # KNAP       · C2  lithic_outcrop
+    ("firesite",    _seek_firesite),      # IGNITE     · C7  fire_ignition (the VOÛTE)
+    ("tempersite",  _seek_tempersite),    # TEMPER     · C8  lithic_tempering
+    ("clay",        _seek_clay),          # DIG        · C5  clay_outcrop
+    ("kiln",        _seek_kiln),          # FIRE_CLAY  · C9  ceramic_firing
+    ("ochre",       _seek_ochre),         # GRIND      · C18 ochre_grinding
+    ("canvas",      _seek_canvas),        # MARK       · C20 rock_canvas
+)
+
+# Perception budget — the maximum number of arc seeks evaluated per agent-tick, bounding the hot
+# loop as the registry grows (ADR-0009). Set comfortably above the whole 20-capability arc, so it is
+# a no-op during the wiring campaign (behaviour identical to the former hand-written sequence); it is
+# the knob to lower — with explicit survival-first priority tiers — if profiling ever shows the
+# per-tick seek cost biting. Cues are memoised and every seek early-returns on a missing cache, so
+# the present per-tick cost is a handful of dict lookups.
+ARC_SEEK_BUDGET = 24
+
+
+def _run_arc_seeks(agents, row, obs, sim):
+    """Evaluate the ``_ARC_SEEKS`` in canonical order, returning the first actionable ``Decision``
+    (or ``None`` to fall through to EXPLORE). At most ``ARC_SEEK_BUDGET`` seeks are evaluated per
+    call. Behaviour-identical to the previous inlined sequence while ``ARC_SEEK_BUDGET`` ≥
+    ``len(_ARC_SEEKS)`` — which it is for the full arc."""
+    for i, (_name, seek) in enumerate(_ARC_SEEKS):
+        if i >= ARC_SEEK_BUDGET:
+            break
+        d = seek(agents, row, obs, sim)
+        if d is not None:
+            return d
+    return None
 
 
 def _act_on(agents, row, obs, drive_kind):
