@@ -260,11 +260,8 @@ def main() -> int:
         s2, _c2 = _build()
         _calm_curious(s2, 0, tool_secured=True)
         px, py = _stand(s2, 0, coord)
-        cue = lt.temper_cue_for_chunk(s2, coord)
         ev = _ORIG_APPLY(s2.agents, 0, cog.Decision(int(ActionKind.TEMPER), px, py, 0.5),
                          s2.streamer, s2.tick, sim=s2)
-        ok = bool(ev and ev[-1]["kind"] == "temper"
-                  and ev[-1]["tempered_quality"] == round(float(cue.tempered_quality), 4))
         gains[label] = float(ev[-1]["quality_gain"]) if ev else 0.0
         detail2.append(f"{label}Δ={gains.get(label)}")
     truth_ok = ("chert" in gains and gains["chert"] > 0.0
