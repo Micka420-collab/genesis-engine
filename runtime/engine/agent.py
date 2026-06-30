@@ -94,6 +94,14 @@ class ActionKind(IntEnum):
     # the copper-smelting threshold. Fire-based (the furnace) → D9 0→1 after the non-fire CURE.
     # NON-MUTATING (no geo.mine_at; D10 frozen).
     FORCE_DRAUGHT = 33  # blow air into the charcoal kiln → a hotter forced furnace — the world decides its peak
+    # D12 wire (2026-06-30) — read a surface weathering stain and remember a buried ore site (consumes
+    # C1 surface_mineralization). The 1ʳᵉ acte purement cognitif/visuel : the agent perceives a coloured
+    # outcrop (malachite green / gossan rust / sulfur yellow / salt-bloom white / placer gold) and LEARNS
+    # by association — colour ⇒ what lies beneath. Self-limiting per expression group (each colour is its
+    # own discovery, once learned the agent stops re-seeking the same group). Posera la fondation
+    # cognitive du futur D10 (C13 cuivre / C17 fer) sans franchir la mutation. NON-FIRE (visuel) → D9
+    # alternance 1→0 après FORCE_DRAUGHT. NON-MUTATING (no inventory, no geo.mine_at; D10 frozen).
+    PROSPECT = 34  # read the colour of the earth and remember it — the world decides what its colour means
 
 
 @dataclass
@@ -175,6 +183,18 @@ class EpisodicMemory:
     # ses propres provisions tenir ou pourrir).
     has_cured_food: bool = False
     last_preservation_class: Optional[str] = None
+    # Prospection (C1) : le 1ᵉʳ acte purement cognitif/visuel — apprendre par association couleur → ce
+    # qui se trouve dessous, sans rien creuser. ``has_prospected_ore`` est le drapeau de découverte
+    # (l'agent sait désormais que la terre porte des couleurs qui *signifient* quelque chose) ; chaque
+    # GROUPE d'expression (malachite verte / chapeau de fer rouille / soufre jaune / sel blanc / placer
+    # doré) est sa PROPRE découverte, suivie dans ``prospected_ore_groups`` (auto-limite : l'agent ne
+    # re-prospecte pas un groupe déjà rencontré). ``known_ore_sites`` mémorise (group, x, y) — la
+    # carte cognitive des indices vus, qui servira à des wires futurs (C13 cuivre, C17 fer) sans
+    # franchir D10. ``last_prospect_group`` enregistre le dernier groupe lu — émergent, jamais dit.
+    known_ore_sites: List[Tuple[str, float, float]] = field(default_factory=list)
+    prospected_ore_groups: List[str] = field(default_factory=list)
+    has_prospected_ore: bool = False
+    last_prospect_group: Optional[str] = None
     capacity_short: int = 32
     capacity_long: int = 256
 

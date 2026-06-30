@@ -1281,6 +1281,77 @@ def _seek_forcedraught(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_prospect(agents, row, obs, sim):
+    """Emergent prospecting — the agent loop's consumption of C1 (the 1ᵉʳ ACTE COGNITIF / VISUEL).
+
+    A survival-satisfied, curious agent that SEES a coloured weathering stain on the ground
+    (``surface_mineralization.discover_by_sight`` — malachite green / gossan rust / sulfur yellow /
+    salt-bloom white / placer gold) and HAS NOT YET READ that colour (``mem.prospected_ore_groups``)
+    walks there and PROSPECTs — *learning by association* what lies below. Utility-based action
+    selection: with survival/tools/fire/transforms handled, building the cognitive map of WHICH
+    earth-colour HOLDS WHICH ore beats wandering blind. Tried *last* in the registry (after the
+    symbolic ``_seek_canvas``) because the gain is purely deferred — the agent today gains nothing
+    portable, only a memory that future C13/C17 wires will consume.
+
+    Nothing is scripted — the agent perceives a stain and *chooses* to read it; the WORLD decides
+    what the colour MEANS (the cue's ``mineral`` / ``dig_depth_m`` / ``mass_fraction``). A
+    surface stain truly marks a buried body (the C1 invariant: the colour is honest about the column
+    below); the AGENT does not know that yet — they read the colour today, in a later capacity they
+    will MINE there and DISCOVER what lay beneath (the colour↔ore link learned by acting).
+
+    Self-limiting per expression GROUP: each colour (copper / gossan / sulfur / salt / gold_placer)
+    is its OWN discovery. Once the agent has prospected a group, the wire ignores fresh stains of
+    that same group and looks for a different colour — the discovery tree branches by sight, not by
+    repetition. With 5 groups it caps naturally at 5 prospects per lifetime (the « 5 mensonges du
+    sol » to learn). The agent steers to the NEAREST unread stain (``discover_by_sight`` already
+    returns chunks ordered by squared distance to the agent).
+
+    Gated on C1 being installed (its cue cache exists) — fully inert wherever surface_mineralization
+    was never installed (forced_draught already pulls C1, so this wire goes live alongside any
+    C12-installed world). Two hot-loop safety rules mirror the other wires: (1) only *read* an
+    already installed C1 — never ``install_*`` mid-iteration; (2) any error degrades to ``None``
+    (ordinary exploration), never crashes the tick. NON-MUTATING (no inventory consumed — purely
+    cognitive ; no ``geo.mine_at`` ; D10 frozen). NON-FIRE (visual / cognitive — the alternance
+    pendant of the fire-based FORCE_DRAUGHT, D9 1→0).
+
+    Returns a ``Decision`` (PROSPECT if standing on the stain, else WALK_TO) or ``None`` to fall
+    through to ordinary exploration.
+    """
+    if sim is None or getattr(sim, "_surface_cue_cache", None) is None:
+        return None
+    mem = agents.memory[row]
+    if mem is None:
+        return None
+    known = getattr(mem, "prospected_ore_groups", None)
+    if known is None:
+        return None
+    if len(known) >= PROSPECT_MAX_GROUPS:
+        return None   # all 5 surface expression groups already read — no more colours to discover
+    try:
+        from engine import surface_mineralization as sm
+        cues_by_row = sm.discover_by_sight(sim, [int(row)],
+                                           perception_radius_m=PROSPECT_PERCEPT_M)
+    except Exception:
+        return None
+    cues = cues_by_row.get(int(row)) or []
+    cue = None
+    for c in cues:
+        if c.group not in known:
+            cue = c
+            break
+    if cue is None:
+        return None   # the world says: no new colour in sight — all visible stains already read
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as KNAP / GATHER / GRIND / MARK: above random EXPLORE (0.3), below survival.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.PROSPECT), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 def _seek_cure(agents, row, obs, sim):
     """Emergent food salting — the agent loop's consumption of C16 (the 1ʳᵉ capacité dont l'intrant
     est le PRODUIT d'une cap. précédente : le sel raté à RAKE/C15 que l'agent porte dans ``inv_salt``).
@@ -1363,6 +1434,7 @@ _ARC_SEEKS = (
     ("cure",        _seek_cure),          # CURE       · C16 food_curing (1ʳᵉ consommation d'un produit raté)
     ("ochre",       _seek_ochre),         # GRIND      · C18 ochre_grinding
     ("canvas",      _seek_canvas),        # MARK       · C20 rock_canvas
+    ("prospect",    _seek_prospect),      # PROSPECT   · C1  surface_mineralization (1ᵉʳ acte purement cognitif)
 )
 
 # Perception budget — the maximum number of arc seeks evaluated per agent-tick, bounding the hot
@@ -1748,6 +1820,21 @@ CURED_FOOD_SATED_KG = 3.0     # stop seeking to cure once this much reserve is b
 # alternance 0→1 after the non-fire CURE. One-line append to the registry (after the kiln apparatus).
 FORCE_PERCEPT_M = 96.0        # sight range for forced-draught sites (chunk-scale, memoised)
 FORCE_FUEL_COST_KG = 1.0      # charcoal-grade fuel consumed to feed the bellows (from GLEAN/C4)
+
+# D12 wire (2026-06-30) — read a surface weathering stain and remember the buried ore site (consumes
+# C1 surface_mineralization, the 1ᵉʳ ACTE COGNITIF / VISUEL de l'agent). A survival-satisfied, curious
+# agent that SEES a coloured outcrop in its perception range (``surface_mineralization.discover_by_sight``)
+# and HAS NOT YET READ that colour group walks there and PROSPECTs it: it records ``(group, x, y)`` into
+# its ``known_ore_sites`` map, marks the group as ``prospected_ore_groups`` (auto-limit: never re-seek
+# the same colour) and learns by association what lies beneath. NON-MUTATING (no inventory consumed —
+# the act is purely cognitive ; no ``geo.mine_at`` ; D10 frozen). NON-FIRE (visual / cognitive — D9
+# alternance 1→0 after the fire-based FORCE_DRAUGHT). Posera la fondation cognitive sur laquelle les
+# wires futurs (C13 cuivre / C17 fer) construiront leurs MUTATIONS — sans franchir D10 aujourd'hui. With
+# 5 expression groups (copper / gossan / sulfur / salt / gold_placer) the wire caps naturally at 5
+# prospects par vie d'agent (les « 5 mensonges du sol » à apprendre — le mensonge #21).
+PROSPECT_PERCEPT_M = 96.0     # sight range for surface mineralization stains (chunk-scale, memoised)
+PROSPECT_MAX_GROUPS = 5       # one discovery per expression group (5 in C1) — natural lifetime cap
+
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -2624,6 +2711,67 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "would_smelt_copper_here": bool(cue.would_smelt_copper_here),
             "reaches_iron_bloomery_temp": bool(cue.reaches_iron_bloomery_temp),
             "fuel_kg_spent": round(float(spent), 4),
+        })
+        return events
+
+    if act == int(ActionKind.PROSPECT):
+        # Read the surface weathering stain underfoot (C1 surface_mineralization — the 1ᵉʳ acte
+        # purement cognitif / visuel : pas d'objet emporté, pas de géologie modifiée, juste un
+        # apprentissage). The world never lies about the COLOUR→ORE link: the C1 invariant says
+        # that wherever a cue exists, the geology column truly carries the named mineral at
+        # ``dig_depth_m``. The AGENT learns the link by ASSOCIATION (sees the colour, remembers
+        # the place + the colour-group); the WORLD has not been mutated — D10 stays frozen. A spot
+        # the world says has no stain (out-of-biome / under-canopy / no shallow ore) records
+        # nothing. NON-MUTATING per excellence: no inventory consumed, no geology touched. NON-FIRE
+        # (visual / cognitive). The lie #21 (the cognitive lie): a striking VERT outcrop *means*
+        # one ore (the agent guesses MALACHITE), while a humble RUSTY stain *means* several (a
+        # gossan caps pyrite, hematite, magnetite, galena, sphalerite — five possible ores under
+        # the same colour). Learned by acting: the agent prospects 5 different groups and discovers
+        # that visual richness ≠ underground richness.
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_surface_cue_cache", None) is None:
+            return events
+        mem = agents.memory[row]
+        if mem is None:
+            return events
+        try:
+            from engine import surface_mineralization as sm
+            cue = sm.prospect(sim, px, py)
+        except Exception:
+            return events
+        if cue is None:
+            return events   # the world says: no readable stain here — nothing to learn
+        group = str(cue.group)
+        # Idempotent learning: only the FIRST reading of a group is the discovery (re-reading the
+        # same colour teaches nothing new). Mirrors has_made_fire / has_built_kiln semantics.
+        already = group in (mem.prospected_ore_groups or [])
+        if not already:
+            mem.prospected_ore_groups.append(group)
+        mem.has_prospected_ore = True
+        mem.last_prospect_group = group
+        # Memorise the site (group, x, y). Keep the map bounded — 32 sites is a generous cognitive
+        # budget (5 groups × ~6 sites per group). FIFO eviction by insertion order.
+        sites = mem.known_ore_sites
+        sites.append((group, float(px), float(py)))
+        if len(sites) > 32:
+            sites.pop(0)
+        remember_short(agents, row, "prospect",
+                       {"group": group, "mineral": cue.mineral,
+                        "dig_depth_m": round(float(cue.dig_depth_m), 3),
+                        "biome": int(cue.biome)})
+        events.append({
+            "kind": "prospect",
+            "row": int(row),
+            "group": group,
+            "mineral": cue.mineral,
+            "rgb": list(cue.rgb),
+            "label": cue.label,
+            "dig_depth_m": round(float(cue.dig_depth_m), 3),
+            "mass_fraction": round(float(cue.mass_fraction), 5),
+            "expression_depth_m": round(float(cue.expression_depth_m), 3),
+            "biome": int(cue.biome),
+            "confidence": round(float(cue.confidence), 4),
+            "first_for_group": not already,
         })
         return events
 

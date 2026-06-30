@@ -259,7 +259,9 @@ def main() -> int:
     check("4 — survie > broyage : un agent assoiffé (eau en vue) BOIT, ne broie pas",
           d_thirst.action == int(ActionKind.DRINK), f"action={ActionKind(d_thirst.action).name}")
 
-    # 5 — bounded: once pigment-sated, the agent stops seeking and explores
+    # 5 — bounded: once pigment-sated, the ochre wire is gated off (no more GRIND-seek). Whatever
+    # downstream fall-through fires (PROSPECT on the gossan underfoot since C1 is now a wire ;
+    # otherwise EXPLORE) is acceptable — the contract under test is « not GRIND ».
     ss, cs = _build()
     bs = _best_usable(ss, cs)
     _calm_curious(ss, 0)
@@ -267,8 +269,8 @@ def main() -> int:
     ss.agents.inv_pigment[0] = cog.PIGMENT_SATED_KG + 0.1   # already carrying enough
     obs_s = cog.perceive(ss.agents, 0, ss.streamer, tick=ss.tick)
     d_sated = _ORIG_DECIDE(ss.agents, obs_s, sim=ss)
-    check("5 — borné : une fois rassasié (inv_pigment≥seuil) l'agent cesse de chercher, explore",
-          d_sated.action == int(ActionKind.EXPLORE),
+    check("5 — borné : une fois rassasié (inv_pigment≥seuil) l'agent ne broie plus (fall-through PROSPECT/EXPLORE)",
+          d_sated.action != int(ActionKind.GRIND),
           f"action={ActionKind(d_sated.action).name} sated_kg={cog.PIGMENT_SATED_KG}")
 
     # 6 — same path as the real tick

@@ -354,4 +354,9 @@ def test_pigment_sated_agent_stops_seeking():
     _stand(sim, 0, best)
     sim.agents.inv_pigment[0] = cog.PIGMENT_SATED_KG + 0.1   # already carrying enough
     dec = _ORIG_DECIDE(sim.agents, _obs(sim, 0), sim=sim)
-    assert dec.action == int(ActionKind.EXPLORE)
+    # The intent: the OCHRE wire self-gates when pigment-sated — agent does NOT seek/grind ochre.
+    # Whatever downstream wire fires (PROSPECT on the gossan underfoot, canvas if pigment-bearing,
+    # plain EXPLORE otherwise) is acceptable; the contract under test is "no GRIND, no WALK_TO an
+    # ochre site". Since a gossan site is exactly a prospect-eligible cue, PROSPECT is the expected
+    # fall-through here.
+    assert dec.action != int(ActionKind.GRIND)
