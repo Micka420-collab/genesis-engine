@@ -1228,6 +1228,59 @@ def _seek_kilnbuild(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_forcedraught(agents, row, obs, sim):
+    """Emergent forced draught — the agent loop's consumption of C12 (the 2nd APPARATUS it builds: the
+    pendant of C11's kiln — a bellows on charcoal driving the furnace into the high-temp regime).
+
+    An agent that has ALREADY BUILT A KILN (``mem.has_built_kiln``, from RAISE_KILN/C11) AND CARRIES
+    fuel (``inv_fuel`` ≥ ``FORCE_FUEL_COST_KG``, the charcoal charge, from GLEAN/C4) at a forceable site
+    (``forced_draught.best_forced_site_near``) FORCE_DRAUGHTs it — blowing air into the charcoal so the
+    heat climbs past the natural-draught kiln peak. Self-limiting: it forces the draught ONCE
+    (``has_forced_draught``), the discovery of the apparatus (like the kiln's first raising), rather than
+    re-forcing every tick. Tried right after ``_seek_kilnbuild`` — the apparatus chain (raise → force).
+    The heat it unlocks finally VITRIFIES the refractory kaolin (the step C9/C11 deferred) and reaches the
+    copper-smelting threshold.
+
+    Nothing is scripted — the agent perceives its charcoal kiln and *chooses* to blow harder; the WORLD
+    decides the peak (``forced_peak_c``). The lie #20 (the wall the bellows cannot beat): a COMMON-clay
+    kiln SLUMPS however hard it is blown (capped just past copper, never vitrifies, never reaches iron),
+    while the refractory KAOLIN furnace breaks through — ``best_forced_site_near`` prefers the hottest.
+    Learned by forcing.
+
+    Gated on C12 installed (cue cache) AND the two ingredients (kiln skill + fuel in hand). Two hot-loop
+    safety rules mirror the other wires: (1) only *read* an already installed C12; (2) any error degrades
+    to ``None``. NON-MUTATING (consumes inv_fuel as the charcoal charge; no ``geo.mine_at``; D10 frozen).
+    Fire-based (the furnace) — the alternance pendant of the non-fire CURE.
+
+    Returns a ``Decision`` (FORCE_DRAUGHT if standing on the site, else WALK_TO) or ``None`` to fall through.
+    """
+    if sim is None or getattr(sim, "_forced_draught_cue_cache", None) is None:
+        return None
+    mem = agents.memory[row]
+    if mem is None or not bool(getattr(mem, "has_built_kiln", False)):
+        return None   # cannot force-draught a kiln you never built (C11/RAISE_KILN dependency)
+    if bool(getattr(mem, "has_forced_draught", False)):
+        return None   # the apparatus is already discovered — self-limiting (one forcing)
+    inv_fuel = getattr(agents, "inv_fuel", None)
+    if inv_fuel is None or float(inv_fuel[row]) < FORCE_FUEL_COST_KG:
+        return None   # no charcoal-grade fuel in hand to feed the bellows (C4/GLEAN dependency)
+    try:
+        from engine import forced_draught as fd
+        cue = fd.best_forced_site_near(sim, int(row), perception_radius_m=FORCE_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None   # the world says: no forceable (charcoal-fed kiln) site within sight
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.FORCE_DRAUGHT), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 def _seek_cure(agents, row, obs, sim):
     """Emergent food salting — the agent loop's consumption of C16 (the 1ʳᵉ capacité dont l'intrant
     est le PRODUIT d'une cap. précédente : le sel raté à RAKE/C15 que l'agent porte dans ``inv_salt``).
@@ -1306,6 +1359,7 @@ _ARC_SEEKS = (
     ("saltpan",     _seek_saltpan),       # RAKE       · C15 salt_evaporation
     ("fuel",        _seek_fuel),          # GLEAN      · C4  combustible_outcrop
     ("kilnbuild",   _seek_kilnbuild),     # RAISE_KILN · C11 kiln_draft
+    ("forcedraught", _seek_forcedraught), # FORCE_DRAUGHT · C12 forced_draught (the 2nd apparatus — raise → force)
     ("cure",        _seek_cure),          # CURE       · C16 food_curing (1ʳᵉ consommation d'un produit raté)
     ("ochre",       _seek_ochre),         # GRIND      · C18 ochre_grinding
     ("canvas",      _seek_canvas),        # MARK       · C20 rock_canvas
@@ -1679,6 +1733,21 @@ CURE_PERCEPT_M = 160.0        # sight range for curing sites (the saltpan that t
 CURE_FOOD_BATCH_KG = 0.5      # raw food cured per CURE (a haunch / a day's catch — the unit of preservation)
 CURE_SALT_PER_KG_FOOD = 0.27  # kg salt per kg food for saturation dry-cure (FIPS 0.75 a_w / SAT_BRINE_FRAC physics)
 CURED_FOOD_SATED_KG = 3.0     # stop seeking to cure once this much reserve is built (≈ 2 months of stores)
+
+# D12 wire (2026-06-30) — work a bellows on a charcoal-fed kiln (consumes C12 forced_draught = C11 kiln
+# × C4 charcoal, the 2nd APPARATUS — the pendant of C11's kiln). An agent that has BUILT a kiln
+# (``has_built_kiln``, from RAISE_KILN/C11) AND CARRIES fuel (``inv_fuel`` ≥ cost, the charcoal charge,
+# from GLEAN/C4) at a forceable site (``forced_draught.best_forced_site_near``) FORCE_DRAUGHTs it: blowing
+# air into the charcoal drives the furnace past the natural-draught kiln peak (``forced_peak_c``), finally
+# VITRIFYING the refractory kaolin body (the step C9 AND C11 both deferred) and reaching the copper-smelting
+# threshold. It forces the draught ONCE (the discovery, ``has_forced_draught``), recording the peak. The
+# lie #20 (the wall the bellows cannot beat): a COMMON-clay kiln, blown ever harder, SLUMPS — its wall caps
+# just past copper (``FORCED_COMMON_WALL_CAP_C``) and NEVER vitrifies nor reaches the iron regime; only the
+# refractory KAOLIN furnace breaks through. ``best_forced_site_near`` prefers the hottest. Consumes inv_fuel
+# (the charcoal charge); NON-MUTATING (no ``geo.mine_at``; D10 frozen). Fire-based (the furnace) → D9
+# alternance 0→1 after the non-fire CURE. One-line append to the registry (after the kiln apparatus).
+FORCE_PERCEPT_M = 96.0        # sight range for forced-draught sites (chunk-scale, memoised)
+FORCE_FUEL_COST_KG = 1.0      # charcoal-grade fuel consumed to feed the bellows (from GLEAN/C4)
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
 
@@ -2502,6 +2571,59 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "open_fire_peak_c": round(float(cue.open_fire_peak_c), 2),
             "draft_gain_c": round(float(cue.draft_gain_c), 2),
             "clay_kg_spent": round(float(spent), 4),
+        })
+        return events
+
+    if act == int(ActionKind.FORCE_DRAUGHT):
+        # Blow a bellows on the charcoal-fed kiln the agent has built (C12 forced_draught = C11 kiln ×
+        # C4 charcoal — the 2nd APPARATUS). It consumes inv_fuel (the charcoal charge) and records the
+        # higher peak the forced draught reaches (forced_peak_c). The world never lies about the PEAK:
+        # a COMMON-clay wall slumps (capped just past copper, never vitrifies / never reaches iron), a
+        # refractory kaolin wall survives into the bloomery regime — the lie #20, learned by forcing.
+        # The payoff: the refractory body finally VITRIFIES watertight (the step C9/C11 deferred) and
+        # the furnace reaches the copper-smelting threshold. Requires both ingredients (has_built_kiln
+        # + inv_fuel). NON-MUTATING (no geo.mine_at; D10 frozen). Fire-based (D9 alternance).
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_forced_draught_cue_cache", None) is None:
+            return events
+        mem = agents.memory[row]
+        if mem is None or not bool(getattr(mem, "has_built_kiln", False)):
+            return events   # cannot force a kiln you never built
+        inv_fuel = getattr(agents, "inv_fuel", None)
+        if inv_fuel is None or float(inv_fuel[row]) < FORCE_FUEL_COST_KG:
+            return events   # no charcoal in hand to feed the bellows
+        try:
+            from engine import forced_draught as fd
+            cue = fd.prospect_forced_draught(sim, px, py)
+        except Exception:
+            return events
+        if cue is None or not cue.forceable:
+            return events   # the world says: no charcoal-fed kiln forceable here
+        spent = min(FORCE_FUEL_COST_KG, float(inv_fuel[row]))
+        inv_fuel[row] = float(inv_fuel[row]) - spent
+        mem.has_forced_draught = True
+        mem.last_forced_peak_c = float(cue.forced_peak_c)
+        locs = getattr(mem, "known_forced_locations", None)
+        if locs is not None:
+            locs.append((px, py))
+            if len(locs) > 8:
+                locs.pop(0)
+        remember_short(agents, row, "forced_draught",
+                       {"wall": cue.wall_material, "refractory": bool(cue.wall_refractory),
+                        "vitrifies": bool(cue.vitrifies_watertight)})
+        events.append({
+            "kind": "force_draught",
+            "row": int(row),
+            "wall_material": cue.wall_material,
+            "wall_refractory": bool(cue.wall_refractory),
+            "kiln_peak_c": round(float(cue.kiln_peak_c), 2),
+            "forced_peak_c": round(float(cue.forced_peak_c), 2),
+            "forced_gain_c": round(float(cue.forced_gain_c), 2),
+            "vitrifies_watertight": bool(cue.vitrifies_watertight),
+            "reaches_copper_smelting_temp": bool(cue.reaches_copper_smelting_temp),
+            "would_smelt_copper_here": bool(cue.would_smelt_copper_here),
+            "reaches_iron_bloomery_temp": bool(cue.reaches_iron_bloomery_temp),
+            "fuel_kg_spent": round(float(spent), 4),
         })
         return events
 

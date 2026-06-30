@@ -8,6 +8,42 @@
 
 ---
 
+## ✅ Livré (2026-06-30) — D12 wire #16 : la boucle agent FORCE le tirage de son four (consomme C12)
+
+**16ᵉ bouchée → 16/20** et **le 2ᵉ APPAREILLAGE de l'arc** (le pendant exact de C11 : C11 *enferme*
+le feu dans des parois d'argile, C12 *souffle dessus* pour le pousser dans le régime haute température).
+Append d'une **ligne** au registre `_ARC_SEEKS` (`("forcedraught", _seek_forcedraught)` **après
+`kilnbuild`** — la chaîne d'appareillage *raise → force*).
+
+- Un agent qui a **DÉJÀ BÂTI UN FOUR** (`has_built_kiln`, RAISE_KILN/C11) **ET porte du combustible**
+  (`inv_fuel ≥ FORCE_FUEL_COST_KG`, GLEAN/C4) à un site forçable (`forced_draught.best_forced_site_near`)
+  **FORCE_DRAUGHT** (`ActionKind.FORCE_DRAUGHT = 33`) : il souffle de l'air dans le charbon → le four
+  dépasse le pic à tirage naturel (`forced_peak_c`, ≈1100–1400 °C). **Compose deux produits de wires
+  antérieurs** : le *savoir-four* de C11 × le *combustible* de C4. **Auto-limité** (`has_forced_draught`,
+  un seul forçage). Consomme `inv_fuel` ; **aucun nouveau champ d'inventaire**.
+- **Le payoff** : le régime ouvert **VITRIFIE enfin** le corps kaolin réfractaire (`vitrifies_watertight`,
+  l'étape que C9 ET C11 différaient) et **atteint le seuil de fonte du cuivre**.
+- **Mensonge rendu visible #20** (le mur que le soufflet ne bat pas) : une paroi en **argile commune**
+  *flue* (plafond **1100 °C**, juste au-delà du cuivre) — jamais de vitrification, jamais le fer ; seule
+  la **kaolinite réfractaire** (**1400 °C**) perce. Seed `0xBEEF` : réfractaire forced **1295 °C →
+  vitrifie** vs commun **1100 °C → ne vitrifie pas**.
+- **Garde-fous** : **D8** (COMPOSE C11 × C4, `PY_TO_RUST` reste **15**) · **D10** (appareillage non-mutant,
+  0 `geo.mine_at`) · **D9** (feu après le non-feu C16 → alternance **0→1**) · gate sur C12 installé (inerte
+  par défaut) · déterministe (0 RNG).
+- **Chiffres** : `test_forced_draught_wire.py` **13 tests** + `test_arc_seek_registry.py` **6** (registre
+  → **15 entrées**) + smoke **`p171` 8/8** (seed `0xBEEF`, 144 forçables / 17 réfractaires). **pytest
+  suite complète 1029/1029**, `ruff` clean. Portail CI/Makefile p170 → **p171** (glob lint étendu `p17[0-9]`).
+  Non-régression live : p169/p170/p161/p164 **8/8**.
+- **Veille du jour (5 axes) → 0 combo externe intégrable** (tous gated cargo/LLM/endpoint) ; signal neuf =
+  **Fill–Spill–Merge** (lacs endoréiques, couche World) → **COMBO_BACKLOG** [`ROADMAP.md`](ROADMAP.md) ;
+  CVE-2026-3298 / supply-chain litellm **sans impact** (arc numpy-seul, sans asyncio-sockets ni litellm).
+  Détail : [`docs/sprints/2026-06-30_D12-WIRE-C12-forced-draught.md`](docs/sprints/2026-06-30_D12-WIRE-C12-forced-draught.md).
+- **Reste** : 4 capacités non consommées (C1, C13, C17, C19) + piliers langage/bâtiments. **Prochaine
+  bouchée à forte valeur :** la **1ʳᵉ métallurgie agent — C13 `copper_smelting`** (cycle **ADR D10** :
+  `geo.mine_at` dans la boucle agent — ADR avant code).
+
+---
+
 ## ✅ Livré (2026-06-18, J+8 run #2) — Cap. C13 : la fonte du cuivre (`engine.copper_smelting`)
 
 **13ᵉ capacité agent, la _4ᵉ transformation_ et la _1ʳᵉ métallurgique_** — le **seuil

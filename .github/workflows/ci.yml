@@ -112,6 +112,7 @@ jobs:
             p168_combustible_glean_loop_smoke.py
             p169_kiln_draft_loop_smoke.py
             p170_food_curing_cure_loop_smoke.py
+            p171_forced_draught_loop_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="

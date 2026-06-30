@@ -88,6 +88,12 @@ class ActionKind(IntEnum):
     # 1ʳᵉ capacité dont l'intrant est le PRODUIT d'une cap. précédente (le sel raté à RAKE) ET de la nourriture
     # foragée — la chaîne « ramasser → saler → garder ». NON-FIRE / non-thermal (osmose du sel, pas la chaleur).
     CURE = 32        # salt raw food into preserved cured food — the world decides the shelf life
+    # D12 wire (2026-06-30) — work a bellows on a charcoal-fed kiln (consumes C12 forced_draught = C11
+    # kiln × C4 charcoal). The 2nd APPARATUS, after RAISE_KILN: blowing air drives the furnace past the
+    # natural-draught peak, finally vitrifying the refractory kaolin body (C9/C11 deferred) and reaching
+    # the copper-smelting threshold. Fire-based (the furnace) → D9 0→1 after the non-fire CURE.
+    # NON-MUTATING (no geo.mine_at; D10 frozen).
+    FORCE_DRAUGHT = 33  # blow air into the charcoal kiln → a hotter forced furnace — the world decides its peak
 
 
 @dataclass
@@ -155,6 +161,13 @@ class EpisodicMemory:
     known_kiln_site_locations: List[Tuple[float, float]] = field(default_factory=list)
     has_built_kiln: bool = False
     last_kiln_peak_c: Optional[float] = None
+    # Forced draught (C12): the 2nd APPARATUS — blowing a bellows on a charcoal-fed kiln to drive it
+    # into the high-temperature regime (finally VITRIFYING the refractory kaolin body that under-fires
+    # as a pot in C9/C11, and reaching the copper-smelting threshold). Learned by acting:
+    # ``has_forced_draught`` is the discovery flag; ``last_forced_peak_c`` the peak it last reached.
+    known_forced_locations: List[Tuple[float, float]] = field(default_factory=list)
+    has_forced_draught: bool = False
+    last_forced_peak_c: Optional[float] = None
     # Salaison (C16): la 1ʳᵉ conservation, apprise en agissant. ``has_cured_food`` est le drapeau de
     # découverte (l'agent sait désormais que sel + viande crue → réserve qui tient des mois) ;
     # ``last_preservation_class`` enregistre la CLASSE de conservation atteinte (PERISHABLE /
