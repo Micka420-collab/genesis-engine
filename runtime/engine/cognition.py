@@ -1342,6 +1342,72 @@ def _seek_smelt(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_bloom(agents, row, obs, sim):
+    """Emergent iron bloomery — the agent loop's consumption of C17, and the 2nd AGENT-DRIVEN MUTATION of
+    the world (after SMELT/C13). The metallurgical sub-arc ADR-0010 unfroze extends from copper to iron:
+    le seuil de l'âge du fer, vécu.
+
+    An agent that (a) has DISCOVERED the forced-draught furnace apparatus (``mem.has_forced_draught``,
+    from FORCE_DRAUGHT/C12 — only a forced refractory furnace clears the 1200 °C bloomery regime), (b) has
+    LEARNED that the rusty iron-hat means iron (``"gossan" in mem.prospected_ore_groups``, from PROSPECT/C1
+    — the same cognitive foundation copper's wire spent, now spent again for iron), (c) CARRIES a charcoal
+    charge (``inv_fuel`` ≥ ``BLOOM_FUEL_COST_KG``, from GLEAN/C4) and (d) SEES a DIRECTLY reducible iron-hat
+    site (``iron_bloomery.best_bloomery_site_near`` with ``require_direct=True`` — an oxide gossan, hot
+    enough) walks there and BLOOMs — the WORLD decides the spongy loupe of iron that forms. Self-limiting on
+    a discovery flag (``mem.has_bloomed_iron``): the iron age is a threshold moment — the agent blooms until
+    it has actually won iron, then stops. Using the discovery flag (not a shared metal-sated check) keeps
+    ``inv_metal`` orthogonal to copper's SMELT, so the two metallurgy wires never interfere.
+
+    Nothing is scripted — the agent perceives red rusty stone in a roaring refractory furnace and *chooses*
+    to feed it in; the WORLD decides what forms at the bottom. THE PHYSICAL LIE lived: copper ran to a
+    poured bead (C13), but iron NEVER melts (1538 °C, out of reach) — it is reduced SOLID to a sponge that
+    must be forged (C19), never poured. The lie #8 lived: an oxide iron-hat reduces to sound iron, but the
+    SAME rusty gossan over pyrite yields only slag unless roasted first (roasting deferred to a future
+    wire), and over lead/zinc yields NO iron at all — so ``require_direct=True`` routes the agent to the
+    oxide it can reduce NOW, ignoring the pyrite and lead/zinc lies. Placed right after ``_seek_smelt`` —
+    the metallurgy chain reads SMELT (copper) → BLOOM (iron).
+
+    Gated on C17 installed (its cue cache exists). Two hot-loop safety rules mirror the other wires:
+    (1) only *read* an already installed C17; (2) any error degrades to ``None``, never crashes the tick.
+    **MUTATING** — ``bloom_at`` drains a charge of ore from the geology column (``geo.mine_at``): D10 is
+    crossed here (the metallurgical sub-arc, ADR-0010). Fire-based (the furnace): SMELT and BLOOM are both
+    fire — the iron-age tail of the arc is structurally fire-bound (no non-fire capability remains to
+    interleave; D9 alternance yields to the arc's reality, noted honestly).
+
+    Returns a ``Decision`` (BLOOM if standing on the site, else WALK_TO) or ``None`` to fall through.
+    """
+    if sim is None or getattr(sim, "_iron_bloom_cue_cache", None) is None:
+        return None
+    mem = agents.memory[row]
+    if mem is None or not bool(getattr(mem, "has_forced_draught", False)):
+        return None   # only a forced refractory furnace reaches the 1200 °C bloomery regime (C12 dep.)
+    if bool(getattr(mem, "has_bloomed_iron", False)):
+        return None   # self-limiting: the iron age is discovered — bloom once (keeps inv_metal orthogonal to copper)
+    prospected = getattr(mem, "prospected_ore_groups", None)
+    if not prospected or "gossan" not in prospected:
+        return None   # must have LEARNED that the rusty iron-hat means iron first (C1/PROSPECT dependency)
+    inv_fuel = getattr(agents, "inv_fuel", None)
+    if inv_fuel is None or float(inv_fuel[row]) < BLOOM_FUEL_COST_KG:
+        return None   # no charcoal charge in hand to run the bloomery (C4/GLEAN dependency)
+    try:
+        from engine import iron_bloomery as ib
+        cue = ib.best_bloomery_site_near(sim, int(row), perception_radius_m=BLOOM_PERCEPT_M,
+                                         require_direct=True)
+    except Exception:
+        return None
+    if cue is None:
+        return None   # the world says: no directly-reducible iron-hat site within sight
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as the other transform wires: above random EXPLORE (0.3), below survival.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.BLOOM), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 def _seek_prospect(agents, row, obs, sim):
     """Emergent prospecting — the agent loop's consumption of C1 (the 1ᵉʳ ACTE COGNITIF / VISUEL).
 
@@ -1493,6 +1559,7 @@ _ARC_SEEKS = (
     ("kilnbuild",   _seek_kilnbuild),     # RAISE_KILN · C11 kiln_draft
     ("forcedraught", _seek_forcedraught), # FORCE_DRAUGHT · C12 forced_draught (the 2nd apparatus — raise → force)
     ("smelt",       _seek_smelt),         # SMELT      · C13 copper_smelting (1ᵉʳ MUTATION agent — D10 crossed, ADR-0010)
+    ("bloom",       _seek_bloom),         # BLOOM      · C17 iron_bloomery (2ᵉ MUTATION agent — l'âge du fer, ADR-0010)
     ("cure",        _seek_cure),          # CURE       · C16 food_curing (1ʳᵉ consommation d'un produit raté)
     ("ochre",       _seek_ochre),         # GRIND      · C18 ochre_grinding
     ("canvas",      _seek_canvas),        # MARK       · C20 rock_canvas
@@ -1909,6 +1976,23 @@ PROSPECT_MAX_GROUPS = 5       # one discovery per expression group (5 in C1) —
 SMELT_PERCEPT_M = 96.0        # sight range for smeltable copper sites (chunk-scale, memoised)
 SMELT_FUEL_COST_KG = 1.0      # charcoal-grade charge a single smelt burns (from GLEAN/C4)
 SMELT_METAL_SATED_KG = 2.0    # stop seeking to smelt once this much copper is carried (self-limiting)
+
+# D12 wire (2026-07-01) — reduce the rusty iron-hat gossan ore in the forced-draught furnace the agent
+# built (consumes C17 iron_bloomery). THE 2nd AGENT-DRIVEN MUTATION of the world after SMELT/C13: ``bloom_at``
+# drains a charge of ore from the geology column (``geo.mine_at``), staying within the metallurgical sub-arc
+# ADR-0010 unfroze (D10). The agent must (a) have discovered the forced-draught apparatus (only a refractory
+# forced furnace clears the 1200 °C bloomery regime, C12/FORCE_DRAUGHT), (b) have LEARNED that the rusty
+# iron-hat means iron (``"gossan" in prospected_ore_groups``, from PROSPECT/C1), (c) carry a charcoal charge
+# (``inv_fuel``, from GLEAN/C4). ``best_bloomery_site_near(require_direct=True)`` routes to the OXIDE iron-hat
+# it can reduce NOW — ignoring the pyrite (needs roasting, deferred) and lead/zinc (no iron) lies. Self-limiting
+# on the discovery flag ``has_bloomed_iron`` (the iron age is a threshold moment; keeps inv_metal orthogonal to
+# copper's metal-sated check). Fire-based → SMELT and BLOOM are both fire (the iron-age tail is structurally
+# fire-bound; no non-fire capability remains to interleave — D9 alternance yields to the arc's reality). THE
+# PHYSICAL LIE lived: copper runs to a poured bead (C13), but iron NEVER melts (1538 °C, out of reach) — the
+# bloom is a SOLID sponge that must be forged (C19), never poured. The lie #8 lived: an oxide iron-hat reduces
+# to sound iron, the SAME rusty gossan over pyrite yields only slag (roast first), over lead/zinc yields no iron.
+BLOOM_PERCEPT_M = 96.0        # sight range for directly-reducible iron-hat sites (chunk-scale, memoised)
+BLOOM_FUEL_COST_KG = 1.0      # charcoal-grade charge a single bloomery run burns (from GLEAN/C4)
 
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
@@ -2856,6 +2940,89 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "recovered_cu_kg": round(gained, 6),
             "slag_kg": round(float(result.slag_kg), 4),
             "bead_purity": round(float(result.bead_purity), 4),
+            "roasted": bool(result.roasted),
+            "required_roasting": bool(result.required_roasting),
+            "peak_c": round(float(result.peak_c), 1),
+            "mutated_geology": True,
+        })
+        return events
+
+    if act == int(ActionKind.BLOOM):
+        # Reduce the rusty iron-hat gossan ore under the agent in the forced-draught furnace it knows how
+        # to build (C17 iron_bloomery — the 2nd agent-driven MUTATION of the world after SMELT/C13; the
+        # metallurgical sub-arc ADR-0010 unfroze extends from copper to iron). It spends a charcoal charge
+        # (inv_fuel) and, via ``ib.bloom_at``, DRAINS a charge of ore from the geology column (``geo.mine_at``
+        # — the ore truly leaves the ground) reducing it SOLID to a spongy iron bloom (inv_metal) + fayalite
+        # slag. The world never lies: the recovered iron equals the oracle's committed yield. THE PHYSICAL
+        # LIE lived: unlike copper's poured bead, iron NEVER melts (1538 °C, out of reach) — the bloom is a
+        # solid sponge that must be forged (C19), never poured. The lie #8 lived: an oxide iron-hat reduces
+        # to sound iron; the SAME rusty gossan over PYRITE yields only slag unless roasted (deferred), over
+        # lead/zinc yields NO iron at all (bloom_iron_kg == 0 — the ore still consumed, the honest costly
+        # lesson). Requires the forced-draught skill + a prospected gossan group + charcoal in hand. MUTATING
+        # (D10, bounded to the metallurgical sub-arc); fire-based (D9 — both metallurgy wires are fire).
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_iron_bloom_cue_cache", None) is None:
+            return events
+        mem = agents.memory[row]
+        if mem is None or not bool(getattr(mem, "has_forced_draught", False)):
+            return events   # cannot bloom without the forced furnace (only it reaches the 1200 C regime)
+        inv_fuel = getattr(agents, "inv_fuel", None)
+        if inv_fuel is None or float(inv_fuel[row]) < BLOOM_FUEL_COST_KG:
+            return events   # no charcoal in hand to run the bloomery
+        inv_metal = getattr(agents, "inv_metal", None)
+        if inv_metal is None:
+            return events
+        inv_stone = getattr(agents, "inv_stone", None)
+        metal_before = float(inv_metal[row])
+        stone_before = float(inv_stone[row]) if inv_stone is not None else None
+        try:
+            from engine import iron_bloomery as ib
+            result = ib.bloom_at(sim, int(row))
+        except Exception:
+            inv_metal[row] = metal_before          # bloom_at may have partly credited inv before raising
+            if inv_stone is not None and stone_before is not None:
+                inv_stone[row] = stone_before
+            return events
+        if result is None:
+            return events   # the world says: nothing reducible here (no hot furnace / no iron gossan)
+        spent = min(BLOOM_FUEL_COST_KG, float(inv_fuel[row]))
+        inv_fuel[row] = float(inv_fuel[row]) - spent
+        gained = float(result.bloom_iron_kg)
+        # ``bloom_at`` → ``geo.mine_at`` auto-credits the RAW ore mass (ore + gangue) to inv_metal /
+        # inv_stone — the legacy Wave-1 bridge, wrong for a reduction (the ore is reduced SOLID, not
+        # pocketed raw). Overwrite it with the physically honest outcome — only the recovered iron BLOOM
+        # enters inv_metal, the gangue + fayalite leaves as slag (inv_stone unchanged). The geology mutation
+        # (extracted_kg ↑ on the layer — the D10 crossing) lives on the column and is NOT reverted.
+        inv_metal[row] = metal_before + gained
+        if inv_stone is not None and stone_before is not None:
+            inv_stone[row] = stone_before
+        # ``has_bloomed_iron`` is the iron-age discovery — set only when real iron is won. A wasted
+        # pyrite/non-iron attempt yields slag (gained == 0) and does NOT count as the discovery, so the
+        # agent is never locked out by an honest failure; the seek self-limits on this flag (keeping
+        # inv_metal orthogonal to copper's metal-sated check).
+        if gained > 0.0:
+            mem.has_bloomed_iron = True
+        mem.last_bloom_mineral = str(result.iron_mineral)
+        mem.last_bloom_iron_kg = gained
+        locs = getattr(mem, "known_bloom_locations", None)
+        if locs is not None:
+            locs.append((px, py))
+            if len(locs) > 8:
+                locs.pop(0)
+        remember_short(agents, row, "bloom",
+                       {"mineral": result.iron_mineral, "ore_class": result.ore_class,
+                        "iron_kg": round(gained, 4), "red_short": bool(result.red_short)})
+        events.append({
+            "kind": "bloom",
+            "row": int(row),
+            "iron_mineral": result.iron_mineral,
+            "ore_class": result.ore_class,
+            "ore_consumed_kg": round(float(result.ore_consumed_kg), 4),
+            "bloom_iron_kg": round(gained, 6),
+            "slag_kg": round(float(result.slag_kg), 4),
+            "bloom_purity": round(float(result.bloom_purity), 4),
+            "red_short": bool(result.red_short),
+            "is_solid_bloom": bool(result.is_solid_bloom),
             "roasted": bool(result.roasted),
             "required_roasting": bool(result.required_roasting),
             "peak_c": round(float(result.peak_c), 1),

@@ -107,6 +107,15 @@ class ActionKind(IntEnum):
     # green==copper and carries charcoal now SMELTs its copper ore through C13 ``copper_smelting.smelt_at``
     # — the FIRST agent-driven world mutation (``geo.mine_at``): the D10 frontier, frozen through 17 wires,
     # is crossed here by design (ADR-0010). See ``cognition._seek_smelt`` / the SMELT ``apply_decision`` arm.
+    # D12 wire (2026-07-01) — reduce the rusty iron-hat gossan ore in the forced-draught furnace (consumes
+    # C17 iron_bloomery). The 2nd agent-driven world MUTATION after SMELT/C13 — le seuil de l'âge du fer:
+    # ``bloom_at`` DRAINS a charge of ore from the geology column (``geo.mine_at``), staying within the
+    # metallurgical sub-arc ADR-0010 unfroze. Unlike copper's poured bead, iron NEVER melts (1538 °C, out
+    # of reach) — the world hands back a SOLID spongy bloom that must be forged (C19), never poured. The
+    # lie #8 lived: an oxide iron-hat (hematite/magnetite) reduces to sound iron; the SAME rusty gossan over
+    # pyrite yields only slag (needs roasting), over galena/sphalerite yields NO iron at all. See
+    # ``cognition._seek_bloom`` / the BLOOM ``apply_decision`` arm.
+    BLOOM = 35       # reduce iron-hat ore to a solid iron bloom in a forced furnace — the world decides the loupe
 
 
 @dataclass
@@ -211,6 +220,18 @@ class EpisodicMemory:
     has_smelted_copper: bool = False
     last_smelt_mineral: Optional[str] = None
     last_smelt_cu_kg: float = 0.0
+    # Réduction du fer (C17) — la 2ᵉ MÉTALLURGIE et la 2ᵉ MUTATION du monde par un agent (le sous-arc
+    # métallurgique de D10, ADR-0010, déjà franchi par C13). ``has_bloomed_iron`` est le drapeau de
+    # découverte de l'âge du fer (l'agent sait désormais que le chapeau de fer rouille, réduit à l'état
+    # SOLIDE dans un four soufflé assez chaud, laisse une éponge de fer grise à MARTELER — jamais un perlé
+    # coulé comme le cuivre) ; ``last_bloom_mineral`` enregistre le minerai réduit (hematite / magnetite /
+    # pyrite) et ``last_bloom_iron_kg`` la dernière loupe rendue — émergent, jamais dit (le chapeau qui
+    # coiffe du plomb/zinc ne rend AUCUN fer ; le sulfure cru que de la scorie : les mensonges #8, appris
+    # en agissant). ``known_bloom_locations`` mémorise les bas-fourneaux où le fer a été réduit (FIFO borné).
+    known_bloom_locations: List[Tuple[float, float]] = field(default_factory=list)
+    has_bloomed_iron: bool = False
+    last_bloom_mineral: Optional[str] = None
+    last_bloom_iron_kg: float = 0.0
     capacity_short: int = 32
     capacity_long: int = 256
 
