@@ -102,6 +102,11 @@ class ActionKind(IntEnum):
     # cognitive du futur D10 (C13 cuivre / C17 fer) sans franchir la mutation. NON-FIRE (visuel) → D9
     # alternance 1→0 après FORCE_DRAUGHT. NON-MUTATING (no inventory, no geo.mine_at; D10 frozen).
     PROSPECT = 34  # read the colour of the earth and remember it — the world decides what its colour means
+    # NB — the D12 wire #18 (2026-07-01) does NOT add a new ActionKind: it makes the LEGACY generic
+    # ``SMELT = 18`` HONEST (like C3 did for ``DRINK``). A curious agent that has forced a draught, learned
+    # green==copper and carries charcoal now SMELTs its copper ore through C13 ``copper_smelting.smelt_at``
+    # — the FIRST agent-driven world mutation (``geo.mine_at``): the D10 frontier, frozen through 17 wires,
+    # is crossed here by design (ADR-0010). See ``cognition._seek_smelt`` / the SMELT ``apply_decision`` arm.
 
 
 @dataclass
@@ -195,6 +200,17 @@ class EpisodicMemory:
     prospected_ore_groups: List[str] = field(default_factory=list)
     has_prospected_ore: bool = False
     last_prospect_group: Optional[str] = None
+    # Fonte du cuivre (C13) — la 1ʳᵉ MÉTALLURGIE vécue et la 1ʳᵉ MUTATION du monde par un agent (le
+    # front D10, gelé pendant 17 wires, est franchi ici — ADR-0010). ``has_smelted_copper`` est le
+    # drapeau de découverte (l'agent sait désormais que la pierre verte, jetée dans un four assez chaud,
+    # rend un perlé de métal) ; ``last_smelt_mineral`` enregistre le minerai fondu (native_copper /
+    # chalcopyrite) et ``last_smelt_cu_kg`` le dernier bouton rendu — émergent, jamais dit (le sulfure
+    # cru ne rend que de la scorie : la leçon coûteuse #4, apprise en agissant). ``known_smelt_locations``
+    # mémorise les fours où le métal a coulé (FIFO borné, comme les autres apparatus).
+    known_smelt_locations: List[Tuple[float, float]] = field(default_factory=list)
+    has_smelted_copper: bool = False
+    last_smelt_mineral: Optional[str] = None
+    last_smelt_cu_kg: float = 0.0
     capacity_short: int = 32
     capacity_long: int = 256
 

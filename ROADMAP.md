@@ -1,6 +1,6 @@
 # Genesis Engine — Roadmap Viable
 
-**Derniere mise a jour :** 2026-06-28
+**Derniere mise a jour :** 2026-07-01
 
 Ce fichier est la roadmap stable du projet. La file de sprint vivante reste
 dans [`NEXT-SPRINT.md`](NEXT-SPRINT.md). Ici, l'objectif est simple :
@@ -90,9 +90,20 @@ drives de survie, **sans arbre tech scripté** (le monde décide le résultat).
   D10 gelé) ; D8 par composition (`PY_TO_RUST` reste 15, C7 sans `_PROFILE`). 11 tests +
   smoke p161 8/8.
 
-**Reste (14 capacités + piliers langage/bâtiments)** : même patron, une tranche
-verticale à la fois. Un **registre de capacités** + budget de perception seront
-introduits quand le nombre de branchements le justifiera (éviter la sur-ingénierie).
+- **C13 / SMELT** (2026-07-01, [ADR-0010](adr/0010-agent-driven-mutation.md)) — **18ᵉ wire → 18/20**, et
+  **LA PREMIÈRE MUTATION DU MONDE PAR UN AGENT**. Après 17 wires non-mutants (D10 gelé, `g_before ==
+  g_after`), un agent qui a **découvert le tirage forcé** (C12), **appris que le vert signifie cuivre**
+  (PROSPECT/C1 — la fondation cognitive du wire #17 est ici dépensée) et **porte du charbon** (C4) **FOND**
+  son minerai (`ActionKind.SMELT`, réutilisé du legacy — honnête comme DRINK). `smelt_at` → `geo.mine_at`
+  **draine la colonne** (le minerai disparaît du sol) : D10 est **franchi par design**, borné au sous-arc
+  métallurgique. Le monde décide du bouton : cuivre natif → métal (bouton `0.2375 kg`), la **même**
+  chalcopyrite (sulfure) → **scorie seule** tant qu'elle n'est pas grillée (mensonge #4 vécu). D8
+  (`PY_TO_RUST` reste 15), D9 0→1 (feu), déterministe. 13 tests + smoke p173 8/8.
+
+**Reste (2 capacités C17 `iron_bloomery` / C19 `bloom_forging` + piliers langage/bâtiments)** : même
+patron, une tranche verticale à la fois. C17/C19 franchiront D10 sous [ADR-0010](adr/0010-agent-driven-mutation.md)
+(SSOT mutant audité + préconditions vécues). Le **registre de capacités** `_ARC_SEEKS` + budget de
+perception (ADR-0009) porte déjà les 18 branchements.
 
 ---
 

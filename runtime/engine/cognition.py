@@ -1281,6 +1281,67 @@ def _seek_forcedraught(agents, row, obs, sim):
     return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
 
 
+def _seek_smelt(agents, row, obs, sim):
+    """Emergent copper smelting — the agent loop's consumption of C13, and THE FIRST AGENT-DRIVEN
+    MUTATION OF THE WORLD (the D10 mutation frontier, frozen through 17 non-mutating wires, is crossed
+    here — ADR-0010, the payoff of the cognitive PROSPECT wire #17).
+
+    An agent that (a) has DISCOVERED the forced-draught furnace apparatus (``mem.has_forced_draught``,
+    from FORCE_DRAUGHT/C12 — only a forced furnace clears copper's 1085 °C melt point), (b) has LEARNED
+    that the green earth means copper (``"copper" in mem.prospected_ore_groups``, from PROSPECT/C1 — the
+    cognitive foundation is now *spent*), (c) CARRIES a charcoal charge (``inv_fuel`` ≥
+    ``SMELT_FUEL_COST_KG``, from GLEAN/C4) and (d) SEES a smeltable copper site
+    (``copper_smelting.best_smelt_site_near``) walks there and SMELTs — the WORLD decides the bead of
+    metal that weeps out. Self-limiting on a metal-sated threshold (``inv_metal`` ≥
+    ``SMELT_METAL_SATED_KG``): the agent smelts until it has enough copper, not every tick.
+
+    Nothing is scripted — the agent perceives green stone in a roaring charcoal furnace and *chooses*
+    to feed it in; the WORLD decides what runs out. The lie #4 made lived: native copper melts to a
+    bead directly, but the SAME green chalcopyrite (a refractory sulfide) yields only slag unless
+    roasted first — ``best_smelt_site_near`` prefers the copper actually recoverable, so the agent
+    learns to smelt the native green directly. Placed right after ``_seek_forcedraught`` — the apparatus
+    chain reads raise → force → SMELT.
+
+    Gated on C13 installed (its cue cache exists). Two hot-loop safety rules mirror the other wires:
+    (1) only *read* an already installed C13; (2) any error degrades to ``None``, never crashes the
+    tick. **MUTATING** — ``smelt_at`` drains a charge of ore from the geology column (``geo.mine_at``):
+    D10 is crossed here, by design. Fire-based (the furnace) → D9 alternance 0→1 after the non-fire
+    PROSPECT.
+
+    Returns a ``Decision`` (SMELT if standing on the site, else WALK_TO) or ``None`` to fall through.
+    """
+    if sim is None or getattr(sim, "_copper_smelt_cue_cache", None) is None:
+        return None
+    mem = agents.memory[row]
+    if mem is None or not bool(getattr(mem, "has_forced_draught", False)):
+        return None   # only a forced-draught furnace reaches copper's melt point (C12/FORCE_DRAUGHT dep.)
+    prospected = getattr(mem, "prospected_ore_groups", None)
+    if not prospected or "copper" not in prospected:
+        return None   # must have LEARNED that green == copper first (C1/PROSPECT dep. — wire #17's payoff)
+    inv_metal = getattr(agents, "inv_metal", None)
+    if inv_metal is not None and float(inv_metal[row]) >= SMELT_METAL_SATED_KG:
+        return None   # self-limiting: enough copper carried, don't reseek
+    inv_fuel = getattr(agents, "inv_fuel", None)
+    if inv_fuel is None or float(inv_fuel[row]) < SMELT_FUEL_COST_KG:
+        return None   # no charcoal charge in hand to run the smelt (C4/GLEAN dependency)
+    try:
+        from engine import copper_smelting as cs
+        cue = cs.best_smelt_site_near(sim, int(row), perception_radius_m=SMELT_PERCEPT_M)
+    except Exception:
+        return None
+    if cue is None:
+        return None   # the world says: no smeltable copper site within sight
+    tx = (cue.coord[0] + 0.5) * CHUNK_SIDE_M
+    ty = (cue.coord[1] + 0.5) * CHUNK_SIDE_M
+    px, py = obs.pos[0], obs.pos[1]
+    d = math.hypot(tx - px, ty - py)
+    # Same confidence band as the other transform wires: above random EXPLORE (0.3), below survival.
+    conf = 0.30 + 0.20 * float(cue.confidence)
+    if d < INTERACT_RADIUS_M:
+        return Decision(int(ActionKind.SMELT), tx, ty, conf)
+    return Decision(int(ActionKind.WALK_TO), tx, ty, min(conf, 0.34))
+
+
 def _seek_prospect(agents, row, obs, sim):
     """Emergent prospecting — the agent loop's consumption of C1 (the 1ᵉʳ ACTE COGNITIF / VISUEL).
 
@@ -1431,6 +1492,7 @@ _ARC_SEEKS = (
     ("fuel",        _seek_fuel),          # GLEAN      · C4  combustible_outcrop
     ("kilnbuild",   _seek_kilnbuild),     # RAISE_KILN · C11 kiln_draft
     ("forcedraught", _seek_forcedraught), # FORCE_DRAUGHT · C12 forced_draught (the 2nd apparatus — raise → force)
+    ("smelt",       _seek_smelt),         # SMELT      · C13 copper_smelting (1ᵉʳ MUTATION agent — D10 crossed, ADR-0010)
     ("cure",        _seek_cure),          # CURE       · C16 food_curing (1ʳᵉ consommation d'un produit raté)
     ("ochre",       _seek_ochre),         # GRIND      · C18 ochre_grinding
     ("canvas",      _seek_canvas),        # MARK       · C20 rock_canvas
@@ -1834,6 +1896,19 @@ FORCE_FUEL_COST_KG = 1.0      # charcoal-grade fuel consumed to feed the bellows
 # prospects par vie d'agent (les « 5 mensonges du sol » à apprendre — le mensonge #21).
 PROSPECT_PERCEPT_M = 96.0     # sight range for surface mineralization stains (chunk-scale, memoised)
 PROSPECT_MAX_GROUPS = 5       # one discovery per expression group (5 in C1) — natural lifetime cap
+
+# D12 wire (2026-07-01) — smelt the copper ore under the forced-draught furnace the agent built (consumes
+# C13 copper_smelting). THE FIRST AGENT-DRIVEN MUTATION of the world: ``smelt_at`` drains a charge of ore
+# from the geology column (``geo.mine_at``), so the D10 mutation frontier — frozen through 17 wires — is
+# CROSSED here by design (ADR-0010), the payoff of PROSPECT's cognitive foundation. The agent must (a) have
+# discovered the forced-draught apparatus (only it reaches copper's 1085 °C melt point), (b) have LEARNED
+# that green earth means copper (``"copper" in prospected_ore_groups``, from PROSPECT/C1), (c) carry a
+# charcoal charge (``inv_fuel``, from GLEAN/C4). Self-limiting on a metal-sated threshold. Fire-based → D9
+# alternance 0→1 after the non-fire PROSPECT. The lie #4 lived: native green melts to a bead, the SAME
+# green chalcopyrite (a refractory sulfide) yields only slag unless roasted first.
+SMELT_PERCEPT_M = 96.0        # sight range for smeltable copper sites (chunk-scale, memoised)
+SMELT_FUEL_COST_KG = 1.0      # charcoal-grade charge a single smelt burns (from GLEAN/C4)
+SMELT_METAL_SATED_KG = 2.0    # stop seeking to smelt once this much copper is carried (self-limiting)
 
 _JITTER_PRIME_X = np.uint64(0x9E3779B97F4A7C15)
 _JITTER_PRIME_Y = np.uint64(0xBF58476D1CE4E5B9)
@@ -2711,6 +2786,80 @@ def apply_decision(agents, row, decision, streamer, tick, sim=None):
             "would_smelt_copper_here": bool(cue.would_smelt_copper_here),
             "reaches_iron_bloomery_temp": bool(cue.reaches_iron_bloomery_temp),
             "fuel_kg_spent": round(float(spent), 4),
+        })
+        return events
+
+    if act == int(ActionKind.SMELT):
+        # Smelt the copper ore under the agent in the forced-draught furnace it knows how to build (C13
+        # copper_smelting — the FIRST agent-driven MUTATION of the world: the D10 mutation frontier,
+        # frozen through 17 non-mutating wires, is CROSSED here by design, ADR-0010). It spends a
+        # charcoal charge (inv_fuel) and, via ``cs.smelt_at``, DRAINS a charge of ore from the geology
+        # column (``geo.mine_at`` — the ore truly disappears from the ground) reducing it to a bead of
+        # copper (inv_metal) + slag. The world never lies: the recovered metal equals the oracle's
+        # committed yield. The lie #4 lived: native copper runs to a bead directly; the SAME green
+        # chalcopyrite (a refractory sulfide) yields ONLY slag unless roasted first (recovered_cu_kg == 0
+        # — the ore is still consumed, the costly honest lesson). Requires the forced-draught skill + a
+        # prospected copper site + charcoal in hand. MUTATING (D10 crossed); fire-based (D9 alternance).
+        agents.vel[row, :2] = 0.0
+        if sim is None or getattr(sim, "_copper_smelt_cue_cache", None) is None:
+            return events
+        mem = agents.memory[row]
+        if mem is None or not bool(getattr(mem, "has_forced_draught", False)):
+            return events   # cannot smelt without the forced furnace (only it reaches 1085 C)
+        inv_fuel = getattr(agents, "inv_fuel", None)
+        if inv_fuel is None or float(inv_fuel[row]) < SMELT_FUEL_COST_KG:
+            return events   # no charcoal in hand to run the smelt
+        inv_metal = getattr(agents, "inv_metal", None)
+        if inv_metal is None:
+            return events
+        inv_stone = getattr(agents, "inv_stone", None)
+        metal_before = float(inv_metal[row])
+        stone_before = float(inv_stone[row]) if inv_stone is not None else None
+        try:
+            from engine import copper_smelting as cs
+            result = cs.smelt_at(sim, int(row))
+        except Exception:
+            inv_metal[row] = metal_before          # smelt_at may have partly credited inv before raising
+            if inv_stone is not None and stone_before is not None:
+                inv_stone[row] = stone_before
+            return events
+        if result is None:
+            return events   # the world says: nothing smeltable here (no hot furnace / no copper ore)
+        spent = min(SMELT_FUEL_COST_KG, float(inv_fuel[row]))
+        inv_fuel[row] = float(inv_fuel[row]) - spent
+        gained = float(result.recovered_cu_kg)
+        # ``smelt_at`` → ``geo.mine_at`` auto-credits the RAW ore mass (ore + gangue) to inv_metal /
+        # inv_stone — a legacy Wave-1 bridge. That is wrong for a smelt: the ore is REDUCED, not pocketed
+        # raw. Overwrite it with the physically honest outcome — only the recovered copper BEAD enters
+        # inv_metal, the gangue leaves as slag (inv_stone unchanged). The geology mutation (extracted_kg
+        # ↑ on the layer — the D10 crossing) lives on the column and is NOT reverted.
+        inv_metal[row] = metal_before + gained
+        if inv_stone is not None and stone_before is not None:
+            inv_stone[row] = stone_before
+        mem.has_smelted_copper = True
+        mem.last_smelt_mineral = str(result.copper_mineral)
+        mem.last_smelt_cu_kg = gained
+        locs = getattr(mem, "known_smelt_locations", None)
+        if locs is not None:
+            locs.append((px, py))
+            if len(locs) > 8:
+                locs.pop(0)
+        remember_short(agents, row, "smelt",
+                       {"mineral": result.copper_mineral, "ore_class": result.ore_class,
+                        "cu_kg": round(gained, 4)})
+        events.append({
+            "kind": "smelt",
+            "row": int(row),
+            "copper_mineral": result.copper_mineral,
+            "ore_class": result.ore_class,
+            "ore_consumed_kg": round(float(result.ore_consumed_kg), 4),
+            "recovered_cu_kg": round(gained, 6),
+            "slag_kg": round(float(result.slag_kg), 4),
+            "bead_purity": round(float(result.bead_purity), 4),
+            "roasted": bool(result.roasted),
+            "required_roasting": bool(result.required_roasting),
+            "peak_c": round(float(result.peak_c), 1),
+            "mutated_geology": True,
         })
         return events
 
