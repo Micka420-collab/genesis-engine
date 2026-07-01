@@ -116,6 +116,9 @@ class ActionKind(IntEnum):
     # pyrite yields only slag (needs roasting), over galena/sphalerite yields NO iron at all. See
     # ``cognition._seek_bloom`` / the BLOOM ``apply_decision`` arm.
     BLOOM = 35       # reduce iron-hat ore to a solid iron bloom in a forced furnace — the world decides the loupe
+    # D12 wire (2026-07-0X) — hammer-consolidate a carried iron bloom into wrought iron (consumes C19 = C17
+    # bloom × C12 forge heat).
+    FORGE = 36  # hammer-consolidate a carried iron bloom in the forge heat → wrought iron — the world decides if it's sound or cracks
 
 
 @dataclass
@@ -232,6 +235,14 @@ class EpisodicMemory:
     has_bloomed_iron: bool = False
     last_bloom_mineral: Optional[str] = None
     last_bloom_iron_kg: float = 0.0
+    # Cinglage de la loupe (C19) — la 3ᵉ MÉTALLURGIE, mais PAS une nouvelle mutation : c'est la 1ʳᵉ
+    # capacité qui ne fait que RAFFINER un produit déjà en poche (la loupe de C17), sans toucher la
+    # géologie (D10 reste gelé à 2 franchissements, SMELT et BLOOM). ``has_forged_iron`` est le drapeau
+    # de découverte (l'agent sait désormais que marteler la loupe au rouge en chasse la scorie et la
+    # consolide en fer forgé) — posé seulement si le billon rendu est SAIN (``is_wrought``) ; une loupe
+    # red-short (pyrite) martelée se fissure et ne verrouille rien, la leçon coûteuse du chapeau de fer
+    # rejouée au forgeron (mensonge #10).
+    has_forged_iron: bool = False
     capacity_short: int = 32
     capacity_long: int = 256
 

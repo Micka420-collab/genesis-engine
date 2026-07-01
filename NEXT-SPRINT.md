@@ -8,6 +8,46 @@
 
 ---
 
+## ✅ Livré (2026-07-01, D12 wire #20) — la 20ᵉ bouchée, la DERNIÈRE : FORGE consolide la loupe de C17 en fer forgé (consomme C19)
+
+**20ᵉ capacité agent consommée — arc C1→C20 fermé à 20/20** (registre `_ARC_SEEKS` : 19 entrées après
+insertion de `("forge", _seek_forge)` ; avec `C3 water_potability` déjà câblé hors registre via `DRINK`,
+**les 20 capacités C1→C20 sont désormais toutes consommées** par la boucle agent — D12 tombe). Append d'une **ligne** au registre (`("forge", _seek_forge)` **juste après `"bloom"`** — la chaîne
+métallurgique se lit désormais SMELT (cuivre) → BLOOM (fer) → FORGE (fer forgé)).
+
+- Un agent qui a **DÉJÀ GAGNÉ UNE LOUPE** (`has_bloomed_iron`, BLOOM/C17) et **PORTE** assez de fer-loupe
+  (`inv_metal ≥ FORGE_ORE_COST_KG`, 1 kg) à un site de forge assez chaud (`bloom_forging.best_forge_site_near`
+  — la **même** fournaise à tirage forcé, C12, qui l'a produite) **FORGE** (`ActionKind.FORGE = 36`) : il
+  martèle la loupe au rouge, chasse la scorie de fayalite, et le monde décide si le billon **soude** ou
+  **fissure**. **Auto-limité** (`has_forged_iron`, posé uniquement quand le billon est SAIN — un échec
+  honnête ne verrouille jamais l'agent).
+- **Transformation, pas extraction** : contrairement à SMELT/BLOOM, `bloom_forging.prospect_forge`
+  **ne mine rien** (`geo.mine_at` jamais appelé) — c'est un pur **raffinage** d'un produit déjà en poche,
+  le premier de son genre dans l'arc (comme la trempe C8 ou la cuisson C9, mais appliqué à un métal). Le
+  fer-loupe dépensé (`inv_metal`) est remplacé par du fer forgé au ratio `cue.consolidation_ratio`
+  (`wrought_iron_per_kg_ore / bloom_iron_per_kg_ore`) — la fraction de masse qui survit au cinglage.
+- **Mensonge rendu visible #10** (le fer du chapeau pyriteux se brise sous le marteau) : la **même** loupe
+  d'oxyde (hématite/magnétite) se consolide **saine** et dense sous le marteau, tandis que la loupe
+  **red-short** (pyrite — le FeS aux joints de grain fond sous la chaleur de forge) **fissure**
+  (*hot-shortness*) : rendement de fer forgé effondré, santé plafonnée bas. Le forgeron relit, plus tard et
+  plus cher, la même leçon que le fondeur (BLOOM) avait déjà apprise.
+- **Garde-fous** : **D8** (COMPOSE C19 `bloom_forging`, lui-même C17×C12×C1 ; aucun nouveau tell,
+  `PY_TO_RUST` reste **15**) · **D10** (non-mutant — `prospect_forge` ne touche jamais la géologie ; D10
+  reste exactement où SMELT/BLOOM l'ont laissé, gelé à 2 franchissements) · **D9** (fire-based — la chaleur
+  de forge est la MÊME fournaise C12 que BLOOM/SMELT ; la queue métallurgique reste structurellement liée
+  au feu, aucune nouvelle alternance) · gate sur C19 installé (inerte par défaut) · déterministe (0 RNG).
+- **Chiffres** : `test_bloom_forging_wire.py` **13 tests** (nouveau) + `test_arc_seek_registry.py` mis à
+  jour (registre → **19 entrées**) + smoke **`p176` 8/8** (seed `0x1901`, sites oxyde/pyrite injectés).
+  **pytest suite complète** avant/après documentés ci-dessous, `ruff` clean sur l'ensemble arc (`make lint`).
+  Non-régression live : **p175/p151/p173/p149 8/8** chacun (bloomery boucle, capacité forge, smelt boucle,
+  bloomery capacité — aucune régression).
+- **Veille** : étape sautée dans cette session (pas d'accès web disponible pour la recherche "veille"
+  externe habituelle) — à faire manuellement si le rituel du sprint l'exige.
+- **Reste** : les 20 capacités C1→C20 sont toutes câblées dans la boucle agent. Les piliers **langage** et
+  **bâtiments** (immobiles depuis J+0) restent la prochaine frontière à forte valeur.
+
+---
+
 ## ✅ Livré (2026-06-30) — D12 wire #16 : la boucle agent FORCE le tirage de son four (consomme C12)
 
 **16ᵉ bouchée → 16/20** et **le 2ᵉ APPAREILLAGE de l'arc** (le pendant exact de C11 : C11 *enferme*

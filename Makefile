@@ -76,6 +76,7 @@ lint:
 	  runtime/tests/test_prospect_ore_wire.py \
 	  runtime/tests/test_copper_smelt_wire.py \
 	  runtime/tests/test_iron_bloom_wire.py \
+	  runtime/tests/test_bloom_forging_wire.py \
 	  runtime/scripts/p13[3-9]_*_smoke.py runtime/scripts/p14[0-9]_*_smoke.py \
 	  runtime/scripts/p15[0-9]_*_smoke.py runtime/scripts/p16[0-9]_*_smoke.py \
 	  runtime/scripts/p17[0-9]_*_smoke.py
@@ -222,6 +223,7 @@ validate-all: test-python
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p172_prospect_ore_loop_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p173_copper_smelt_loop_smoke.py
 	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p175_iron_bloom_loop_smoke.py
+	PYTHONPATH=runtime $(PYTHON) runtime/scripts/p176_bloom_forging_wire_smoke.py
 
 maturin-dev:
 	cd native/world-engine && maturin develop -m crates/pybindings/Cargo.toml --release

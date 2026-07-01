@@ -116,6 +116,7 @@ jobs:
             p172_prospect_ore_loop_smoke.py
             p173_copper_smelt_loop_smoke.py
             p175_iron_bloom_loop_smoke.py
+            p176_bloom_forging_wire_smoke.py
           )
           for s in "${scripts[@]}"; do
             echo "=== $s ==="

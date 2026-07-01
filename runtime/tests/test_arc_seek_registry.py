@@ -29,7 +29,7 @@ from engine import cognition as cog                               # noqa: E402
 EXPECTED_ORDER = [
     "frost_clast", "toolstone", "firesite", "tempersite",
     "clay", "kiln", "limestone", "limekiln", "saltpan", "fuel", "kilnbuild",
-    "forcedraught", "smelt", "bloom", "cure", "ochre", "canvas", "prospect",
+    "forcedraught", "smelt", "bloom", "forge", "cure", "ochre", "canvas", "prospect",
 ]
 
 
@@ -53,6 +53,7 @@ def test_registry_entries_map_to_real_seek_callables():
         "forcedraught": cog._seek_forcedraught,
         "smelt": cog._seek_smelt,
         "bloom": cog._seek_bloom,
+        "forge": cog._seek_forge,
         "cure": cog._seek_cure,
         "ochre": cog._seek_ochre,
         "canvas": cog._seek_canvas,
