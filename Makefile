@@ -62,8 +62,10 @@ lint:
 	  runtime/engine/climate_biome.py \
 	  runtime/engine/river_discharge.py \
 	  runtime/engine/lake_hydrology.py \
+	  runtime/engine/fill_spill_merge.py \
 	  runtime/tests/test_geology_cross_language_contract.py \
 	  runtime/tests/test_lake_hydrology.py \
+	  runtime/tests/test_fill_spill_merge.py \
 	  runtime/tests/test_drink_potability.py \
 	  runtime/tests/test_lithic_knapping_loop.py \
 	  runtime/tests/test_frost_clast_gather_loop.py \
